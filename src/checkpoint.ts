@@ -1,0 +1,144 @@
+/**
+ * File-level checkpointing for resumable execution.
+ * Uses a JSON file to record status per file so runs can resume after interruption.
+ * (No native modules - works on Windows without Visual Studio build tools.)
+ */
+
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import type { CheckpointRecord, CheckpointStatus } from './types.js';
+
+const RUN_ID_KEY = 'current_run_id';
+
+interface CheckpointRow {
+  file_path: string;
+  relative_path: string;
+  brand: string;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  latency_ms: number | null;
+  status_code: number | null;
+  error_message: string | null;
+  run_id: string;
+}
+
+interface CheckpointStore {
+  run_meta: Record<string, string>;
+  checkpoints: CheckpointRow[];
+}
+
+export interface CheckpointDb {
+  _path: string;
+  _data: CheckpointStore;
+}
+
+function jsonPath(checkpointPath: string): string {
+  return checkpointPath.replace(/\.sqlite$/i, '.json') || checkpointPath + '.json';
+}
+
+function loadStore(path: string): CheckpointStore {
+  if (!existsSync(path)) {
+    return { run_meta: {}, checkpoints: [] };
+  }
+  const raw = readFileSync(path, 'utf-8');
+  try {
+    return JSON.parse(raw) as CheckpointStore;
+  } catch {
+    return { run_meta: {}, checkpoints: [] };
+  }
+}
+
+function saveStore(db: CheckpointDb): void {
+  mkdirSync(dirname(db._path), { recursive: true });
+  writeFileSync(db._path, JSON.stringify(db._data, null, 0), 'utf-8');
+}
+
+function rowToRecord(r: CheckpointRow): CheckpointRecord {
+  return {
+    filePath: r.file_path,
+    relativePath: r.relative_path,
+    brand: r.brand,
+    status: r.status as CheckpointStatus,
+    startedAt: r.started_at ?? undefined,
+    finishedAt: r.finished_at ?? undefined,
+    latencyMs: r.latency_ms ?? undefined,
+    statusCode: r.status_code ?? undefined,
+    errorMessage: r.error_message ?? undefined,
+    runId: r.run_id,
+  };
+}
+
+function recordToRow(record: CheckpointRecord): CheckpointRow {
+  return {
+    file_path: record.filePath,
+    relative_path: record.relativePath,
+    brand: record.brand,
+    status: record.status,
+    started_at: record.startedAt ?? null,
+    finished_at: record.finishedAt ?? null,
+    latency_ms: record.latencyMs ?? null,
+    status_code: record.statusCode ?? null,
+    error_message: record.errorMessage ?? null,
+    run_id: record.runId,
+  };
+}
+
+export function openCheckpointDb(checkpointPath: string): CheckpointDb {
+  const path = jsonPath(checkpointPath);
+  const dir = dirname(path);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const _data = loadStore(path);
+  if (!_data.run_meta) _data.run_meta = {};
+  if (!Array.isArray(_data.checkpoints)) _data.checkpoints = [];
+  return { _path: path, _data };
+}
+
+export function startRun(db: CheckpointDb): string {
+  const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  db._data.run_meta[RUN_ID_KEY] = runId;
+  saveStore(db);
+  return runId;
+}
+
+export function getCurrentRunId(db: CheckpointDb): string | null {
+  return db._data.run_meta[RUN_ID_KEY] ?? null;
+}
+
+export function getOrCreateRunId(db: CheckpointDb): string {
+  let runId = getCurrentRunId(db);
+  if (!runId) {
+    runId = startRun(db);
+  }
+  return runId;
+}
+
+export function upsertCheckpoint(db: CheckpointDb, record: CheckpointRecord): void {
+  const row = recordToRow(record);
+  const idx = db._data.checkpoints.findIndex((c) => c.file_path === record.filePath);
+  if (idx >= 0) {
+    db._data.checkpoints[idx] = row;
+  } else {
+    db._data.checkpoints.push(row);
+  }
+  saveStore(db);
+}
+
+export function isCompleted(db: CheckpointDb, runId: string, filePath: string): boolean {
+  const row = db._data.checkpoints.find((c) => c.file_path === filePath && c.run_id === runId);
+  return row?.status === 'done';
+}
+
+export function getCompletedPaths(db: CheckpointDb, runId: string): Set<string> {
+  const rows = db._data.checkpoints.filter((c) => c.run_id === runId && c.status === 'done');
+  return new Set(rows.map((r) => r.file_path));
+}
+
+export function getRecordsForRun(db: CheckpointDb, runId: string): CheckpointRecord[] {
+  const rows = db._data.checkpoints.filter((c) => c.run_id === runId);
+  return rows.map(rowToRecord);
+}
+
+export function closeCheckpointDb(db: CheckpointDb): void {
+  saveStore(db);
+}

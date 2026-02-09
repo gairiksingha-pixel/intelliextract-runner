@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+config/config.yaml
+*.db
+output/logs/*.jsonl
+output/checkpoints/*.db
+output/staging/
+output/reports/*.md
+output/reports/*.html
+output/reports/*.json
+output/reports/*.pdf
+.DS_Store
+*.log

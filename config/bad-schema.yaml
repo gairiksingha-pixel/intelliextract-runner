@@ -1,0 +1,6 @@
+# Missing required fields for test N3 (no api.baseUrl, no s3.buckets etc.)
+api:
+  timeoutMs: 5000
+s3:
+  stagingDir: ./out
+  region: us-east-1

@@ -1,0 +1,154 @@
+/**
+ * Load engine: run extraction with configurable concurrency and optional rate limiting.
+ * Uses p-queue for concurrency and requests-per-second cap.
+ */
+
+import PQueue from 'p-queue';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import type { Config, CheckpointRecord } from './types.js';
+import { extract } from './api-client.js';
+import { openCheckpointDb, getOrCreateRunId, getCompletedPaths, upsertCheckpoint, getRecordsForRun, closeCheckpointDb } from './checkpoint.js';
+import { initRequestResponseLogger, logRequestResponse, closeRequestResponseLogger } from './logger.js';
+
+export interface FileJob {
+  filePath: string;
+  relativePath: string;
+  brand: string;
+}
+
+export interface LoadEngineResult {
+  runId: string;
+  records: CheckpointRecord[];
+  startedAt: Date;
+  finishedAt: Date;
+}
+
+function discoverStagingFiles(stagingDir: string, buckets: { name: string }[]): FileJob[] {
+  const jobs: FileJob[] = [];
+  for (const bucket of buckets) {
+    const brandDir = join(stagingDir, bucket.name);
+    if (!existsSync(brandDir)) continue;
+    const walk = (dir: string) => {
+      const entries = readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        const full = join(dir, e.name);
+        const rel = relative(brandDir, full);
+        if (e.isDirectory()) walk(full);
+        else jobs.push({ filePath: full, relativePath: rel, brand: bucket.name });
+      }
+    };
+    walk(brandDir);
+  }
+  return jobs;
+}
+
+/**
+ * Run extraction against all staging files with concurrency and optional rate limit.
+ * Checkpoints each file so the run can be resumed.
+ * @param options.extractLimit - Max number of files to process (0 = no limit). Overrides config when set from CLI.
+ */
+export async function runExtraction(
+  config: Config,
+  options?: { extractLimit?: number }
+): Promise<LoadEngineResult> {
+  const db = openCheckpointDb(config.run.checkpointPath);
+  const runId = getOrCreateRunId(db);
+  const completed = config.run.skipCompleted ? getCompletedPaths(db, runId) : new Set<string>();
+  initRequestResponseLogger(config, runId);
+
+  const jobs = discoverStagingFiles(config.s3.stagingDir, config.s3.buckets);
+  let toProcess = jobs.filter((j) => !completed.has(j.filePath));
+  const extractLimit = options?.extractLimit;
+  if (extractLimit !== undefined && extractLimit > 0) {
+    toProcess = toProcess.slice(0, extractLimit);
+  }
+  const concurrency = config.run.concurrency;
+  const intervalCap = config.run.requestsPerSecond > 0 ? config.run.requestsPerSecond : undefined;
+  const queueOptions: { concurrency: number; interval?: number; intervalCap?: number } = { concurrency };
+  if (intervalCap != null) {
+    queueOptions.interval = 1000;
+    queueOptions.intervalCap = intervalCap;
+  }
+  const queue = new PQueue(queueOptions);
+  const startedAt = new Date();
+
+  for (const job of toProcess) {
+    queue.add(async () => {
+      const started = new Date().toISOString();
+      upsertCheckpoint(db, {
+        filePath: job.filePath,
+        relativePath: job.relativePath,
+        brand: job.brand,
+        status: 'running',
+        startedAt: started,
+        runId,
+      });
+
+      let bodyBase64: string | undefined;
+      try {
+        bodyBase64 = readFileSync(job.filePath, { encoding: 'base64' });
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        upsertCheckpoint(db, {
+          filePath: job.filePath,
+          relativePath: job.relativePath,
+          brand: job.brand,
+          status: 'error',
+          startedAt: started,
+          finishedAt: new Date().toISOString(),
+          errorMessage: `Read file: ${errMsg}`,
+          runId,
+        });
+        return;
+      }
+
+      const result = await extract(config, {
+        filePath: job.filePath,
+        fileContentBase64: bodyBase64,
+        brand: job.brand,
+      });
+
+      logRequestResponse({
+        runId,
+        filePath: job.filePath,
+        brand: job.brand,
+        request: {
+          method: 'POST',
+          url: `${config.api.baseUrl}/extract`,
+          bodyPreview: undefined,
+          bodyLength: bodyBase64?.length,
+        },
+        response: {
+          statusCode: result.statusCode,
+          latencyMs: result.latencyMs,
+          bodyPreview: result.body.slice(0, 500),
+          bodyLength: result.body.length,
+          headers: result.headers,
+        },
+        success: result.success,
+      });
+
+      const status = result.success ? 'done' : 'error';
+      upsertCheckpoint(db, {
+        filePath: job.filePath,
+        relativePath: job.relativePath,
+        brand: job.brand,
+        status,
+        startedAt: started,
+        finishedAt: new Date().toISOString(),
+        latencyMs: result.latencyMs,
+        statusCode: result.statusCode,
+        errorMessage: result.success ? undefined : result.body.slice(0, 500),
+        runId,
+      });
+    });
+  }
+
+  await queue.onIdle();
+  const finishedAt = new Date();
+  const records = getRecordsForRun(db, runId);
+  closeRequestResponseLogger();
+  closeCheckpointDb(db);
+  return { runId, records, startedAt, finishedAt };
+}

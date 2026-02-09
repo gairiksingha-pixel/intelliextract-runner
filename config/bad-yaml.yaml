@@ -1,0 +1,6 @@
+# Invalid YAML for test N2
+api:
+  baseUrl: "unclosed quote
+  timeoutMs: 5000
+s3: [
+  buckets: []
