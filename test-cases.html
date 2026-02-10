@@ -36,13 +36,17 @@
       position: sticky;
       top: 0;
       z-index: 10;
+      background: var(--bg);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0.75rem 1.5rem;
       display: flex;
       align-items: center;
       gap: 1.5rem;
-      padding: 0.75rem 1.5rem;
-      background: var(--bg);
       flex-wrap: wrap;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
     .header-right {
       margin-left: auto;
@@ -243,15 +247,17 @@
 </head>
 <body>
   <header class="header">
-    <img src="/assets/logo.png" alt="intellirevenue" class="logo" id="logo-img">
-    <span class="logo-placeholder" style="display:none;">intellirevenue</span>
-    <div>
-      <h1>EntelliExtract Test Cases</h1>
-      <p class="subtitle">Run test cases from the browser. Click <strong>Run</strong> to execute a case.</p>
-    </div>
-    <div class="header-right">
-      <span class="server-status" id="server-check">Checking…</span>
-      <button type="button" class="header-reload" id="header-reload" title="Reload page">↻ Reload</button>
+    <div class="header-inner">
+      <img src="/assets/logo.png" alt="intellirevenue" class="logo" id="logo-img">
+      <span class="logo-placeholder" style="display:none;">intellirevenue</span>
+      <div>
+        <h1>EntelliExtract Test Cases</h1>
+        <p class="subtitle">Run test cases from the browser. Click <strong>Run</strong> to execute a case.</p>
+      </div>
+      <div class="header-right">
+        <span class="server-status" id="server-check">Checking…</span>
+        <button type="button" class="header-reload" id="header-reload" title="Reload page">↻ Reload</button>
+      </div>
     </div>
   </header>
 
