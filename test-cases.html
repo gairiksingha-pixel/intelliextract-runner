@@ -1,463 +1,789 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EntelliExtract Test Cases – intellirevenue</title>
-  <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
-  <style>
-    :root {
-      --bg: #ffffff;
-      --surface: #fafafa;
-      --text: #333333;
-      --text-secondary: #555555;
-      --border: #e0e0e0;
-      --accent: #009688;
-      --accent-light: #e6f7f2;
-      --primary: #32C778;
-      --primary-hover: #2ab369;
-      --pass: #2e7d32;
-      --pass-bg: #e8f5e9;
-      --fail: #c62828;
-      --fail-bg: #ffebee;
-      --muted: #9e9e9e;
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 0;
-      line-height: 1.5;
-      font-size: 14px;
-    }
-    .header {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: var(--bg);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-    .header-inner {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0.75rem 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-    }
-    .header-right {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-shrink: 0;
-    }
-    .server-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.35rem 0.65rem;
-      border-radius: 6px;
-      font-size: 0.8125rem;
-      font-weight: 500;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-    }
-    .server-status.connected {
-      background: var(--pass-bg);
-      border-color: var(--pass);
-      color: var(--pass);
-    }
-    .server-status.disconnected {
-      background: var(--fail-bg);
-      border-color: var(--fail);
-      color: var(--fail);
-    }
-    .server-status::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: currentColor;
-    }
-    button.header-reload {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.4rem 0.75rem;
-      border-radius: 6px;
-      font-size: 0.8125rem;
-      font-weight: 500;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-      cursor: pointer;
-      font-family: inherit;
-    }
-    button.header-reload:hover {
-      background: var(--accent-light);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-    .header .logo {
-      height: 32px;
-      width: auto;
-      display: block;
-      object-fit: contain;
-    }
-    .header .logo-placeholder {
-      height: 32px;
-      display: flex;
-      align-items: center;
-      font-weight: 600;
-      color: var(--accent);
-      font-size: 1.1rem;
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .header .subtitle {
-      margin: 0;
-      color: var(--text-secondary);
-      font-size: 0.875rem;
-      font-weight: 400;
-    }
-    .main {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 1rem 1.5rem 2rem;
-    }
-    .limits-cell { font-size: 0.8rem; color: var(--text-secondary); }
-    .limits-cell .limit-row {
-      display: grid;
-      grid-template-columns: 4.5rem 4.5rem;
-      gap: 0.25rem 0.5rem;
-      align-items: center;
-    }
-    .limits-cell .limit-label { white-space: nowrap; }
-    .limits-cell input[type="number"] {
-      width: 4rem;
-      padding: 0.25rem 0.4rem;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 0.8rem;
-      box-sizing: border-box;
-    }
-    .limits-cell .n/a { color: var(--muted); font-style: italic; }
-    h2 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text);
-      margin-top: 1.5rem;
-      margin-bottom: 0.5rem;
-      padding-bottom: 0.35rem;
-
-    }
-    h2:first-of-type { margin-top: 0; }
-    .table-section {
-      padding: 0;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      margin-bottom: 1.25rem;
-      overflow: hidden;
-    }
-    .table-section table {
-      width: 100%;
-      min-width: 1100px;
-      table-layout: fixed;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-      background: var(--bg);
-    }
-    th, td {
-      padding: 0.5rem 0.75rem;
-      text-align: left;
-      border: 1px solid var(--border);
-      vertical-align: top;
-    }
-    th {
-      background: var(--surface);
-      color: var(--text);
-      font-weight: 600;
-    }
-    thead th { border-bottom: none; }
-    tr:hover td { background: var(--surface); }
-    .id { width: 3rem; font-weight: 600; color: var(--accent); }
-    .scenario { width: 12rem; word-break: break-word; }
-    .command { width: 18rem; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 0.8rem; word-break: break-all; color: var(--text-secondary); }
-    .expected { width: 12rem; word-break: break-word; font-size: 0.8rem; color: var(--muted); }
-    .limits-col { width: 11rem; }
-    .run-cell { width: 8rem; text-align: center; }
-    .run-cell .btn-group { display: flex; gap: 0.35rem; justify-content: center; flex-wrap: wrap; }
-    .result-cell {
-      width: 20rem;
-      min-width: 20rem;
-      max-width: 20rem;
-      vertical-align: top;
-    }
-    button.run {
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      padding: 0.4rem 0.75rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    button.run:hover { background: var(--primary-hover); }
-    button.run:disabled { opacity: 0.6; cursor: not-allowed; }
-    button.reset-case {
-      background: var(--bg);
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
-      padding: 0.4rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    button.reset-case:hover { background: var(--surface); color: var(--text); }
-    .result {
-      font-family: ui-monospace, 'SF Mono', Consolas, monospace;
-      font-size: 0.75rem;
-      margin-top: 0.35rem;
-      padding: 0.5rem;
-      border-radius: 4px;
-      white-space: pre-wrap;
-      word-break: break-all;
-      border-left: 3px solid var(--border);
-    }
-    .result.pass { background: var(--pass-bg); border-left-color: var(--pass); }
-    .result.fail { background: var(--fail-bg); border-left-color: var(--fail); }
-    .result.running { background: var(--accent-light); border-left-color: var(--accent); }
-    .result .exit { font-weight: 600; margin-bottom: 0.2rem; color: var(--text); }
-    .result .out { color: var(--text-secondary); }
-    code { background: var(--surface); padding: 0.15rem 0.35rem; border-radius: 3px; font-size: 0.85em; border: 1px solid var(--border); }
-  </style>
-</head>
-<body>
-  <header class="header">
-    <div class="header-inner">
-      <img src="/assets/logo.png" alt="intellirevenue" class="logo" id="logo-img">
-      <span class="logo-placeholder" style="display:none;">intellirevenue</span>
-      <div>
-        <h1>EntelliExtract Test Cases</h1>
-        <p class="subtitle">Run test cases from the browser. Click <strong>Run</strong> to execute a case.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EntelliExtract Test Cases – intellirevenue</title>
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+    <style>
+      :root {
+        --bg: #ffffff;
+        --surface: #fafafa;
+        --text: #333333;
+        --text-secondary: #555555;
+        --border: #e0e0e0;
+        --accent: #009688;
+        --accent-light: #e6f7f2;
+        --primary: #32c778;
+        --primary-hover: #2ab369;
+        --pass: #2e7d32;
+        --pass-bg: #e8f5e9;
+        --fail: #c62828;
+        --fail-bg: #ffebee;
+        --muted: #9e9e9e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 0;
+        line-height: 1.5;
+        font-size: 14px;
+      }
+      .header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--bg);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+      .header-inner {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+      }
+      .header-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-shrink: 0;
+      }
+      .server-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 6px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+      }
+      .server-status.connected {
+        background: var(--pass-bg);
+        border-color: var(--pass);
+        color: var(--pass);
+      }
+      .server-status.disconnected {
+        background: var(--fail-bg);
+        border-color: var(--fail);
+        color: var(--fail);
+      }
+      .server-status::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      button.header-reload {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        cursor: pointer;
+        font-family: inherit;
+      }
+      button.header-reload:hover {
+        background: var(--accent-light);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .header .logo {
+        height: 32px;
+        width: auto;
+        display: block;
+        object-fit: contain;
+      }
+      .header .logo-placeholder {
+        height: 32px;
+        display: flex;
+        align-items: center;
+        font-weight: 600;
+        color: var(--accent);
+        font-size: 1.1rem;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .header .subtitle {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        font-weight: 400;
+      }
+      .main {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1rem 1.5rem 2rem;
+      }
+      .limits-cell {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+      }
+      .limits-cell .limit-row {
+        display: grid;
+        grid-template-columns: 4.5rem 4.5rem;
+        gap: 0.25rem 0.5rem;
+        align-items: center;
+      }
+      .limits-cell .limit-label {
+        white-space: nowrap;
+      }
+      .limits-cell input[type="number"] {
+        width: 4rem;
+        padding: 0.25rem 0.4rem;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-size: 0.8rem;
+        box-sizing: border-box;
+      }
+      .limits-cell .n/a {
+        color: var(--muted);
+        font-style: italic;
+      }
+      h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.35rem;
+      }
+      h2:first-of-type {
+        margin-top: 0;
+      }
+      .table-section {
+        padding: 0;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        margin-bottom: 1.25rem;
+        overflow: hidden;
+      }
+      .table-section table {
+        width: 100%;
+        min-width: 1100px;
+        table-layout: fixed;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+        background: var(--bg);
+      }
+      th,
+      td {
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        border: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th {
+        background: var(--surface);
+        color: var(--text);
+        font-weight: 600;
+      }
+      thead th {
+        border-bottom: none;
+      }
+      tr:hover td {
+        background: var(--surface);
+      }
+      .id {
+        width: 3rem;
+        font-weight: 600;
+        color: var(--accent);
+      }
+      .scenario {
+        width: 12rem;
+        word-break: break-word;
+      }
+      .command {
+        width: 18rem;
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 0.8rem;
+        word-break: break-all;
+        color: var(--text-secondary);
+      }
+      .expected {
+        width: 12rem;
+        word-break: break-word;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .limits-col {
+        width: 11rem;
+      }
+      .run-cell {
+        width: 8rem;
+        text-align: center;
+      }
+      .run-cell .btn-group {
+        display: flex;
+        gap: 0.35rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .result-cell {
+        width: 20rem;
+        min-width: 20rem;
+        max-width: 20rem;
+        vertical-align: top;
+      }
+      button.run {
+        background: var(--primary);
+        color: #fff;
+        border: none;
+        padding: 0.4rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      button.run:hover {
+        background: var(--primary-hover);
+      }
+      button.run:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      button.reset-case {
+        background: var(--bg);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+        padding: 0.4rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      button.reset-case:hover {
+        background: var(--surface);
+        color: var(--text);
+      }
+      .result {
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 0.75rem;
+        margin-top: 0.35rem;
+        padding: 0.5rem;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        border-left: 3px solid var(--border);
+      }
+      .result.pass {
+        background: var(--pass-bg);
+        border-left-color: var(--pass);
+      }
+      .result.fail {
+        background: var(--fail-bg);
+        border-left-color: var(--fail);
+      }
+      .result.running {
+        background: var(--accent-light);
+        border-left-color: var(--accent);
+      }
+      .result .exit {
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+        color: var(--text);
+      }
+      .result .out {
+        color: var(--text-secondary);
+      }
+      code {
+        background: var(--surface);
+        padding: 0.15rem 0.35rem;
+        border-radius: 3px;
+        font-size: 0.85em;
+        border: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-inner">
+        <img
+          src="/assets/logo.png"
+          alt="intellirevenue"
+          class="logo"
+          id="logo-img"
+        />
+        <span class="logo-placeholder" style="display: none"
+          >intellirevenue</span
+        >
+        <div>
+          <h1>EntelliExtract Test Cases</h1>
+          <p class="subtitle">
+            Run test cases from the browser. Click <strong>Run</strong> to
+            execute a case.
+          </p>
+        </div>
+        <div class="header-right">
+          <span class="server-status" id="server-check">Checking…</span>
+          <button
+            type="button"
+            class="header-reload"
+            id="header-reload"
+            title="Reload page"
+          >
+            ↻ Reload
+          </button>
+        </div>
       </div>
-      <div class="header-right">
-        <span class="server-status" id="server-check">Checking…</span>
-        <button type="button" class="header-reload" id="header-reload" title="Reload page">↻ Reload</button>
+    </header>
+
+    <main class="main">
+      <h2>Positive (P1–P10)</h2>
+      <div class="table-section">
+        <table>
+          <thead>
+            <tr>
+              <th class="id">ID</th>
+              <th class="scenario">Scenario</th>
+              <th class="command">Command</th>
+              <th class="expected">Expected</th>
+              <th class="limits-col">File limits (0 = no limit)</th>
+              <th class="run-cell"></th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="positive"></tbody>
+        </table>
       </div>
-    </div>
-  </header>
 
-  <main class="main">
-    <h2>Positive (P1–P10)</h2>
-    <div class="table-section">
-      <table>
-        <thead>
-          <tr><th class="id">ID</th><th class="scenario">Scenario</th><th class="command">Command</th><th class="expected">Expected</th><th class="limits-col">File limits (0 = no limit)</th><th class="run-cell"></th><th>Result</th></tr>
-        </thead>
-        <tbody id="positive"></tbody>
-      </table>
-    </div>
+      <h2>Negative (N1–N6)</h2>
+      <div class="table-section">
+        <table>
+          <thead>
+            <tr>
+              <th class="id">ID</th>
+              <th class="scenario">Scenario</th>
+              <th class="command">Command</th>
+              <th class="expected">Expected</th>
+              <th class="limits-col">File limits (0 = no limit)</th>
+              <th class="run-cell"></th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="negative"></tbody>
+        </table>
+      </div>
 
-    <h2>Negative (N1–N6)</h2>
-    <div class="table-section">
-      <table>
-        <thead>
-          <tr><th class="id">ID</th><th class="scenario">Scenario</th><th class="command">Command</th><th class="expected">Expected</th><th class="limits-col">File limits (0 = no limit)</th><th class="run-cell"></th><th>Result</th></tr>
-        </thead>
-        <tbody id="negative"></tbody>
-      </table>
-    </div>
+      <h2>Edge (E1–E8)</h2>
+      <div class="table-section">
+        <table>
+          <thead>
+            <tr>
+              <th class="id">ID</th>
+              <th class="scenario">Scenario</th>
+              <th class="command">Command</th>
+              <th class="expected">Expected</th>
+              <th class="limits-col">File limits (0 = no limit)</th>
+              <th class="run-cell"></th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="edge"></tbody>
+        </table>
+      </div>
+    </main>
 
-    <h2>Edge (E1–E8)</h2>
-    <div class="table-section">
-      <table>
-        <thead>
-          <tr><th class="id">ID</th><th class="scenario">Scenario</th><th class="command">Command</th><th class="expected">Expected</th><th class="limits-col">File limits (0 = no limit)</th><th class="run-cell"></th><th>Result</th></tr>
-        </thead>
-        <tbody id="edge"></tbody>
-      </table>
-    </div>
-  </main>
+    <script type="module">
+      (function () {
+        var logo = document.getElementById("logo-img");
+        var placeholder = logo && logo.nextElementSibling;
+        if (logo) {
+          if (location.protocol === "file:") logo.src = "assets/logo.png";
+          logo.addEventListener("error", function () {
+            logo.style.display = "none";
+            if (placeholder) placeholder.style.display = "flex";
+          });
+        }
+      })();
+      const CASES = {
+        positive: [
+          {
+            id: "P1",
+            scenario: "Sync (valid config)",
+            cmd: "npm start sync",
+            expected: "Exit 0, files in staging",
+            limits: { sync: true, extract: false },
+          },
+          {
+            id: "P2",
+            scenario: "Run extraction",
+            cmd: "npm start run -- --no-sync",
+            expected: "Exit 0, report + log",
+            limits: { sync: false, extract: true },
+          },
+          {
+            id: "P3",
+            scenario: "Report (last run)",
+            cmd: "npm start report",
+            expected: "Exit 0, report files",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "P4",
+            scenario: "Report (by run ID)",
+            cmd: "npm start report -- --run-id <id>",
+            expected: "Exit 0, report for run",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "P5",
+            scenario: "Custom config",
+            cmd: "npm start sync -c config/config.yaml",
+            expected: "Exit 0",
+            limits: { sync: true, extract: false },
+          },
+          {
+            id: "P6",
+            scenario: "Run, no report",
+            cmd: "npm start run -- --no-sync --no-report",
+            expected: "Exit 0, no new reports",
+            limits: { sync: false, extract: true },
+          },
+          {
+            id: "P7",
+            scenario: "Req 1 Full pipeline",
+            cmd: "npm start run",
+            expected: "Exit 0, sync then run all",
+            limits: { sync: true, extract: true },
+          },
+          {
+            id: "P8",
+            scenario: "Req 2 Log structure",
+            cmd: "Inspect output/logs/*.jsonl",
+            expected: "JSONL: runId, filePath, request, response",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "P9",
+            scenario: "Req 4 Benchmark in report",
+            cmd: "Open report",
+            expected: "Throughput, P95, error rate",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "P10",
+            scenario: "Req 5 Report formats",
+            cmd: "npm start report",
+            expected: "Exit 0, .md + .html + .json",
+            limits: { sync: false, extract: false },
+          },
+        ],
+        negative: [
+          {
+            id: "N1",
+            scenario: "Config missing",
+            cmd: "sync -c config/nonexistent.yaml",
+            expected: "Exit 1, Failed to load config",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "N2",
+            scenario: "Invalid YAML",
+            cmd: "sync -c config/bad-yaml.yaml",
+            expected: "Exit 1, Invalid YAML",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "N3",
+            scenario: "Invalid config",
+            cmd: "sync -c config/bad-schema.yaml",
+            expected: "Exit 1, Missing or invalid",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "N4",
+            scenario: "No prior run",
+            cmd: "report (no last-run-id.txt)",
+            expected: "Exit 1, No last run found",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "N5",
+            scenario: "Bad run ID",
+            cmd: "report --run-id run_000...fake",
+            expected: "Exit 1, No records found",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "N6",
+            scenario: "Sync fails (AWS)",
+            cmd: "sync (wrong creds/bucket)",
+            expected: "Exit 1, Sync failed",
+            limits: { sync: true, extract: false },
+          },
+        ],
+        edge: [
+          {
+            id: "E1",
+            scenario: "Empty staging",
+            cmd: "run --no-sync",
+            expected: "Exit 0, Success: 0, Failed: 0",
+            limits: { sync: false, extract: true },
+          },
+          {
+            id: "E2",
+            scenario: "All API fail",
+            cmd: "run --no-sync",
+            expected: "Exit 0, Failed: N, anomalies",
+            limits: { sync: false, extract: true },
+          },
+          {
+            id: "E3",
+            scenario: "Resume after stop",
+            cmd: "run --no-sync (twice)",
+            expected: "2nd run skips done files",
+            limits: { sync: false, extract: true },
+          },
+          {
+            id: "E4",
+            scenario: "Empty S3 bucket",
+            cmd: "sync",
+            expected: "Exit 0, synced 0, errors 0",
+            limits: { sync: true, extract: false },
+          },
+          {
+            id: "E5",
+            scenario: "S3 partial failures",
+            cmd: "sync",
+            expected: "Exit 0, errors M>0",
+            limits: { sync: true, extract: false },
+          },
+          {
+            id: "E6",
+            scenario: "Report (all failed)",
+            cmd: "report --run-id <id>",
+            expected: "Exit 0, failed count, anomalies",
+            limits: { sync: false, extract: false },
+          },
+          {
+            id: "E7",
+            scenario: "Corrupt checkpoint",
+            cmd: "checkpoint.json={} then run",
+            expected: "Exit 0, new run ID",
+            limits: { sync: false, extract: true },
+          },
+          {
+            id: "E8",
+            scenario: "Req 4 Concurrency/rate",
+            cmd: "run --no-sync",
+            expected: "Exit 0, under cap",
+            limits: { sync: false, extract: true },
+          },
+        ],
+      };
 
-  <script type="module">
-    (function() {
-      var logo = document.getElementById('logo-img');
-      var placeholder = logo && logo.nextElementSibling;
-      if (logo) {
-        if (location.protocol === 'file:') logo.src = 'assets/logo.png';
-        logo.addEventListener('error', function() {
-          logo.style.display = 'none';
-          if (placeholder) placeholder.style.display = 'flex';
-        });
+      function renderLimitsCell(c) {
+        const lim = c.limits || { sync: false, extract: false };
+        if (!lim.sync && !lim.extract) {
+          return '<td class="limits-cell"><span class="n/a">—</span></td>';
+        }
+        var html = '<td class="limits-cell"><div class="limit-row">';
+        if (lim.sync) {
+          html +=
+            '<span class="limit-label">Sync:</span><input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to download. 0 = no limit">';
+        }
+        if (lim.extract) {
+          html +=
+            '<span class="limit-label">Extract:</span><input type="number" class="limit-extract" min="0" step="1" value="0" title="Max files to extract. 0 = no limit">';
+        }
+        html += "</div></td>";
+        return html;
       }
-    })();
-    const CASES = {
-      positive: [
-        { id: 'P1', scenario: 'Sync (valid config)', cmd: 'npm start sync', expected: 'Exit 0, files in staging', limits: { sync: true, extract: false } },
-        { id: 'P2', scenario: 'Run extraction', cmd: 'npm start run -- --no-sync', expected: 'Exit 0, report + log', limits: { sync: false, extract: true } },
-        { id: 'P3', scenario: 'Report (last run)', cmd: 'npm start report', expected: 'Exit 0, report files', limits: { sync: false, extract: false } },
-        { id: 'P4', scenario: 'Report (by run ID)', cmd: 'npm start report -- --run-id <id>', expected: 'Exit 0, report for run', limits: { sync: false, extract: false } },
-        { id: 'P5', scenario: 'Custom config', cmd: 'npm start sync -c config/config.yaml', expected: 'Exit 0', limits: { sync: true, extract: false } },
-        { id: 'P6', scenario: 'Run, no report', cmd: 'npm start run -- --no-sync --no-report', expected: 'Exit 0, no new reports', limits: { sync: false, extract: true } },
-        { id: 'P7', scenario: 'Req 1 Full pipeline', cmd: 'npm start run', expected: 'Exit 0, sync then run all', limits: { sync: true, extract: true } },
-        { id: 'P8', scenario: 'Req 2 Log structure', cmd: 'Inspect output/logs/*.jsonl', expected: 'JSONL: runId, filePath, request, response', limits: { sync: false, extract: false } },
-        { id: 'P9', scenario: 'Req 4 Benchmark in report', cmd: 'Open report', expected: 'Throughput, P95, error rate', limits: { sync: false, extract: false } },
-        { id: 'P10', scenario: 'Req 5 Report formats', cmd: 'npm start report', expected: 'Exit 0, .md + .html + .json', limits: { sync: false, extract: false } },
-      ],
-      negative: [
-        { id: 'N1', scenario: 'Config missing', cmd: 'sync -c config/nonexistent.yaml', expected: 'Exit 1, Failed to load config', limits: { sync: false, extract: false } },
-        { id: 'N2', scenario: 'Invalid YAML', cmd: 'sync -c config/bad-yaml.yaml', expected: 'Exit 1, Invalid YAML', limits: { sync: false, extract: false } },
-        { id: 'N3', scenario: 'Invalid config', cmd: 'sync -c config/bad-schema.yaml', expected: 'Exit 1, Missing or invalid', limits: { sync: false, extract: false } },
-        { id: 'N4', scenario: 'No prior run', cmd: 'report (no last-run-id.txt)', expected: 'Exit 1, No last run found', limits: { sync: false, extract: false } },
-        { id: 'N5', scenario: 'Bad run ID', cmd: 'report --run-id run_000...fake', expected: 'Exit 1, No records found', limits: { sync: false, extract: false } },
-        { id: 'N6', scenario: 'Sync fails (AWS)', cmd: 'sync (wrong creds/bucket)', expected: 'Exit 1, Sync failed', limits: { sync: true, extract: false } },
-      ],
-      edge: [
-        { id: 'E1', scenario: 'Empty staging', cmd: 'run --no-sync', expected: 'Exit 0, Success: 0, Failed: 0', limits: { sync: false, extract: true } },
-        { id: 'E2', scenario: 'All API fail', cmd: 'run --no-sync', expected: 'Exit 0, Failed: N, anomalies', limits: { sync: false, extract: true } },
-        { id: 'E3', scenario: 'Resume after stop', cmd: 'run --no-sync (twice)', expected: '2nd run skips done files', limits: { sync: false, extract: true } },
-        { id: 'E4', scenario: 'Empty S3 bucket', cmd: 'sync', expected: 'Exit 0, synced 0, errors 0', limits: { sync: true, extract: false } },
-        { id: 'E5', scenario: 'S3 partial failures', cmd: 'sync', expected: 'Exit 0, errors M>0', limits: { sync: true, extract: false } },
-        { id: 'E6', scenario: 'Report (all failed)', cmd: 'report --run-id <id>', expected: 'Exit 0, failed count, anomalies', limits: { sync: false, extract: false } },
-        { id: 'E7', scenario: 'Corrupt checkpoint', cmd: 'checkpoint.json={} then run', expected: 'Exit 0, new run ID', limits: { sync: false, extract: true } },
-        { id: 'E8', scenario: 'Req 4 Concurrency/rate', cmd: 'run --no-sync', expected: 'Exit 0, under cap', limits: { sync: false, extract: true } },
-      ],
-    };
 
-    function renderLimitsCell(c) {
-      const lim = c.limits || { sync: false, extract: false };
-      if (!lim.sync && !lim.extract) {
-        return '<td class="limits-cell"><span class="n/a">—</span></td>';
+      function renderRow(c, sectionId) {
+        const tr = document.createElement("tr");
+        const resultCell = document.createElement("td");
+        resultCell.className = "result-cell";
+        const resultDiv = document.createElement("div");
+        resultDiv.className = "result";
+        resultDiv.id = "result-" + c.id;
+        resultDiv.style.display = "none";
+        resultCell.appendChild(resultDiv);
+        const btn = document.createElement("button");
+        btn.className = "run";
+        btn.textContent = "Run";
+        btn.onclick = function () {
+          runCase(c.id, btn, resultDiv);
+        };
+        const resetBtn = document.createElement("button");
+        resetBtn.className = "reset-case";
+        resetBtn.textContent = "Reset";
+        resetBtn.onclick = function () {
+          resetCase(resultDiv);
+        };
+        tr.innerHTML =
+          '<td class="id">' +
+          c.id +
+          '</td><td class="scenario">' +
+          escapeHtml(c.scenario) +
+          '</td><td class="command">' +
+          escapeHtml(c.cmd) +
+          '</td><td class="expected">' +
+          escapeHtml(c.expected) +
+          "</td>" +
+          renderLimitsCell(c) +
+          '<td class="run-cell"><div class="btn-group"></div></td>';
+        tr.querySelector(".btn-group").appendChild(btn);
+        tr.querySelector(".btn-group").appendChild(resetBtn);
+        tr.appendChild(resultCell);
+        return tr;
       }
-      var html = '<td class="limits-cell"><div class="limit-row">';
-      if (lim.sync) {
-        html += '<span class="limit-label">Sync:</span><input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to download. 0 = no limit">';
+
+      function escapeHtml(s) {
+        var div = document.createElement("div");
+        div.textContent = s;
+        return div.innerHTML;
       }
-      if (lim.extract) {
-        html += '<span class="limit-label">Extract:</span><input type="number" class="limit-extract" min="0" step="1" value="0" title="Max files to extract. 0 = no limit">';
-      }
-      html += '</div></td>';
-      return html;
-    }
 
-    function renderRow(c, sectionId) {
-      const tr = document.createElement('tr');
-      const resultCell = document.createElement('td');
-      resultCell.className = 'result-cell';
-      const resultDiv = document.createElement('div');
-      resultDiv.className = 'result';
-      resultDiv.id = 'result-' + c.id;
-      resultDiv.style.display = 'none';
-      resultCell.appendChild(resultDiv);
-      const btn = document.createElement('button');
-      btn.className = 'run';
-      btn.textContent = 'Run';
-      btn.onclick = function() { runCase(c.id, btn, resultDiv); };
-      const resetBtn = document.createElement('button');
-      resetBtn.className = 'reset-case';
-      resetBtn.textContent = 'Reset';
-      resetBtn.onclick = function() { resetCase(resultDiv); };
-      tr.innerHTML = '<td class="id">' + c.id + '</td><td class="scenario">' + escapeHtml(c.scenario) + '</td><td class="command">' + escapeHtml(c.cmd) + '</td><td class="expected">' + escapeHtml(c.expected) + '</td>' + renderLimitsCell(c) + '<td class="run-cell"><div class="btn-group"></div></td>';
-      tr.querySelector('.btn-group').appendChild(btn);
-      tr.querySelector('.btn-group').appendChild(resetBtn);
-      tr.appendChild(resultCell);
-      return tr;
-    }
-
-    function escapeHtml(s) {
-      var div = document.createElement('div');
-      div.textContent = s;
-      return div.innerHTML;
-    }
-
-    function showResult(div, data, pass) {
-      div.style.display = 'block';
-      var resultClass = 'running';
-      if (data) resultClass = pass ? 'pass' : 'fail';
-      div.className = 'result ' + resultClass;
-      if (!data) {
-        div.innerHTML = '<span class="exit">Running…</span>';
-        return;
-      }
-      var exit = data.exitCode;
-      var out = [data.stdout, data.stderr].filter(Boolean).join('\n') || '(no output)';
-      div.innerHTML = '<span class="exit">Exit ' + exit + '</span>\n<span class="out">' + escapeHtml(out.slice(0, 2000)) + (out.length > 2000 ? '…' : '') + '</span>';
-    }
-
-    function resetCase(resultDiv) {
-      if (!resultDiv) return;
-      resultDiv.style.display = 'none';
-      resultDiv.innerHTML = '';
-      resultDiv.className = 'result';
-    }
-
-    function getParamsFromRow(row) {
-      var syncInput = row ? row.querySelector('.limit-sync') : null;
-      var extractInput = row ? row.querySelector('.limit-extract') : null;
-      var syncLimit = syncInput ? Number.parseInt(syncInput.value, 10) : 0;
-      var extractLimit = extractInput ? Number.parseInt(extractInput.value, 10) : 0;
-      return { syncLimit: Number.isNaN(syncLimit) ? 0 : Math.max(0, syncLimit), extractLimit: Number.isNaN(extractLimit) ? 0 : Math.max(0, extractLimit) };
-    }
-
-    async function runCase(caseId, btn, resultDiv) {
-      btn.disabled = true;
-      showResult(resultDiv, null, false);
-      var row = btn.closest('tr');
-      var params = getParamsFromRow(row);
-      try {
-        var r = await fetch('/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ caseId: caseId, syncLimit: params.syncLimit, extractLimit: params.extractLimit }) });
-        var data = await r.json();
-        if (data.error) {
-          showResult(resultDiv, { exitCode: 1, stdout: '', stderr: data.error }, false);
+      function showResult(div, data, pass) {
+        div.style.display = "block";
+        var resultClass = "running";
+        if (data) resultClass = pass ? "pass" : "fail";
+        div.className = "result " + resultClass;
+        if (!data) {
+          div.innerHTML = '<span class="exit">Running…</span>';
           return;
         }
-        var expectFail = caseId.indexOf('N') === 0;
-        var pass = expectFail ? data.exitCode !== 0 : data.exitCode === 0;
-        showResult(resultDiv, data, pass);
+        var exit = data.exitCode;
+        var out =
+          [data.stdout, data.stderr].filter(Boolean).join("\n") ||
+          "(no output)";
+        div.innerHTML =
+          '<span class="exit">Exit ' +
+          exit +
+          '</span>\n<span class="out">' +
+          escapeHtml(out.slice(0, 2000)) +
+          (out.length > 2000 ? "…" : "") +
+          "</span>";
+      }
+
+      function resetCase(resultDiv) {
+        if (!resultDiv) return;
+        resultDiv.style.display = "none";
+        resultDiv.innerHTML = "";
+        resultDiv.className = "result";
+        var row = resultDiv.closest("tr");
+        if (row) {
+          var inputs = row.querySelectorAll(".limit-sync, .limit-extract");
+          inputs.forEach(function (input) {
+            input.value = "0";
+          });
+        }
+      }
+
+      function getParamsFromRow(row) {
+        var syncInput = row ? row.querySelector(".limit-sync") : null;
+        var extractInput = row ? row.querySelector(".limit-extract") : null;
+        var syncLimit = syncInput ? Number.parseInt(syncInput.value, 10) : 0;
+        var extractLimit = extractInput
+          ? Number.parseInt(extractInput.value, 10)
+          : 0;
+        return {
+          syncLimit: Number.isNaN(syncLimit) ? 0 : Math.max(0, syncLimit),
+          extractLimit: Number.isNaN(extractLimit)
+            ? 0
+            : Math.max(0, extractLimit),
+        };
+      }
+
+      async function runCase(caseId, btn, resultDiv) {
+        btn.disabled = true;
+        showResult(resultDiv, null, false);
+        var row = btn.closest("tr");
+        var params = getParamsFromRow(row);
+        try {
+          var r = await fetch("/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              caseId: caseId,
+              syncLimit: params.syncLimit,
+              extractLimit: params.extractLimit,
+            }),
+          });
+          var data = await r.json();
+          if (data.error) {
+            showResult(
+              resultDiv,
+              { exitCode: 1, stdout: "", stderr: data.error },
+              false,
+            );
+            return;
+          }
+          var expectFail = caseId.indexOf("N") === 0;
+          var pass = expectFail ? data.exitCode !== 0 : data.exitCode === 0;
+          showResult(resultDiv, data, pass);
+        } catch (e) {
+          showResult(
+            resultDiv,
+            { exitCode: 1, stdout: "", stderr: e.message },
+            false,
+          );
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      ["positive", "negative", "edge"].forEach(function (section) {
+        var tbody = document.getElementById(section);
+        CASES[section].forEach(function (c) {
+          tbody.appendChild(renderRow(c, section));
+        });
+      });
+
+      (function () {
+        var reloadBtn = document.getElementById("header-reload");
+        if (reloadBtn)
+          reloadBtn.addEventListener("click", function () {
+            location.reload();
+          });
+      })();
+
+      var serverEl = document.getElementById("server-check");
+      try {
+        var r = await fetch("/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        await r.json();
+        if (serverEl) {
+          serverEl.className = "server-status connected";
+          serverEl.textContent = "Connected";
+          serverEl.removeAttribute("title");
+        }
       } catch (e) {
-        showResult(resultDiv, { exitCode: 1, stdout: '', stderr: e.message }, false);
-      } finally {
-        btn.disabled = false;
+        var msg = e instanceof Error ? e.message : String(e);
+        if (serverEl) {
+          serverEl.className = "server-status disconnected";
+          serverEl.textContent = "Disconnected";
+          serverEl.title = "Start server: node test-runner-server.mjs. " + msg;
+        }
       }
-    }
-
-    ['positive', 'negative', 'edge'].forEach(function(section) {
-      var tbody = document.getElementById(section);
-      CASES[section].forEach(function(c) { tbody.appendChild(renderRow(c, section)); });
-    });
-
-    (function() {
-      var reloadBtn = document.getElementById('header-reload');
-      if (reloadBtn) reloadBtn.addEventListener('click', function() { location.reload(); });
-    })();
-
-    var serverEl = document.getElementById('server-check');
-    try {
-      var r = await fetch('/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-      await r.json();
-      if (serverEl) { serverEl.className = 'server-status connected'; serverEl.textContent = 'Connected'; serverEl.removeAttribute('title'); }
-    } catch (e) {
-      var msg = e instanceof Error ? e.message : String(e);
-      if (serverEl) {
-        serverEl.className = 'server-status disconnected';
-        serverEl.textContent = 'Disconnected';
-        serverEl.title = 'Start server: node test-runner-server.mjs. ' + msg;
-      }
-    }
-  </script>
-</body>
+    </script>
+  </body>
 </html>
