@@ -3,7 +3,7 @@
  */
 
 import { loadConfig } from './config.js';
-import { syncAllBuckets } from './s3-sync.js';
+import { syncAllBuckets, type SyncResult } from './s3-sync.js';
 import { runExtraction } from './load-engine.js';
 import { computeMetrics } from './metrics.js';
 import type { Config, RunMetrics } from './types.js';
@@ -24,7 +24,7 @@ export interface RunOptions {
 
 export interface FullRunResult {
   config: Config;
-  syncResults?: { brand: string; synced: number; skipped: number; errors: number }[];
+  syncResults?: SyncResult[];
   run: LoadEngineResult;
   metrics: RunMetrics;
 }
@@ -48,7 +48,7 @@ export async function runFull(options: RunOptions = {}): Promise<FullRunResult> 
       ? filterBucketsByTenantPurchaser(config.s3.buckets, options.tenant, options.purchaser)
       : undefined;
 
-  let syncResults: { brand: string; synced: number; skipped: number; errors: number }[] | undefined;
+  let syncResults: SyncResult[] | undefined;
   if (!options.skipSync) {
     syncResults = await syncAllBuckets(config, {
       syncLimit: options.syncLimit,

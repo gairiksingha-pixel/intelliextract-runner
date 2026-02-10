@@ -44,7 +44,7 @@
       .header-inner {
         max-width: 1400px;
         margin: 0 auto;
-        padding: 0.75rem 1.5rem;
+        padding: 1.25rem 1.5rem;
         display: flex;
         align-items: center;
         gap: 1.5rem;
@@ -57,53 +57,33 @@
         gap: 0.75rem;
         flex-shrink: 0;
       }
-      .server-status {
-        display: inline-flex;
+      .header-field-wrap {
+        display: grid;
+        grid-template-columns: auto minmax(10rem, 1fr);
+        grid-template-rows: auto minmax(1.25em, auto);
         align-items: center;
-        gap: 0.35rem;
-        padding: 0.35rem 0.65rem;
-        border-radius: 6px;
-        font-size: 0.8125rem;
-        font-weight: 500;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        color: var(--text-secondary);
+        column-gap: 0.5rem;
+        row-gap: 0.2rem;
+        min-height: calc(2.25rem + 1.25em);
+        justify-content: start;
       }
-      .server-status.connected {
-        background: var(--pass-bg);
-        border-color: var(--pass);
-        color: var(--pass);
+      .header-field-wrap > .header-label {
+        grid-column: 1;
+        grid-row: 1;
       }
-      .server-status.disconnected {
-        background: var(--fail-bg);
-        border-color: var(--fail);
+      .header-field-wrap > .header-select {
+        grid-column: 2;
+        grid-row: 1;
+      }
+      .header-field-wrap > .header-field-error {
+        grid-column: 2;
+        grid-row: 2;
+      }
+      .header-field-error {
         color: var(--fail);
-      }
-      .server-status::before {
-        content: "";
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: currentColor;
-      }
-      button.header-reload {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        padding: 0.4rem 0.75rem;
-        border-radius: 6px;
-        font-size: 0.8125rem;
-        font-weight: 500;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        color: var(--text);
-        cursor: pointer;
-        font-family: inherit;
-      }
-      button.header-reload:hover {
-        background: var(--accent-light);
-        border-color: var(--accent);
-        color: var(--accent);
+        font-size: 0.75rem;
+        min-height: 1.25em;
+        line-height: 1.2;
       }
       .header .logo {
         height: 32px;
@@ -145,6 +125,11 @@
         font-size: 0.8125rem;
         font-family: inherit;
         min-width: 10rem;
+      }
+      .header-select:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        background: var(--surface);
       }
       .main {
         max-width: 1400px;
@@ -230,13 +215,6 @@
         width: 12rem;
         word-break: break-word;
       }
-      .command {
-        width: 18rem;
-        font-family: ui-monospace, "SF Mono", Consolas, monospace;
-        font-size: 0.8rem;
-        word-break: break-all;
-        color: var(--text-secondary);
-      }
       .expected {
         width: 12rem;
         word-break: break-word;
@@ -256,10 +234,13 @@
         justify-content: center;
         flex-wrap: wrap;
       }
+      .result-header {
+        width: 38rem;
+      }
       .result-cell {
-        width: 20rem;
-        min-width: 20rem;
-        max-width: 20rem;
+        width: 38rem;
+        min-width: 38rem;
+        max-width: none;
         vertical-align: top;
       }
       button.run {
@@ -294,6 +275,16 @@
         background: var(--surface);
         color: var(--text);
       }
+      button.reset-case.stop-btn {
+        background: var(--fail);
+        color: #fff;
+        border-color: var(--fail);
+      }
+      button.reset-case.stop-btn:hover {
+        background: #b71c1c;
+        border-color: #b71c1c;
+        color: #fff;
+      }
       .result {
         font-family: ui-monospace, "SF Mono", Consolas, monospace;
         font-size: 0.75rem;
@@ -315,6 +306,47 @@
       .result.running {
         background: var(--accent-light);
         border-left-color: var(--accent);
+      }
+      .result.running .loading-dots::after {
+        content: "";
+        animation: loading-dots 1.2s steps(4, end) infinite;
+      }
+      @keyframes loading-dots {
+        0%, 20% { content: ""; }
+        40% { content: "."; }
+        60% { content: ".."; }
+        80%, 100% { content: "..."; }
+      }
+      .result .sync-progress-wrap {
+        margin-top: 0.5rem;
+        font-size: 0.8125rem;
+        color: var(--text-secondary);
+      }
+      .result .sync-progress-bar {
+        height: 6px;
+        background: var(--border);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 0.35rem;
+        max-width: 12rem;
+      }
+      .result .sync-progress-fill {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 3px;
+        transition: width 0.15s ease-out;
+      }
+      .result .sync-progress-fill.sync-progress-indeterminate {
+        animation: sync-indeterminate 1.2s ease-in-out infinite;
+      }
+      @keyframes sync-indeterminate {
+        0%, 100% { transform: translateX(-100%); }
+        50% { transform: translateX(150%); }
+      }
+      .result.result-placeholder .result-placeholder-text {
+        color: var(--muted);
+        font-size: 0.8125rem;
+        font-style: italic;
       }
       .result .exit {
         font-weight: 600;
@@ -345,36 +377,29 @@
         <span class="logo-placeholder" style="display: none"
           >intellirevenue</span
         >
-        <div>
-          <h1>EntelliExtract Test Cases</h1>
-          <p class="subtitle">
-            Run test cases from the browser. Choose <strong>Brand</strong> and <strong>Purchaser</strong> to sync or extract for a specific brand's purchaser; leave as All to run for all.
-          </p>
-        </div>
         <div class="header-right">
-          <label class="header-label">Brand</label>
-          <select id="tenant-select" class="header-select" title="Select brand">
-            <option value="">All</option>
-            <option value="no-cow-026090539970-prod">no-cow-026090539970-prod</option>
-            <option value="sundia-026090539970-prod">sundia-026090539970-prod</option>
-            <option value="tractor-beverage-026090539970-prod">tractor-beverage-026090539970-prod</option>
-          </select>
-          <label class="header-label">Purchaser</label>
-          <select id="purchaser-select" class="header-select" title="Select purchaser (filtered by brand)">
-            <option value="">All</option>
-            <option value="DOT_FOODS">DOT_FOODS</option>
-            <option value="KEHE">KEHE</option>
-            <option value="UNFI">UNFI</option>
-          </select>
-          <span class="server-status" id="server-check">Checking…</span>
-          <button
-            type="button"
-            class="header-reload"
-            id="header-reload"
-            title="Reload page"
-          >
-            ↻ Reload
-          </button>
+          <div class="header-field-wrap">
+            <label class="header-label" for="tenant-select">Brand</label>
+            <select id="tenant-select" class="header-select" title="Select brand">
+              <option value="">Select</option>
+              <option value="all">All</option>
+              <option value="no-cow-026090539970-prod">no-cow-026090539970-prod</option>
+              <option value="sundia-026090539970-prod">sundia-026090539970-prod</option>
+              <option value="tractor-beverage-026090539970-prod">tractor-beverage-026090539970-prod</option>
+            </select>
+            <div id="brand-error" class="header-field-error" role="alert"></div>
+          </div>
+          <div class="header-field-wrap">
+            <label class="header-label" for="purchaser-select">Purchaser</label>
+            <select id="purchaser-select" class="header-select" title="Select purchaser (filtered by brand)">
+              <option value="">Select</option>
+              <option value="all">All</option>
+              <option value="DOT_FOODS">DOT_FOODS</option>
+              <option value="KEHE">KEHE</option>
+              <option value="UNFI">UNFI</option>
+            </select>
+            <div id="purchaser-error" class="header-field-error" role="alert"></div>
+          </div>
         </div>
       </div>
     </header>
@@ -387,11 +412,10 @@
             <tr>
               <th class="id">ID</th>
               <th class="scenario">Scenario</th>
-              <th class="command">Command</th>
               <th class="expected">Expected</th>
               <th class="limits-col">File limits (0 = no limit)</th>
-              <th class="run-cell"></th>
-              <th>Result</th>
+              <th class="run-cell">Action</th>
+              <th class="result-header">Result</th>
             </tr>
           </thead>
           <tbody id="positive"></tbody>
@@ -405,11 +429,10 @@
             <tr>
               <th class="id">ID</th>
               <th class="scenario">Scenario</th>
-              <th class="command">Command</th>
               <th class="expected">Expected</th>
               <th class="limits-col">File limits (0 = no limit)</th>
-              <th class="run-cell"></th>
-              <th>Result</th>
+              <th class="run-cell">Actions</th>
+              <th class="result-header">Result</th>
             </tr>
           </thead>
           <tbody id="negative"></tbody>
@@ -423,11 +446,10 @@
             <tr>
               <th class="id">ID</th>
               <th class="scenario">Scenario</th>
-              <th class="command">Command</th>
               <th class="expected">Expected</th>
               <th class="limits-col">File limits (0 = no limit)</th>
-              <th class="run-cell"></th>
-              <th>Result</th>
+              <th class="run-cell">Actions</th>
+              <th class="result-header">Result</th>
             </tr>
           </thead>
           <tbody id="edge"></tbody>
@@ -647,9 +669,10 @@
         const resultCell = document.createElement("td");
         resultCell.className = "result-cell";
         const resultDiv = document.createElement("div");
-        resultDiv.className = "result";
+        resultDiv.className = "result result-placeholder";
         resultDiv.id = "result-" + c.id;
-        resultDiv.style.display = "none";
+        resultDiv.innerHTML =
+          '<span class="result-placeholder-text">Choose Brand and Purchaser to sync or extract for a specific brand\'s purchaser. Leave as All to run for all.</span>';
         resultCell.appendChild(resultDiv);
         const btn = document.createElement("button");
         btn.className = "run";
@@ -668,8 +691,6 @@
           c.id +
           '</td><td class="scenario">' +
           escapeHtml(c.scenario) +
-          '</td><td class="command">' +
-          escapeHtml(c.cmd) +
           '</td><td class="expected">' +
           escapeHtml(c.expected) +
           "</td>" +
@@ -687,33 +708,82 @@
         return div.innerHTML;
       }
 
-      function showResult(div, data, pass) {
+      function showResult(div, data, pass, progress, syncProgress) {
         div.style.display = "block";
         var resultClass = "running";
         if (data) resultClass = pass ? "pass" : "fail";
         div.className = "result " + resultClass;
         if (!data) {
-          div.innerHTML = '<span class="exit">Running…</span>';
+          var label;
+          var extra = "";
+          if (syncProgress != null && (syncProgress.done != null || syncProgress.total != null)) {
+            var done = Number(syncProgress.done) || 0;
+            var total = Number(syncProgress.total) || 0;
+            label = "Syncing…";
+            var pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
+            extra =
+              '<div class="sync-progress-wrap">Downloads: ' +
+              (total > 0 ? done + " / " + total : done + " file(s)") +
+              '</div>' +
+              (total > 0
+                ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' + pct + '%"></div></div>'
+                : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
+          } else {
+            var pctVal = progress && progress.percent != null ? Number(progress.percent) : null;
+            var doneVal = progress && progress.done != null ? Number(progress.done) : null;
+            var totalVal = progress && progress.total != null ? Number(progress.total) : null;
+            if (pctVal != null && totalVal != null && totalVal > 0 && doneVal != null) {
+              label = "Running… " + pctVal + "% (" + doneVal + " / " + totalVal + ")";
+            } else if (pctVal != null) {
+              label = "Running… " + pctVal + "%";
+            } else {
+              label = "Running…";
+            }
+          }
+          div.innerHTML =
+            '<span class="exit">' + escapeHtml(label) + '<span class="loading-dots"></span></span>' + extra;
           return;
         }
         var exit = data.exitCode;
-        var out =
-          [data.stdout, data.stderr].filter(Boolean).join("\n") ||
-          "(no output)";
+        var stdoutStr = (data.stdout && String(data.stdout).trim()) || "";
+        var stderrStr = (data.stderr && String(data.stderr).trim()) || "";
+        var syncProgressPrefix = "SYNC_PROGRESS\t";
+        var stdoutFiltered = stdoutStr
+          ? stdoutStr
+              .split("\n")
+              .filter(function (line) {
+                return line.indexOf(syncProgressPrefix) !== 0;
+              })
+              .join("\n")
+              .trim()
+          : "";
+        var out = [stdoutFiltered, stderrStr].filter(Boolean).join("\n");
+        var noOutput = !out;
+        var exitLabel, outHtml;
+        if (noOutput) {
+          if (exit === 0) {
+            exitLabel = "Success";
+            outHtml =
+              "Command completed successfully with no console output (exit code 0). " +
+              "Sync, extraction, or report may have run without printing to stdout/stderr.";
+          } else {
+            exitLabel = "Failed (exit " + exit + ")";
+            outHtml =
+              "Command produced no output. Check server logs or run the command in a terminal for details.";
+          }
+        } else {
+          exitLabel = "Exit " + exit;
+          outHtml = escapeHtml(out.slice(0, 2000)) + (out.length > 2000 ? "…" : "");
+        }
         div.innerHTML =
-          '<span class="exit">Exit ' +
-          exit +
-          '</span>\n<span class="out">' +
-          escapeHtml(out.slice(0, 2000)) +
-          (out.length > 2000 ? "…" : "") +
-          "</span>";
+          '<span class="exit">' + escapeHtml(exitLabel) + '</span>\n<span class="out">' + outHtml + "</span>";
       }
 
       function resetCase(resultDiv) {
         if (!resultDiv) return;
-        resultDiv.style.display = "none";
-        resultDiv.innerHTML = "";
-        resultDiv.className = "result";
+        resultDiv.innerHTML =
+          '<span class="result-placeholder-text">Choose Brand and Purchaser to sync or extract for a specific brand\'s purchaser; leave as All to run for all.</span>';
+        resultDiv.className = "result result-placeholder";
         var row = resultDiv.closest("tr");
         if (row) {
           var inputs = row.querySelectorAll(".limit-sync, .limit-extract");
@@ -741,18 +811,58 @@
       function getTenantPurchaser() {
         var tenantEl = document.getElementById("tenant-select");
         var purchaserEl = document.getElementById("purchaser-select");
-        var tenant = tenantEl && tenantEl.value ? tenantEl.value.trim() : "";
-        var purchaser = purchaserEl && purchaserEl.value ? purchaserEl.value.trim() : "";
-        if (!tenant || !purchaser) return { tenant: undefined, purchaser: undefined };
+        var brandVal = tenantEl && tenantEl.value ? tenantEl.value.trim() : "";
+        var purchaserVal = purchaserEl && purchaserEl.value ? purchaserEl.value.trim() : "";
+        var tenant = (brandVal === "" || brandVal === "all") ? undefined : brandVal;
+        var purchaser = (purchaserVal === "" || purchaserVal === "all") ? undefined : purchaserVal;
         return { tenant: tenant, purchaser: purchaser };
       }
 
       async function runCase(caseId, btn, resultDiv) {
-        btn.disabled = true;
-        showResult(resultDiv, null, false);
-        var row = btn.closest("tr");
-        var params = getParamsFromRow(row);
+        var brandEl = document.getElementById("tenant-select");
+        var purchaserEl = document.getElementById("purchaser-select");
+        var brandVal = brandEl && brandEl.value ? brandEl.value.trim() : "";
+        var purchaserVal = purchaserEl && purchaserEl.value ? purchaserEl.value.trim() : "";
+        if (brandVal === "") {
+          showBrandError("Please select a brand or All.");
+          if (purchaserVal && purchaserVal !== "all") showPurchaserError("Please select a brand first.");
+          else clearPurchaserError();
+          resultDiv.className = "result result-placeholder";
+          resultDiv.innerHTML = '<span class="result-placeholder-text">Select a brand first, then select a purchaser or All to run.</span>';
+          return;
+        }
+        if (purchaserVal === "") {
+          clearBrandError();
+          showPurchaserError("Please select a purchaser or All.");
+          resultDiv.className = "result result-placeholder";
+          resultDiv.innerHTML = '<span class="result-placeholder-text">Select a brand first, then select a purchaser or All to run.</span>';
+          return;
+        }
+        clearBrandError();
+        clearPurchaserError();
         var tp = getTenantPurchaser();
+        var row = btn.closest("tr");
+        var resetBtn = row ? row.querySelector(".reset-case") : null;
+        var controller = new AbortController();
+        function restoreResetBtn() {
+          if (resetBtn) {
+            resetBtn.textContent = "Reset";
+            resetBtn.classList.remove("stop-btn");
+            resetBtn.onclick = function () {
+              resetCase(resultDiv);
+            };
+          }
+        }
+        if (resetBtn) {
+          resetBtn.textContent = "Stop";
+          resetBtn.classList.add("stop-btn");
+          resetBtn.onclick = function () {
+            controller.abort();
+          };
+        }
+        btn.disabled = true;
+        showResult(resultDiv, null, false, null, null);
+        var params = getParamsFromRow(row);
         try {
           var r = await fetch("/run", {
             method: "POST",
@@ -764,27 +874,75 @@
               tenant: tp.tenant,
               purchaser: tp.purchaser,
             }),
+            signal: controller.signal,
           });
-          var data = await r.json();
-          if (data.error) {
-            showResult(
-              resultDiv,
-              { exitCode: 1, stdout: "", stderr: data.error },
-              false,
-            );
+          if (!r.ok || !r.body) {
+            var errText = await r.text();
+            try {
+              var errJson = JSON.parse(errText);
+              if (errJson.error) errText = errJson.error;
+            } catch (_) {}
+            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: errText }, false);
+            return;
+          }
+          var reader = r.body.getReader();
+          var decoder = new TextDecoder();
+          var buffer = "";
+          var data = null;
+          while (true) {
+            var chunk = await reader.read();
+            if (chunk.done) break;
+            buffer += decoder.decode(chunk.value, { stream: true });
+            var lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (var i = 0; i < lines.length; i++) {
+              var line = lines[i].trim();
+              if (!line) continue;
+              try {
+                var msg = JSON.parse(line);
+                if (msg.type === "progress" && msg.percent != null) {
+                  showResult(resultDiv, null, false, { percent: msg.percent, done: msg.done, total: msg.total }, null);
+                } else if (msg.type === "sync_progress") {
+                  showResult(resultDiv, null, false, null, { done: msg.done, total: msg.total });
+                } else if (msg.type === "result") {
+                  data = msg;
+                } else if (msg.error) {
+                  data = { exitCode: 1, stdout: "", stderr: msg.error };
+                }
+              } catch (_) {}
+            }
+          }
+          if (buffer.trim()) {
+            try {
+              var msg = JSON.parse(buffer.trim());
+              if (msg.type === "result") data = msg;
+              else if (msg.error) data = { exitCode: 1, stdout: "", stderr: msg.error };
+            } catch (_) {}
+          }
+          if (!data) {
+            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: "No result from server" }, false);
             return;
           }
           var expectFail = caseId.indexOf("N") === 0;
           var pass = expectFail ? data.exitCode !== 0 : data.exitCode === 0;
           showResult(resultDiv, data, pass);
         } catch (e) {
-          showResult(
-            resultDiv,
-            { exitCode: 1, stdout: "", stderr: e.message },
-            false,
-          );
+          if (e.name === "AbortError") {
+            showResult(
+              resultDiv,
+              { exitCode: 130, stdout: "", stderr: "Stopped by user." },
+              false,
+            );
+          } else {
+            showResult(
+              resultDiv,
+              { exitCode: 1, stdout: "", stderr: e.message },
+              false,
+            );
+          }
         } finally {
           btn.disabled = false;
+          restoreResetBtn();
         }
       }
 
@@ -805,49 +963,54 @@
         var purchaserSelect = document.getElementById("purchaser-select");
         if (!brandSelect || !purchaserSelect) return;
         var brand = brandSelect.value;
+        if (brand === "") {
+          purchaserSelect.disabled = true;
+          purchaserSelect.innerHTML = '<option value="">Select</option><option value="all">All</option><option value="DOT_FOODS">DOT_FOODS</option><option value="KEHE">KEHE</option><option value="UNFI">UNFI</option>';
+          purchaserSelect.value = "";
+          return;
+        }
+        purchaserSelect.disabled = false;
         var current = purchaserSelect.value;
-        var opts = brand ? (BRAND_PURCHASERS[brand] || ["DOT_FOODS", "KEHE", "UNFI"]) : ["DOT_FOODS", "KEHE", "UNFI"];
-        purchaserSelect.innerHTML = '<option value="">All</option>' + opts.map(function (p) { return '<option value="' + p + '">' + p + '</option>'; }).join("");
-        if (opts.indexOf(current) !== -1) purchaserSelect.value = current;
+        var opts = brand !== "all" ? (BRAND_PURCHASERS[brand] || ["DOT_FOODS", "KEHE", "UNFI"]) : ["DOT_FOODS", "KEHE", "UNFI"];
+        purchaserSelect.innerHTML = '<option value="">Select</option><option value="all">All</option>' + opts.map(function (p) { return '<option value="' + p + '">' + p + '</option>'; }).join("");
+        if (current === "all" || opts.indexOf(current) !== -1) purchaserSelect.value = current;
         else purchaserSelect.value = "";
+      }
+      function showBrandError(msg) {
+        var el = document.getElementById("brand-error");
+        if (el) el.textContent = msg || "Please select a brand.";
+      }
+      function clearBrandError() {
+        var el = document.getElementById("brand-error");
+        if (el) el.textContent = "";
+      }
+      function showPurchaserError(msg) {
+        var el = document.getElementById("purchaser-error");
+        if (el) el.textContent = msg || "Please select a brand first.";
+      }
+      function clearPurchaserError() {
+        var el = document.getElementById("purchaser-error");
+        if (el) el.textContent = "";
       }
       (function () {
         var brandSelect = document.getElementById("tenant-select");
         var purchaserSelect = document.getElementById("purchaser-select");
         if (brandSelect && purchaserSelect) {
-          brandSelect.addEventListener("change", refreshPurchaserOptions);
+          brandSelect.addEventListener("change", function () {
+            clearBrandError();
+            clearPurchaserError();
+            refreshPurchaserOptions();
+          });
+          purchaserSelect.addEventListener("change", function () {
+            if (purchaserSelect.value && purchaserSelect.value !== "all" && (!brandSelect.value || brandSelect.value === "")) {
+              showPurchaserError("Please select a brand first.");
+            } else {
+              clearPurchaserError();
+            }
+          });
           refreshPurchaserOptions();
         }
       })();
-      (function () {
-        var reloadBtn = document.getElementById("header-reload");
-        if (reloadBtn)
-          reloadBtn.addEventListener("click", function () {
-            location.reload();
-          });
-      })();
-
-      var serverEl = document.getElementById("server-check");
-      try {
-        var r = await fetch("/run", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: "{}",
-        });
-        await r.json();
-        if (serverEl) {
-          serverEl.className = "server-status connected";
-          serverEl.textContent = "Connected";
-          serverEl.removeAttribute("title");
-        }
-      } catch (e) {
-        var msg = e instanceof Error ? e.message : String(e);
-        if (serverEl) {
-          serverEl.className = "server-status disconnected";
-          serverEl.textContent = "Disconnected";
-          serverEl.title = "Start server: node test-runner-server.mjs. " + msg;
-        }
-      }
     </script>
   </body>
 </html>

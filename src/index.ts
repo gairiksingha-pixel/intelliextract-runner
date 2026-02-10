@@ -6,7 +6,7 @@
 
 import { program } from 'commander';
 import { loadConfig, getConfigPath } from './config.js';
-import { syncAllBuckets } from './s3-sync.js';
+import { syncAllBuckets, printSyncResults } from './s3-sync.js';
 import { runFull, runExtractionOnly } from './runner.js';
 import type { Config } from './types.js';
 import { buildSummary, writeReports } from './report.js';
@@ -57,9 +57,24 @@ program
         console.error(`No bucket config for tenant "${cmdOpts.tenant}" / purchaser "${cmdOpts.purchaser}".`);
         process.exit(1);
       }
-      console.log(buckets ? `Syncing ${cmdOpts.tenant}/${cmdOpts.purchaser} to staging...` : 'Syncing S3 buckets to staging...');
-      const results = await syncAllBuckets(config, { syncLimit, buckets });
-      console.log('Sync complete:', results);
+      const stdoutPiped = typeof process !== 'undefined' && process.stdout?.isTTY !== true;
+      const syncLimitNum = syncLimit !== undefined && syncLimit > 0 ? syncLimit : 0;
+      if (stdoutPiped) process.stdout.write(`SYNC_PROGRESS\t0\t${syncLimitNum}\n`);
+      const results = await syncAllBuckets(config, {
+        syncLimit,
+        buckets,
+        onProgress: stdoutPiped
+          ? (done, total) => {
+              process.stdout.write(`SYNC_PROGRESS\t${done}\t${total}\n`);
+            }
+          : undefined,
+      });
+      printSyncResults(results, syncLimit);
+      if (typeof process !== 'undefined' && process.stdout?.writable) {
+        await new Promise<void>((resolve, reject) => {
+          process.stdout!.write('', (err) => (err ? reject(err) : resolve()));
+        });
+      }
     } catch (e) {
       console.error('Sync failed:', e instanceof Error ? e.message : String(e));
       process.exit(1);
@@ -95,11 +110,13 @@ program
         console.error('--tenant is required when --purchaser is set.');
         process.exit(1);
       }
-      console.log(doSync ? 'Running with S3 sync...' : 'Running extraction only (no sync)...');
       if (tenant && purchaser) console.log(`Scoped to tenant: ${tenant}, purchaser: ${purchaser}`);
       const result = await (doSync
         ? runFull({ configPath: globalOpts.config, syncLimit, extractLimit, tenant, purchaser })
         : runExtractionOnly({ configPath: globalOpts.config, extractLimit, tenant, purchaser }));
+      if (doSync && result.syncResults && result.syncResults.length > 0) {
+        printSyncResults(result.syncResults, syncLimit);
+      }
       console.log(`Run ${result.run.runId} finished. Success: ${result.metrics.success}, Failed: ${result.metrics.failed}, Skipped: ${result.metrics.skipped}`);
       saveLastRunId(config, result.run.runId);
       if (doReport) {

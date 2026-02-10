@@ -64,7 +64,7 @@ All commands use the config file at `config/config.yaml` unless you pass `-c pat
 
 ## Output Layout
 
-- **Staging:** `output/staging/<tenant>__<purchaser>/<key>` – files synced from S3 (when using env-driven buckets).
+- **Staging:** `output/staging/<brand>/<purchaser>/<key>` – files synced from S3; each brand has purchaser-wise subfolders (signed URLs or file paths for API extraction use these paths).
 - **Sync manifest:** `output/checkpoints/sync-manifest.json` (or `s3.syncManifestPath`) – stores key → SHA-256 so already-downloaded unchanged files are skipped on the next sync.
 - **Checkpoints:** `output/checkpoints/checkpoint.json` – resumable run state; `last-run-id.txt` in the same directory stores the latest run ID for `report`.
 - **Logs:** `output/logs/request-response_<runId>.jsonl` – one JSON object per request/response for debugging.
@@ -79,7 +79,7 @@ In `config.yaml` under `s3`:
 - **`syncLimit`** – Optional. Max number of files to **download** per sync (e.g. `10` to sync only 10 new files). Files that already exist and have the same SHA-256 as in the manifest are **skipped** and do not count toward this limit. Use `0` or omit for no limit.
 - **`syncManifestPath`** – Optional. Path to a JSON file that stores `key → SHA-256` for each synced file. Default: `./output/checkpoints/sync-manifest.json`. On the next sync, any local file whose SHA-256 matches the manifest is skipped (no re-download).
 
-Example: with 1000 objects in S3, set `syncLimit: 10` to download at most 10 files per run. If 5 of those 10 are already on disk and unchanged (same SHA-256), they are skipped and only 5 are downloaded; the next run will continue from the remaining list.
+Example: with 1000 objects in S3, set `syncLimit: 10` to download at most 10 **new** files per run. Files already on disk with matching SHA-256 are **skipped** and do not count toward the limit (e.g. limit 1 with 3 already synced → "Downloaded: 1, Skipped: 3"). Sync logs are structured and show download limit, downloaded count, skipped count, and per-brand staging paths.
 
 ## Benchmark (one App Runner instance)
 
@@ -94,9 +94,21 @@ Use a single run with fixed concurrency to establish a baseline:
 After `npm start run` you should see something like:
 
 ```
-Running with S3 sync...
-[S3] no-cow-026090539970-prod__DOT_FOODS: synced 42, skipped (unchanged) 5, errors 0
-[S3] sundia-026090539970-prod__KEHE: synced 18, skipped (unchanged) 0, errors 0
+Sync Summary
+------------
+Download limit: no limit
+Downloaded (new): 60
+Skipped (already present, unchanged): 5
+Errors: 0
+
+By brand (staging path → counts):
+  no-cow-026090539970-prod / DOT_FOODS
+    Staging path: output/staging/no-cow-026090539970-prod__DOT_FOODS/DOT_FOODS
+    Downloaded: 42, Skipped: 5, Errors: 0
+  sundia-026090539970-prod / KEHE
+    Staging path: output/staging/sundia-026090539970-prod__KEHE/KEHE
+    Downloaded: 18, Skipped: 0, Errors: 0
+
 Run run_1739123456789_abc1234 finished. Success: 88, Failed: 0, Skipped: 3
 Report(s) written: [ 'output/reports/report_run_1739123456789_abc1234_1739123500000.md', ... ]
 ```
@@ -131,7 +143,7 @@ See `output/reports/` for the full executive summary (total files, run time, suc
 
 ## Test Cases
 
-Manual test cases covering **positive**, **negative**, and **edge** scenarios aligned to the core requirements. Run the **Command** and assert the **Expected result**.
+Manual test cases covering **positive**, **negative**, and **edge** scenarios aligned to the core requirements. **Commands** for each case are listed in the tables below (Positive / Negative / Edge); run the command and assert the **Expected** result. The browser test runner (see [Test runner (HTML UI)](#test-runner-html-ui)) uses these same cases without showing the command column; refer to this README for the exact command per case.
 
 ### Requirements coverage (core objectives → test cases)
 
@@ -164,7 +176,7 @@ Manual test cases covering **positive**, **negative**, and **edge** scenarios al
 
 **Details (positive)**
 
-- **P1** — *Given:* Valid `config.yaml`, real S3 buckets, AWS creds. *Expect:* "Syncing S3 buckets...", `[S3] <brand>: synced N, errors 0`, files under `output/staging/<BrandName>/`.
+- **P1** — *Given:* Valid `config.yaml`, real S3 buckets, AWS creds. *Expect:* Structured "Sync Summary" with download/skipped/errors and per-brand staging paths; files under `output/staging/<brand>/<purchaser>/`.
 - **P2** — *Given:* Staging has ≥1 file, API creds set. *Expect:* "Run run_... finished. Success: N, Failed: M, Skipped: K"; report in `output/reports/`; checkpoint and request-response log updated.
 - **P3** — *Given:* At least one completed run (last-run-id.txt exists). *Expect:* "Report(s) written: [ ... ]"; markdown/HTML/JSON with metrics and run ID.
 - **P4** — *Given:* Valid run ID from a previous run. *Expect:* Report generated for that run ID.
@@ -202,8 +214,8 @@ Manual test cases covering **positive**, **negative**, and **edge** scenarios al
 | E1  | Empty staging       | `npm start run -- --no-sync`     | Exit 0, Success: 0, Failed: 0, Skipped: 0 |
 | E2  | All API fail        | `npm start run -- --no-sync`     | Exit 0, Failed: N, report has error rate + anomalies |
 | E3  | Resume after stop   | Run twice: start, Ctrl+C, run again | 2nd run skips done files |
-| E4  | Empty S3 bucket     | `npm start sync`                 | Exit 0, `[S3] <brand>: synced 0, errors 0` |
-| E5  | S3 partial failures | `npm start sync`                 | Exit 0, synced N, errors M (M>0), errors logged |
+| E4  | Empty S3 bucket     | `npm start sync`                 | Exit 0, Sync Summary with Downloaded: 0, Errors: 0 |
+| E5  | S3 partial failures | `npm start sync`                 | Exit 0, Sync Summary with synced N, errors M (M>0), errors logged |
 | E6  | Report (all failed) | `npm start report -- --run-id <id>` | Exit 0, report: failed count, 0 success, anomalies |
 | E7  | Corrupt checkpoint  | Replace checkpoint.json with `{}` then run | Exit 0, new run ID, no crash |
 | E8  | **Req 4** Concurrency/rate | `npm start run -- --no-sync` (config: concurrency 3, rps 5) | Exit 0, run completes under cap |
@@ -213,8 +225,8 @@ Manual test cases covering **positive**, **negative**, and **edge** scenarios al
 - **E1** — *Given:* Empty `output/staging/` or no brand dirs. *Expect:* Exit 0; "Success: 0, Failed: 0, Skipped: 0"; no crash; report may show zero throughput.
 - **E2** — *Given:* Staging has files; API URL wrong or creds invalid. *Expect:* Exit 0; run completes with "Failed: N"; checkpoint status error; report shows error rate and anomalies.
 - **E3** — *Given:* Start run, Ctrl+C after some files complete, same config. *Expect:* First run partial; second run skips completed files; final counts consistent.
-- **E4** — *Given:* Real bucket with zero objects. *Expect:* Exit 0; `[S3] <brand>: synced 0, errors 0`; no files in staging for that brand.
-- **E5** — *Given:* Bucket with some keys that fail (e.g. access denied). *Expect:* Exit 0; `[S3] <brand>: synced N, errors M` (M>0); successful files in staging; errors on console.
+- **E4** — *Given:* Real bucket with zero objects. *Expect:* Exit 0; Sync Summary with Downloaded: 0, Errors: 0; no files in staging for that brand.
+- **E5** — *Given:* Bucket with some keys that fail (e.g. access denied). *Expect:* Exit 0; Sync Summary with synced N, errors M (M>0); successful files in staging; errors on console.
 - **E6** — *Given:* Run where 0 success, all failed. *Expect:* Exit 0; report has failed count, 0 success, safe latency defaults, anomalies list errors.
 - **E7** — *Given:* checkpoint.json is `{}` or invalid JSON. *Expect:* Exit 0; stub uses empty store, new run ID; no crash.
 - **E8** — *Given:* config has run.concurrency: 3, run.requestsPerSecond: 5; staging has several files. *Expect:* Exit 0; run completes; throughput/latency consistent with cap.

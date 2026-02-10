@@ -90,27 +90,67 @@ const CASE_COMMANDS = {
   E8: (p) => runArgs(p, ['--no-sync']),
 };
 
-function runCase(caseId, params = {}) {
+const PROGRESS_REGEX = /(\d+)%\s*\((\d+)\/(\d+)\)/g;
+const SYNC_PROGRESS_PREFIX = 'SYNC_PROGRESS\t';
+
+function runCase(caseId, params = {}, callbacks = null) {
   const def = CASE_COMMANDS[caseId];
   if (!def) return Promise.reject(new Error(`Unknown case: ${caseId}`));
   const resolved = typeof def === 'function' ? def(params) : def();
   const [cmd, args, opts] = resolved;
   const displayCmd = args ? [cmd, ...args].join(' ') : cmd;
+  const onProgress = callbacks?.onProgress ?? (typeof callbacks === 'function' ? callbacks : null);
+  const onSyncProgress = callbacks?.onSyncProgress ?? null;
+  const onChild = callbacks?.onChild ?? null;
   return new Promise((resolve) => {
     const child = spawn(cmd, args || [], {
       ...opts,
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stdout = '';
+    if (onChild) onChild(child);
+    let fullStdout = '';
+    let lineBuffer = '';
     let stderr = '';
-    child.stdout?.on('data', (d) => (stdout += d.toString()));
+    let lastPercent = -1;
+    child.stdout?.on('data', (d) => {
+      const chunk = d.toString();
+      fullStdout += chunk;
+      lineBuffer += chunk;
+      const lines = lineBuffer.split('\n');
+      lineBuffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (onSyncProgress && line.startsWith(SYNC_PROGRESS_PREFIX)) {
+          const parts = line.slice(SYNC_PROGRESS_PREFIX.length).split('\t');
+          if (parts.length >= 2) {
+            const done = Number(parts[0]);
+            const total = Number(parts[1]);
+            if (!Number.isNaN(done)) onSyncProgress(done, Number.isNaN(total) ? 0 : total);
+          }
+        }
+      }
+      const bufToScan = lineBuffer || fullStdout;
+      if (onProgress && bufToScan) {
+        let m;
+        let last = null;
+        PROGRESS_REGEX.lastIndex = 0;
+        while ((m = PROGRESS_REGEX.exec(bufToScan)) !== null) last = m;
+        if (last) {
+          const [, pct, done, total] = last;
+          const num = Number(pct);
+          if (num !== lastPercent) {
+            lastPercent = num;
+            onProgress(num, Number(done), Number(total));
+          }
+        }
+      }
+    });
     child.stderr?.on('data', (d) => (stderr += d.toString()));
     child.on('close', (code, signal) => {
       resolve({
         caseId,
         exitCode: code ?? (signal ? 1 : 0),
-        stdout: stdout.trim(),
+        stdout: fullStdout.trim(),
         stderr: stderr.trim(),
         command: displayCmd,
       });
@@ -197,9 +237,35 @@ createServer(async (req, res) => {
       if (extractLimit !== undefined && Number(extractLimit) >= 0) params.extractLimit = Number(extractLimit);
       if (tenant && typeof tenant === 'string') params.tenant = tenant.trim();
       if (purchaser && typeof purchaser === 'string') params.purchaser = purchaser.trim();
-      const result = await runCase(caseId, params);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result));
+
+      res.writeHead(200, {
+        'Content-Type': 'application/x-ndjson',
+        'Transfer-Encoding': 'chunked',
+      });
+      const writeLine = (obj) => res.write(JSON.stringify(obj) + '\n');
+
+      let currentChild = null;
+      res.on('close', () => {
+        if (currentChild) {
+          currentChild.kill('SIGTERM');
+          currentChild = null;
+        }
+      });
+
+      const result = await runCase(caseId, params, {
+        onChild: (child) => {
+          currentChild = child;
+        },
+        onProgress: (percent, done, total) => {
+          writeLine({ type: 'progress', percent, done, total });
+        },
+        onSyncProgress: (done, total) => {
+          writeLine({ type: 'sync_progress', done, total });
+        },
+      });
+      currentChild = null;
+      writeLine({ type: 'result', ...result });
+      res.end();
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(e.message) }));

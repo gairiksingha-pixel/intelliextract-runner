@@ -58,19 +58,23 @@ export function loadConfig(configPath: string = CONFIG_PATH): Config {
     throw new Error(`Config at ${configPath} must be a YAML object.`);
   }
   const withEnv = substituteEnv(parsed) as Config;
-  // Build S3 buckets from env when S3_BUCKET + S3_TENANT_PURCHASERS are set (single bucket, tenant/purchaser folders)
+  // Build S3 buckets from env when S3_BUCKET + S3_TENANT_PURCHASERS are set.
+  // Layout (single bucket): <brand>/<purchaser>/... so that staging becomes:
+  //   output/staging/<brand>/<purchaser>/<key-after-prefix>
   const envBucket = process.env.S3_BUCKET?.trim();
   const envTenantPurchasers = process.env.S3_TENANT_PURCHASERS;
   if (envBucket && envTenantPurchasers) {
     try {
       const mapping = JSON.parse(envTenantPurchasers) as Record<string, string[]>;
       const buckets: Config['s3']['buckets'] = [];
-      for (const [tenant, purchasers] of Object.entries(mapping)) {
+      for (const [brand, purchasers] of Object.entries(mapping)) {
         if (!Array.isArray(purchasers)) continue;
         for (const purchaser of purchasers) {
-          const name = `${tenant}__${purchaser}`;
-          const prefix = `${tenant}/${purchaser}/`;
-          buckets.push({ name, bucket: envBucket, prefix, tenant, purchaser });
+          // One logical bucket per (brand, purchaser). The brand is the top-level
+          // folder; purchaser is the subfolder inside that brand.
+          const name = brand;
+          const prefix = `${brand}/${purchaser}/`;
+          buckets.push({ name, bucket: envBucket, prefix, tenant: brand, purchaser });
         }
       }
       if (buckets.length > 0) withEnv.s3.buckets = buckets;

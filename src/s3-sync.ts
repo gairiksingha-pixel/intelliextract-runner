@@ -1,6 +1,6 @@
 /**
  * Sync files from brand-specific S3 buckets to a local staging directory.
- * Preserves brand folder structure: staging/<BrandName>/<key>
+ * Structure: staging/<brand>/<purchaser>/<key after prefix> (purchaser-wise subfolders per brand).
  * Supports syncLimit (max files to download) and SHA-256 skip for already-downloaded unchanged files.
  */
 
@@ -41,6 +41,14 @@ async function listAllKeys(
 
 function manifestKey(brand: string, key: string): string {
   return `${brand}/${key}`;
+}
+
+/**
+ * Top-level staging folder for a bucket (brand). Inside it we use purchaser-wise subfolders.
+ * Structure: stagingDir/<brand>/<purchaser>/<key after prefix>.
+ */
+export function getStagingSubdir(bucket: S3BucketConfig): string {
+  return bucket.name;
 }
 
 function loadSyncManifest(manifestPath: string): Record<string, string> {
@@ -114,26 +122,46 @@ export async function syncBucket(
     manifest: Record<string, string>;
     manifestPath: string;
     limitRemaining: { value: number };
+    /** When set, called after each file. done = new downloads so far; total = limit or 0 (unknown). */
+    onProgress?: (done: number, total: number) => void;
+    /** Used for progress: limit when set, 0 when no limit (unknown total). */
+    initialLimit: number;
   }
-): Promise<{ brand: string; synced: number; skipped: number; errors: number }> {
+): Promise<{ brand: string; stagingPath: string; synced: number; skipped: number; errors: number }> {
   const prefix = bucketConfig.prefix ?? '';
   const keys = await listAllKeys(client, bucketConfig.bucket, prefix);
   let synced = 0;
   let skipped = 0;
   let errors = 0;
-  const brandDir = join(stagingDir, bucketConfig.name);
-  if (!existsSync(brandDir)) mkdirSync(brandDir, { recursive: true });
   const brand = bucketConfig.name;
+  const brandDir = join(stagingDir, brand);
+  const purchaser =
+    bucketConfig.purchaser ??
+    (bucketConfig.name.includes('__') ? bucketConfig.name.split('__')[1] : '');
+  if (!existsSync(brandDir)) mkdirSync(brandDir, { recursive: true });
+  const stagingPathForResult = purchaser ? join(brandDir, purchaser) : brandDir;
+
+  const reportProgress = () => {
+    if (!options.onProgress) return;
+    const total = options.initialLimit;
+    const done =
+      total > 0
+        ? total - options.limitRemaining.value
+        : synced + skipped + errors;
+    options.onProgress(done, total);
+  };
 
   for (const { key } of keys) {
     if (options.limitRemaining.value <= 0) break;
 
-    const destPath = join(brandDir, key);
+    const keyAfterPrefix = prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
+    const destPath = purchaser ? join(brandDir, purchaser, keyAfterPrefix) : join(brandDir, key);
     const mk = manifestKey(brand, key);
 
     const shouldSkip = await skipIfUnchanged(destPath, mk, options.manifest);
     if (shouldSkip) {
       skipped++;
+      reportProgress();
       continue;
     }
 
@@ -143,49 +171,101 @@ export async function syncBucket(
       options.manifest[mk] = sha;
       synced++;
       options.limitRemaining.value--;
+      reportProgress();
     } catch (e) {
       errors++;
       console.error(`Failed to download s3://${bucketConfig.bucket}/${key}:`, e);
+      reportProgress();
     }
   }
 
-  return { brand, synced, skipped, errors };
+  return { brand, stagingPath: stagingPathForResult, synced, skipped, errors };
 }
 
 /**
  * Sync all configured buckets to staging. Respects syncLimit and uses SHA-256 manifest to skip unchanged files.
  * @param overrides.syncLimit - Override config (e.g. from CLI --limit).
  * @param overrides.buckets - Use these buckets instead of config.s3.buckets (e.g. for tenant/purchaser filter).
+ * @param overrides.onProgress - Optional progress callback: (done, total). total is 0 when limit not set (unknown).
  */
 export async function syncAllBuckets(
   config: Config,
-  overrides?: { syncLimit?: number; buckets?: S3BucketConfig[] }
-): Promise<{ brand: string; synced: number; skipped: number; errors: number }[]> {
+  overrides?: {
+    syncLimit?: number;
+    buckets?: S3BucketConfig[];
+    onProgress?: (done: number, total: number) => void;
+  }
+): Promise<SyncResult[]> {
   const client = getS3Client(config.s3.region);
   const stagingDir = config.s3.stagingDir;
   if (!existsSync(stagingDir)) mkdirSync(stagingDir, { recursive: true });
 
   const limit = overrides?.syncLimit ?? config.s3.syncLimit;
   const limitRemaining = { value: limit !== undefined && limit > 0 ? limit : Number.MAX_SAFE_INTEGER };
+  const initialLimit = limit !== undefined && limit > 0 ? limit : 0;
 
   const manifestPath =
     config.s3.syncManifestPath ?? join(dirname(config.run.checkpointPath), 'sync-manifest.json');
   const manifest = loadSyncManifest(manifestPath);
 
   const buckets = overrides?.buckets ?? config.s3.buckets;
-  const results: { brand: string; synced: number; skipped: number; errors: number }[] = [];
+  const results: SyncResult[] = [];
   for (const bucket of buckets) {
     const result = await syncBucket(client, bucket, stagingDir, {
       manifest,
       manifestPath,
       limitRemaining,
+      onProgress: overrides?.onProgress,
+      initialLimit,
     });
     results.push(result);
-    console.log(
-      `[S3] ${result.brand}: synced ${result.synced}, skipped (unchanged) ${result.skipped}, errors ${result.errors}`
-    );
   }
 
   saveSyncManifest(manifestPath, manifest);
   return results;
+}
+
+export interface SyncResult {
+  brand: string;
+  stagingPath: string;
+  synced: number;
+  skipped: number;
+  errors: number;
+}
+
+/**
+ * Print structured sync summary. Clarifies: download limit applies only to new downloads;
+ * skipped = already present and unchanged (do not count toward limit).
+ */
+export function printSyncResults(results: SyncResult[], syncLimit?: number): void {
+  const totalSynced = results.reduce((s, r) => s + r.synced, 0);
+  const totalSkipped = results.reduce((s, r) => s + r.skipped, 0);
+  const totalErrors = results.reduce((s, r) => s + r.errors, 0);
+  const limitLabel =
+    syncLimit !== undefined && syncLimit > 0 ? `${syncLimit} new file(s)` : 'no limit';
+
+  const lines: string[] = [
+    'Sync Summary',
+    '------------',
+    `Download limit: ${limitLabel}`,
+    `Downloaded (new): ${totalSynced}`,
+    `Skipped (already present, unchanged): ${totalSkipped}`,
+    `Errors: ${totalErrors}`,
+    '',
+  ];
+
+  if (results.length > 0) {
+    lines.push('By brand (staging path → counts):');
+    for (const r of results) {
+      const [tenant, purchaser] = r.brand.includes('__') ? r.brand.split('__') : [r.brand, ''];
+      const label = purchaser ? `${tenant} / ${purchaser}` : r.brand;
+      lines.push(
+        `  ${label}`,
+        `    Staging path: ${r.stagingPath}`,
+        `    Downloaded: ${r.synced}, Skipped: ${r.skipped}, Errors: ${r.errors}`
+      );
+    }
+  }
+
+  console.log(lines.join('\n'));
 }

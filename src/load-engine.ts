@@ -6,10 +6,11 @@
 import PQueue from 'p-queue';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { Config, CheckpointRecord } from './types.js';
+import type { Config, CheckpointRecord, S3BucketConfig } from './types.js';
 import { extract } from './api-client.js';
 import { openCheckpointDb, getOrCreateRunId, getCompletedPaths, upsertCheckpoint, getRecordsForRun, closeCheckpointDb } from './checkpoint.js';
 import { initRequestResponseLogger, logRequestResponse, closeRequestResponseLogger } from './logger.js';
+import { getStagingSubdir } from './s3-sync.js';
 
 export interface FileJob {
   filePath: string;
@@ -24,10 +25,11 @@ export interface LoadEngineResult {
   finishedAt: Date;
 }
 
-function discoverStagingFiles(stagingDir: string, buckets: { name: string }[]): FileJob[] {
+function discoverStagingFiles(stagingDir: string, buckets: S3BucketConfig[]): FileJob[] {
   const jobs: FileJob[] = [];
   for (const bucket of buckets) {
-    const brandDir = join(stagingDir, bucket.name);
+    const subdir = getStagingSubdir(bucket);
+    const brandDir = join(stagingDir, subdir);
     if (!existsSync(brandDir)) continue;
     const walk = (dir: string) => {
       const entries = readdirSync(dir, { withFileTypes: true });
@@ -80,6 +82,18 @@ export async function runExtraction(
   }
   const queue = new PQueue(queueOptions);
   const startedAt = new Date();
+  const total = toProcess.length;
+  let done = 0;
+  const isTTY = typeof process !== 'undefined' && process.stdout?.isTTY === true;
+  const barWidth = 24;
+
+  function updateProgress(): void {
+    if (!isTTY || total === 0) return;
+    const pct = total === 0 ? 100 : Math.min(100, Math.round((100 * done) / total));
+    const filled = Math.round((barWidth * done) / total);
+    const bar = '='.repeat(filled) + ' '.repeat(barWidth - filled);
+    process.stdout.write(`\rExtraction: [${bar}] ${pct}% (${done}/${total})`);
+  }
 
   for (const job of toProcess) {
     queue.add(async () => {
@@ -150,10 +164,17 @@ export async function runExtraction(
         errorMessage: result.success ? undefined : result.body.slice(0, 500),
         runId,
       });
+    }).finally(() => {
+      done++;
+      updateProgress();
     });
   }
 
+  if (isTTY && total > 0) updateProgress();
   await queue.onIdle();
+  if (isTTY && total > 0) {
+    process.stdout.write('\r' + ' '.repeat(60) + '\r');
+  }
   const finishedAt = new Date();
   const records = getRecordsForRun(db, runId);
   closeRequestResponseLogger();
