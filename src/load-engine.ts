@@ -7,7 +7,7 @@ import PQueue from 'p-queue';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { Config, CheckpointRecord, S3BucketConfig } from './types.js';
-import { extract } from './api-client.js';
+import { extract, getExtractUploadUrl } from './api-client.js';
 import { openCheckpointDb, getOrCreateRunId, getCompletedPaths, upsertCheckpoint, getRecordsForRun, closeCheckpointDb } from './checkpoint.js';
 import { initRequestResponseLogger, logRequestResponse, closeRequestResponseLogger } from './logger.js';
 import { getStagingSubdir } from './s3-sync.js';
@@ -137,7 +137,7 @@ export async function runExtraction(
         brand: job.brand,
         request: {
           method: 'POST',
-          url: `${config.api.baseUrl}/extract`,
+          url: getExtractUploadUrl(config),
           bodyPreview: undefined,
           bodyLength: bodyBase64?.length,
         },

@@ -1,14 +1,14 @@
 /**
- * EntelliExtract API client.
- * Authenticates using Access Key, Secret Message, and Signature.
- * Adapt sign() to match your API's auth scheme (e.g. custom header or HMAC).
+ * intelliExtract API client.
+ * Uses POST /api/v1/spreadsheet/extract/upload (multipart/form-data file upload).
+ * Auth headers (must match Swagger): X-Access-Key, X-Secret-Message, X-Signature.
  */
 
+import { config as loadEnv } from 'dotenv';
+import { basename } from 'node:path';
 import type { Config } from './types.js';
 
-const ACCESS_KEY = process.env.ENTELLIEXTRACT_ACCESS_KEY ?? '';
-const SECRET_MESSAGE = process.env.ENTELLIEXTRACT_SECRET_MESSAGE ?? '';
-const SIGNATURE = process.env.ENTELLIEXTRACT_SIGNATURE ?? '';
+loadEnv();
 
 export interface ExtractRequest {
   filePath: string;
@@ -25,12 +25,21 @@ export interface ExtractResult {
   headers: Record<string, string>;
 }
 
+/** Base URL for the extract-upload endpoint (no trailing slash). */
+export function getExtractUploadUrl(config: Config): string {
+  const base = config.api.baseUrl.replace(/\/$/, '');
+  return `${base}/api/v1/spreadsheet/extract/upload`;
+}
+
+/** Auth headers exactly as Swagger: X-Access-Key, X-Signature, X-Secret-Message (raw message that was signed). */
 function buildAuthHeaders(): Record<string, string> {
-  // Use the three credentials as required by your API (e.g. custom headers or signing).
+  const accessKey = process.env.ENTELLIEXTRACT_ACCESS_KEY ?? '';
+  const secretMessage = process.env.ENTELLIEXTRACT_SECRET_MESSAGE ?? '';
+  const signature = process.env.ENTELLIEXTRACT_SIGNATURE ?? '';
   return {
-    'X-Access-Key': ACCESS_KEY,
-    'X-Secret-Message': SECRET_MESSAGE,
-    'X-Signature': SIGNATURE,
+    'X-Access-Key': accessKey,
+    'X-Secret-Message': secretMessage,
+    'X-Signature': signature,
   };
 }
 
@@ -39,15 +48,23 @@ export async function extract(
   request: ExtractRequest,
   abortSignal?: AbortSignal
 ): Promise<ExtractResult> {
-  const url = `${config.api.baseUrl.replace(/\/$/, '')}/extract`;
+  const url = getExtractUploadUrl(config);
   const start = Date.now();
 
-  const body = JSON.stringify({
-    filePath: request.filePath,
-    fileContentBase64: request.fileContentBase64,
-    fileUrl: request.fileUrl,
-    brand: request.brand,
-  });
+  if (!request.fileContentBase64) {
+    return {
+      success: false,
+      statusCode: 0,
+      latencyMs: Date.now() - start,
+      body: 'Missing file content (fileContentBase64 required for upload)',
+      headers: {},
+    };
+  }
+
+  const fileBuffer = Buffer.from(request.fileContentBase64, 'base64');
+  const filename = basename(request.filePath);
+  const form = new FormData();
+  form.append('file', new Blob([fileBuffer]), filename);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.api.timeoutMs);
@@ -56,11 +73,8 @@ export async function extract(
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...buildAuthHeaders(),
-      },
-      body,
+      headers: buildAuthHeaders(),
+      body: form,
       signal,
     });
     const latencyMs = Date.now() - start;
