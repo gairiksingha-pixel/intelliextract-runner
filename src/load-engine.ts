@@ -4,8 +4,8 @@
  */
 
 import PQueue from 'p-queue';
-import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
-import { join, relative, dirname, basename, extname } from 'node:path';
+import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join, relative, dirname } from 'node:path';
 import type { Config, CheckpointRecord, S3BucketConfig } from './types.js';
 import { extract, getExtractUploadUrl } from './api-client.js';
 import { openCheckpointDb, getOrCreateRunId, getCompletedPaths, upsertCheckpoint, getRecordsForRun, closeCheckpointDb } from './checkpoint.js';
@@ -37,12 +37,7 @@ function discoverStagingFiles(stagingDir: string, buckets: S3BucketConfig[]): Fi
         const full = join(dir, e.name);
         const rel = relative(brandDir, full);
         if (e.isDirectory()) walk(full);
-        else {
-          const parentName = basename(dir);
-          const fileBase = basename(full, extname(full));
-          if (parentName === fileBase) continue;
-          jobs.push({ filePath: full, relativePath: rel, brand: bucket.name });
-        }
+        else jobs.push({ filePath: full, relativePath: rel, brand: bucket.name });
       }
     };
     walk(brandDir);
@@ -50,16 +45,14 @@ function discoverStagingFiles(stagingDir: string, buckets: S3BucketConfig[]): Fi
   return jobs;
 }
 
-/** Per-file output dir under staging: staging/.../brand/purchaser/<file-basename-no-ext>/ */
-export function getExtractionOutputDir(filePath: string): string {
-  return join(dirname(filePath), basename(filePath, extname(filePath)));
+/** Safe filename for extraction result JSON (one per file per run). */
+function extractionResultFilename(job: FileJob): string {
+  const safe = job.relativePath.replaceAll('/', '_').replaceAll(/[^a-zA-Z0-9._-]/g, '_');
+  const base = job.brand + '_' + (safe || 'file');
+  return base.endsWith('.json') ? base : base + '.json';
 }
 
-function escapeHtml(s: string): string {
-  return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-}
-
-/** Write extraction response and per-file reports under staging/.../brand/purchaser/<file-name>/ */
+/** Write full API response JSON for successful extractions so you get the same shape as Swagger (success, data, item_list, etc.). */
 function writeExtractionResult(
   config: Config,
   runId: string,
@@ -67,32 +60,18 @@ function writeExtractionResult(
   responseBody: string
 ): string | null {
   try {
-    const fileOutputDir = getExtractionOutputDir(job.filePath);
-    mkdirSync(fileOutputDir, { recursive: true });
+    const extractionsDir = join(dirname(config.report.outputDir), 'extractions', runId);
+    mkdirSync(extractionsDir, { recursive: true });
+    const filename = extractionResultFilename(job);
+    const path = join(extractionsDir, filename);
     let data: unknown;
     try {
       data = JSON.parse(responseBody);
     } catch {
       data = { raw: responseBody.slice(0, 10000) };
     }
-    const jsonStr = JSON.stringify(data, null, 2);
-    writeFileSync(join(fileOutputDir, 'response.json'), jsonStr, 'utf-8');
-    const fileLabel = basename(job.filePath);
-    writeFileSync(
-      join(fileOutputDir, 'report.md'),
-      `# Extraction: ${fileLabel}\n\n**Run ID:** ${runId}\n\n## Response\n\n\`\`\`json\n${jsonStr}\n\`\`\`\n`,
-      'utf-8'
-    );
-    writeFileSync(
-      join(fileOutputDir, 'report.json'),
-      JSON.stringify({ filePath: job.filePath, runId, response: data }, null, 2),
-      'utf-8'
-    );
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Extraction: ${escapeHtml(fileLabel)}</title><style>body{font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem;} pre{background:#f8f8f8;padding:1rem;overflow:auto;}</style></head><body><h1>Extraction: ${escapeHtml(fileLabel)}</h1><p><strong>Run ID:</strong> ${escapeHtml(runId)}</p><h2>Response</h2><pre>${escapeHtml(jsonStr)}</pre></body></html>`;
-    writeFileSync(join(fileOutputDir, 'report.html'), html, 'utf-8');
-    const destFile = join(fileOutputDir, basename(job.filePath));
-    if (existsSync(job.filePath)) renameSync(job.filePath, destFile);
-    return fileOutputDir;
+    writeFileSync(path, JSON.stringify(data, null, 2), 'utf-8');
+    return path;
   } catch {
     return null;
   }
@@ -113,6 +92,9 @@ export async function runExtraction(
   const runId = getOrCreateRunId(db);
   const completed = config.run.skipCompleted ? getCompletedPaths(db, runId) : new Set<string>();
   initRequestResponseLogger(config, runId);
+
+  const extractionsDir = join(dirname(config.report.outputDir), 'extractions', runId);
+  if (existsSync(extractionsDir)) rmSync(extractionsDir, { recursive: true });
 
   const buckets =
     options?.tenant && options?.purchaser

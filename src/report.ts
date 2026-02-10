@@ -3,38 +3,58 @@
  * Includes full API extraction response(s) per file when available.
  */
 
-import { mkdirSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import type { Config, RunMetrics, ExecutiveSummary } from './types.js';
 import { openCheckpointDb, getRecordsForRun, closeCheckpointDb } from './checkpoint.js';
-import { getExtractionOutputDir } from './load-engine.js';
 
 export interface ExtractionResultEntry {
   filename: string;
   response: unknown;
 }
 
-/** Load extraction results from staging per-file folders (brand/purchaser/<file-name>/response.json). */
+/** Same naming as load-engine so we only show results for files that succeeded in this run. */
+function extractionResultFilenameFromRecord(record: { relativePath: string; brand: string }): string {
+  const safe = record.relativePath.replaceAll('/', '_').replaceAll(/[^a-zA-Z0-9._-]/g, '_');
+  const base = record.brand + '_' + (safe || 'file');
+  return base.endsWith('.json') ? base : base + '.json';
+}
+
 function loadExtractionResults(config: Config, runId: string): ExtractionResultEntry[] {
+  const extractionsDir = join(dirname(config.report.outputDir), 'extractions', runId);
+  if (!existsSync(extractionsDir)) return [];
+  const entries = readdirSync(extractionsDir, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.json'))
+    .map((e) => {
+      const path = join(extractionsDir, e.name);
+      try {
+        const raw = readFileSync(path, 'utf-8');
+        const response = JSON.parse(raw) as unknown;
+        return { filename: e.name, response };
+      } catch {
+        return null;
+      }
+    })
+    .filter((x): x is ExtractionResultEntry => x !== null);
+  return entries;
+}
+
+/** Keep only extraction results for files that completed successfully in this run (so report doesn't show old run's responses). */
+function filterExtractionResultsForRun(
+  config: Config,
+  runId: string,
+  allResults: ExtractionResultEntry[]
+): ExtractionResultEntry[] {
   const db = openCheckpointDb(config.run.checkpointPath);
   const records = getRecordsForRun(db, runId);
   closeCheckpointDb(db);
-  const doneRecords = records.filter((r) => r.status === 'done');
-  const entries: ExtractionResultEntry[] = [];
-  for (const record of doneRecords) {
-    const fileOutputDir = getExtractionOutputDir(record.filePath);
-    const responsePath = join(fileOutputDir, 'response.json');
-    if (!existsSync(responsePath)) continue;
-    try {
-      const raw = readFileSync(responsePath, 'utf-8');
-      const response = JSON.parse(raw) as unknown;
-      const filename = fileOutputDir.split(/[/\\]/).pop() ?? record.relativePath;
-      entries.push({ filename, response });
-    } catch {
-      // skip
-    }
-  }
-  return entries;
+  const doneFilenames = new Set(
+    records
+      .filter((r) => r.status === 'done')
+      .map((r) => extractionResultFilenameFromRecord({ relativePath: r.relativePath, brand: r.brand }))
+  );
+  if (doneFilenames.size === 0) return [];
+  return allResults.filter((e) => doneFilenames.has(e.filename));
 }
 
 function formatDuration(ms: number): string {
@@ -180,7 +200,8 @@ export function writeReports(config: Config, summary: ExecutiveSummary): string[
 
   const runId = summary.metrics.runId;
   const written: string[] = [];
-  const extractionResults = loadExtractionResults(config, runId);
+  const allResults = loadExtractionResults(config, runId);
+  const extractionResults = filterExtractionResultsForRun(config, runId, allResults);
 
   if (summary.metrics.runId) {
     const base = `report_${runId}_${Date.now()}`;

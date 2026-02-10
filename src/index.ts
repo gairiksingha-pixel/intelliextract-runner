@@ -119,11 +119,15 @@ program
       }
       console.log(`Run ${result.run.runId} finished. Success: ${result.metrics.success}, Failed: ${result.metrics.failed}, Skipped: ${result.metrics.skipped}`);
       if (result.metrics.success > 0) {
-        console.log(
-          `Extraction result(s) per file: under output/staging/<brand>/<purchaser>/<file-name>/ (response.json, report.md, report.html, report.json)`
-        );
+        const extractionsDir = `${dirname(config.report.outputDir)}/extractions/${result.run.runId}`;
+        console.log(`Extraction result(s): ${extractionsDir} (full API response JSON per file)`);
       }
       saveLastRunId(config, result.run.runId);
+      if (doReport) {
+        const summary = buildSummary(result.metrics);
+        const paths = writeReports(config, summary);
+        console.log('Report(s) written:', paths);
+      }
     } catch (e) {
       console.error('Run failed:', e instanceof Error ? e.message : String(e));
       process.exit(1);
