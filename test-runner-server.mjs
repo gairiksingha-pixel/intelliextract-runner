@@ -24,12 +24,16 @@ function getLastRunId() {
 function syncArgs(p) {
   const base = ['dist/index.js', 'sync'];
   if (p?.syncLimit > 0) base.push('--limit', String(p.syncLimit));
+  if (p?.tenant) base.push('--tenant', p.tenant);
+  if (p?.purchaser) base.push('--purchaser', p.purchaser);
   return ['node', base, { cwd: ROOT }];
 }
 function runArgs(p, extra = []) {
   const base = ['dist/index.js', 'run', ...extra];
   if (p?.syncLimit > 0) base.push('--sync-limit', String(p.syncLimit));
   if (p?.extractLimit > 0) base.push('--extract-limit', String(p.extractLimit));
+  if (p?.tenant) base.push('--tenant', p.tenant);
+  if (p?.purchaser) base.push('--purchaser', p.purchaser);
   return ['node', base, { cwd: ROOT }];
 }
 
@@ -182,7 +186,7 @@ createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     try {
-      const { caseId, syncLimit, extractLimit } = JSON.parse(body || '{}');
+      const { caseId, syncLimit, extractLimit, tenant, purchaser } = JSON.parse(body || '{}');
       if (!caseId || !CASE_COMMANDS[caseId]) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid or missing caseId' }));
@@ -191,6 +195,8 @@ createServer(async (req, res) => {
       const params = {};
       if (syncLimit !== undefined && Number(syncLimit) >= 0) params.syncLimit = Number(syncLimit);
       if (extractLimit !== undefined && Number(extractLimit) >= 0) params.extractLimit = Number(extractLimit);
+      if (tenant && typeof tenant === 'string') params.tenant = tenant.trim();
+      if (purchaser && typeof purchaser === 'string') params.purchaser = purchaser.trim();
       const result = await runCase(caseId, params);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));

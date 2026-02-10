@@ -11,6 +11,10 @@ export interface S3BucketConfig {
   name: string;
   bucket: string;
   prefix?: string;
+  /** Tenant folder name (when using single-bucket tenant/purchaser layout). */
+  tenant?: string;
+  /** Purchaser folder name (when using single-bucket tenant/purchaser layout). */
+  purchaser?: string;
 }
 
 export interface S3Config {

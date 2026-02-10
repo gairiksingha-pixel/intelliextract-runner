@@ -131,6 +131,21 @@
         font-size: 0.875rem;
         font-weight: 400;
       }
+      .header-label {
+        font-size: 0.8125rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+      }
+      .header-select {
+        padding: 0.35rem 0.5rem;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 0.8125rem;
+        font-family: inherit;
+        min-width: 10rem;
+      }
       .main {
         max-width: 1400px;
         margin: 0 auto;
@@ -333,11 +348,24 @@
         <div>
           <h1>EntelliExtract Test Cases</h1>
           <p class="subtitle">
-            Run test cases from the browser. Click <strong>Run</strong> to
-            execute a case.
+            Run test cases from the browser. Choose <strong>Brand</strong> and <strong>Purchaser</strong> to sync or extract for a specific brand's purchaser; leave as All to run for all.
           </p>
         </div>
         <div class="header-right">
+          <label class="header-label">Brand</label>
+          <select id="tenant-select" class="header-select" title="Select brand">
+            <option value="">All</option>
+            <option value="no-cow-026090539970-prod">no-cow-026090539970-prod</option>
+            <option value="sundia-026090539970-prod">sundia-026090539970-prod</option>
+            <option value="tractor-beverage-026090539970-prod">tractor-beverage-026090539970-prod</option>
+          </select>
+          <label class="header-label">Purchaser</label>
+          <select id="purchaser-select" class="header-select" title="Select purchaser (filtered by brand)">
+            <option value="">All</option>
+            <option value="DOT_FOODS">DOT_FOODS</option>
+            <option value="KEHE">KEHE</option>
+            <option value="UNFI">UNFI</option>
+          </select>
           <span class="server-status" id="server-check">Checking…</span>
           <button
             type="button"
@@ -424,15 +452,15 @@
           {
             id: "P1",
             scenario: "Sync (valid config)",
-            cmd: "npm start sync",
-            expected: "Exit 0, files in staging",
+            cmd: "npm start sync [--tenant T --purchaser P]",
+            expected: "Exit 0, files in staging (for selected tenant/purchaser or all)",
             limits: { sync: true, extract: false },
           },
           {
             id: "P2",
             scenario: "Run extraction",
-            cmd: "npm start run -- --no-sync",
-            expected: "Exit 0, report + log",
+            cmd: "npm start run -- --no-sync [--tenant T --purchaser P]",
+            expected: "Exit 0, report + log (for selected tenant/purchaser or all)",
             limits: { sync: false, extract: true },
           },
           {
@@ -466,8 +494,8 @@
           {
             id: "P7",
             scenario: "Req 1 Full pipeline",
-            cmd: "npm start run",
-            expected: "Exit 0, sync then run all",
+            cmd: "npm start run [--tenant T --purchaser P]",
+            expected: "Exit 0, sync then run (for selected tenant/purchaser or all)",
             limits: { sync: true, extract: true },
           },
           {
@@ -561,14 +589,14 @@
           {
             id: "E4",
             scenario: "Empty S3 bucket",
-            cmd: "sync",
+            cmd: "sync [--tenant T --purchaser P]",
             expected: "Exit 0, synced 0, errors 0",
             limits: { sync: true, extract: false },
           },
           {
             id: "E5",
             scenario: "S3 partial failures",
-            cmd: "sync",
+            cmd: "sync [--tenant T --purchaser P]",
             expected: "Exit 0, errors M>0",
             limits: { sync: true, extract: false },
           },
@@ -710,11 +738,21 @@
         };
       }
 
+      function getTenantPurchaser() {
+        var tenantEl = document.getElementById("tenant-select");
+        var purchaserEl = document.getElementById("purchaser-select");
+        var tenant = tenantEl && tenantEl.value ? tenantEl.value.trim() : "";
+        var purchaser = purchaserEl && purchaserEl.value ? purchaserEl.value.trim() : "";
+        if (!tenant || !purchaser) return { tenant: undefined, purchaser: undefined };
+        return { tenant: tenant, purchaser: purchaser };
+      }
+
       async function runCase(caseId, btn, resultDiv) {
         btn.disabled = true;
         showResult(resultDiv, null, false);
         var row = btn.closest("tr");
         var params = getParamsFromRow(row);
+        var tp = getTenantPurchaser();
         try {
           var r = await fetch("/run", {
             method: "POST",
@@ -723,6 +761,8 @@
               caseId: caseId,
               syncLimit: params.syncLimit,
               extractLimit: params.extractLimit,
+              tenant: tp.tenant,
+              purchaser: tp.purchaser,
             }),
           });
           var data = await r.json();
@@ -755,6 +795,30 @@
         });
       });
 
+      var BRAND_PURCHASERS = {
+        "no-cow-026090539970-prod": ["DOT_FOODS", "KEHE", "UNFI"],
+        "sundia-026090539970-prod": ["DOT_FOODS", "KEHE"],
+        "tractor-beverage-026090539970-prod": ["DOT_FOODS"],
+      };
+      function refreshPurchaserOptions() {
+        var brandSelect = document.getElementById("tenant-select");
+        var purchaserSelect = document.getElementById("purchaser-select");
+        if (!brandSelect || !purchaserSelect) return;
+        var brand = brandSelect.value;
+        var current = purchaserSelect.value;
+        var opts = brand ? (BRAND_PURCHASERS[brand] || ["DOT_FOODS", "KEHE", "UNFI"]) : ["DOT_FOODS", "KEHE", "UNFI"];
+        purchaserSelect.innerHTML = '<option value="">All</option>' + opts.map(function (p) { return '<option value="' + p + '">' + p + '</option>'; }).join("");
+        if (opts.indexOf(current) !== -1) purchaserSelect.value = current;
+        else purchaserSelect.value = "";
+      }
+      (function () {
+        var brandSelect = document.getElementById("tenant-select");
+        var purchaserSelect = document.getElementById("purchaser-select");
+        if (brandSelect && purchaserSelect) {
+          brandSelect.addEventListener("change", refreshPurchaserOptions);
+          refreshPurchaserOptions();
+        }
+      })();
       (function () {
         var reloadBtn = document.getElementById("header-reload");
         if (reloadBtn)

@@ -45,7 +45,7 @@ export function loadConfig(configPath: string = CONFIG_PATH): Config {
     raw = readFileSync(configPath, 'utf-8');
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`Failed to load config from ${configPath}. Copy config.example.yaml to config.yaml and set values. ${msg}`, { cause: e });
+    throw new Error(`Failed to load config from ${configPath}. ${msg}`, { cause: e });
   }
   let parsed: Record<string, unknown>;
   try {
@@ -58,6 +58,26 @@ export function loadConfig(configPath: string = CONFIG_PATH): Config {
     throw new Error(`Config at ${configPath} must be a YAML object.`);
   }
   const withEnv = substituteEnv(parsed) as Config;
+  // Build S3 buckets from env when S3_BUCKET + S3_TENANT_PURCHASERS are set (single bucket, tenant/purchaser folders)
+  const envBucket = process.env.S3_BUCKET?.trim();
+  const envTenantPurchasers = process.env.S3_TENANT_PURCHASERS;
+  if (envBucket && envTenantPurchasers) {
+    try {
+      const mapping = JSON.parse(envTenantPurchasers) as Record<string, string[]>;
+      const buckets: Config['s3']['buckets'] = [];
+      for (const [tenant, purchasers] of Object.entries(mapping)) {
+        if (!Array.isArray(purchasers)) continue;
+        for (const purchaser of purchasers) {
+          const name = `${tenant}__${purchaser}`;
+          const prefix = `${tenant}/${purchaser}/`;
+          buckets.push({ name, bucket: envBucket, prefix, tenant, purchaser });
+        }
+      }
+      if (buckets.length > 0) withEnv.s3.buckets = buckets;
+    } catch {
+      // ignore invalid JSON, keep yaml buckets
+    }
+  }
   validateConfig(withEnv, configPath);
   // Apply env overrides for API
   if (process.env.ENTELLIEXTRACT_BASE_URL) withEnv.api.baseUrl = process.env.ENTELLIEXTRACT_BASE_URL;

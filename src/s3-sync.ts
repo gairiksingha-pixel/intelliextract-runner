@@ -155,10 +155,11 @@ export async function syncBucket(
 /**
  * Sync all configured buckets to staging. Respects syncLimit and uses SHA-256 manifest to skip unchanged files.
  * @param overrides.syncLimit - Override config (e.g. from CLI --limit).
+ * @param overrides.buckets - Use these buckets instead of config.s3.buckets (e.g. for tenant/purchaser filter).
  */
 export async function syncAllBuckets(
   config: Config,
-  overrides?: { syncLimit?: number }
+  overrides?: { syncLimit?: number; buckets?: S3BucketConfig[] }
 ): Promise<{ brand: string; synced: number; skipped: number; errors: number }[]> {
   const client = getS3Client(config.s3.region);
   const stagingDir = config.s3.stagingDir;
@@ -171,8 +172,9 @@ export async function syncAllBuckets(
     config.s3.syncManifestPath ?? join(dirname(config.run.checkpointPath), 'sync-manifest.json');
   const manifest = loadSyncManifest(manifestPath);
 
+  const buckets = overrides?.buckets ?? config.s3.buckets;
   const results: { brand: string; synced: number; skipped: number; errors: number }[] = [];
-  for (const bucket of config.s3.buckets) {
+  for (const bucket of buckets) {
     const result = await syncBucket(client, bucket, stagingDir, {
       manifest,
       manifestPath,

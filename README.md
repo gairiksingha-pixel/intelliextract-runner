@@ -1,6 +1,6 @@
 # EntelliExtract Test Stub
 
-TypeScript test automation for the EntelliExtract spreadsheet extraction API. Supports S3 sync from brand buckets, file-level checkpointing (resumable runs), configurable concurrency and rate limiting, full request/response logging, and executive summary reports (Markdown, HTML, JSON).
+TypeScript test automation for the EntelliExtract spreadsheet extraction API. Supports S3 sync from a single bucket with tenant/purchaser folders, file-level checkpointing (resumable runs), configurable concurrency and rate limiting, full request/response logging, and executive summary reports (Markdown, HTML, JSON).
 
 ## Requirements
 
@@ -18,18 +18,16 @@ TypeScript test automation for the EntelliExtract spreadsheet extraction API. Su
 
 2. **Configuration**
 
-   - Copy `config/config.example.yaml` to `config/config.yaml`.
-   - Set your S3 bucket names and paths, staging directory, concurrency, and report options.
+   - Edit `config/config.yaml` (staging dir, concurrency, report options). S3 buckets are built from `.env` when `S3_BUCKET` and `S3_TENANT_PURCHASERS` are set.
 
 3. **Environment (credentials)**
 
-   - Copy `.env.example` to `.env`.
-   - Set EntelliExtract API credentials:
+   - Create `.env` with EntelliExtract API credentials:
      - `ENTELLIEXTRACT_BASE_URL` – API base URL
      - `ENTELLIEXTRACT_ACCESS_KEY`
      - `ENTELLIEXTRACT_SECRET_MESSAGE`
      - `ENTELLIEXTRACT_SIGNATURE`
-   - For S3 sync, set AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) or use a configured AWS profile.
+   - For S3 sync, set AWS credentials and `S3_BUCKET`, `S3_TENANT_PURCHASERS` (JSON map of tenant folder → purchaser folders). See `.env` for the bucket and tenant/purchaser layout.
 
 4. **Build**
 
@@ -41,18 +39,19 @@ TypeScript test automation for the EntelliExtract spreadsheet extraction API. Su
 
 All commands use the config file at `config/config.yaml` unless you pass `-c path/to/config.yaml`.
 
-- **Sync only** – copy files from production S3 buckets (Sundia, No Cow, Tractor) to the staging directory:
+- **Sync only** – copy files from the S3 bucket (tenant/purchaser folders) to staging. Optionally scope to one tenant and purchaser:
 
   ```bash
   npm start sync
-  # or: node dist/index.js sync
+  npm start sync -- --tenant no-cow-026090539970-prod --purchaser DOT_FOODS
   ```
 
-- **Run extraction** – sync (optional) then run the extraction API against every file in staging. Uses checkpointing so you can resume after an interrupt:
+- **Run extraction** – sync (optional) then run the extraction API against staging files. Optionally scope to one tenant/purchaser. Uses checkpointing so you can resume after an interrupt:
 
   ```bash
   npm start run              # sync + run + write report
   npm start run -- --no-sync # run only (staging already present)
+  npm start run -- --tenant <tenant> --purchaser <purchaser>
   npm start run -- --no-report  # run but do not write report
   ```
 
@@ -65,7 +64,7 @@ All commands use the config file at `config/config.yaml` unless you pass `-c pat
 
 ## Output Layout
 
-- **Staging:** `output/staging/<BrandName>/<key>` – files synced from S3.
+- **Staging:** `output/staging/<tenant>__<purchaser>/<key>` – files synced from S3 (when using env-driven buckets).
 - **Sync manifest:** `output/checkpoints/sync-manifest.json` (or `s3.syncManifestPath`) – stores key → SHA-256 so already-downloaded unchanged files are skipped on the next sync.
 - **Checkpoints:** `output/checkpoints/checkpoint.json` – resumable run state; `last-run-id.txt` in the same directory stores the latest run ID for `report`.
 - **Logs:** `output/logs/request-response_<runId>.jsonl` – one JSON object per request/response for debugging.
@@ -96,9 +95,8 @@ After `npm start run` you should see something like:
 
 ```
 Running with S3 sync...
-[S3] Sundia: synced 42, skipped (unchanged) 5, errors 0
-[S3] NoCow: synced 18, skipped (unchanged) 0, errors 0
-[S3] Tractor: synced 31, skipped (unchanged) 2, errors 0
+[S3] no-cow-026090539970-prod__DOT_FOODS: synced 42, skipped (unchanged) 5, errors 0
+[S3] sundia-026090539970-prod__KEHE: synced 18, skipped (unchanged) 0, errors 0
 Run run_1739123456789_abc1234 finished. Success: 88, Failed: 0, Skipped: 3
 Report(s) written: [ 'output/reports/report_run_1739123456789_abc1234_1739123500000.md', ... ]
 ```
@@ -120,12 +118,13 @@ See `output/reports/` for the full executive summary (total files, run time, suc
 | Run without writing report | `npm start run -- --no-report` |
 | Report from last run | `npm start report` |
 | Report for specific run ID | `npm start report -- --run-id <runId>` |
+| Sync/run for one tenant+purchaser | `npm start sync -- --tenant <tenant> --purchaser <purchaser>` (same for `run`) |
 | Use custom config | `npm start sync -c path/to/config.yaml` (any command) |
 
 ### Prerequisites for testing
 
-- **Config:** `config/config.yaml` (copy from `config/config.example.yaml`).
-- **Env:** `.env` with `ENTELLIEXTRACT_BASE_URL`, `ENTELLIEXTRACT_ACCESS_KEY`, `ENTELLIEXTRACT_SECRET_MESSAGE`, `ENTELLIEXTRACT_SIGNATURE` (for extract). AWS env vars for S3 sync.
+- **Config:** `config/config.yaml`.
+- **Env:** `.env` with EntelliExtract API vars, `S3_BUCKET`, `S3_TENANT_PURCHASERS`, and AWS credentials for S3 sync.
 - **Build:** `npm run build` before running `npm start ...` (or use `npm run sync` / `npm run extract` / `npm run report`, which build then run).
 
 ---

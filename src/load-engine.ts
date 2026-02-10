@@ -47,17 +47,25 @@ function discoverStagingFiles(stagingDir: string, buckets: { name: string }[]): 
  * Run extraction against all staging files with concurrency and optional rate limit.
  * Checkpoints each file so the run can be resumed.
  * @param options.extractLimit - Max number of files to process (0 = no limit). Overrides config when set from CLI.
+ * @param options.tenant - When set with purchaser, only process files for this tenant/purchaser.
+ * @param options.purchaser - When set with tenant, only process files for this tenant/purchaser.
  */
 export async function runExtraction(
   config: Config,
-  options?: { extractLimit?: number }
+  options?: { extractLimit?: number; tenant?: string; purchaser?: string }
 ): Promise<LoadEngineResult> {
   const db = openCheckpointDb(config.run.checkpointPath);
   const runId = getOrCreateRunId(db);
   const completed = config.run.skipCompleted ? getCompletedPaths(db, runId) : new Set<string>();
   initRequestResponseLogger(config, runId);
 
-  const jobs = discoverStagingFiles(config.s3.stagingDir, config.s3.buckets);
+  const buckets =
+    options?.tenant && options?.purchaser
+      ? config.s3.buckets.filter(
+          (b) => b.tenant === options.tenant && b.purchaser === options.purchaser
+        )
+      : config.s3.buckets;
+  const jobs = discoverStagingFiles(config.s3.stagingDir, buckets);
   let toProcess = jobs.filter((j) => !completed.has(j.filePath));
   const extractLimit = options?.extractLimit;
   if (extractLimit !== undefined && extractLimit > 0) {
