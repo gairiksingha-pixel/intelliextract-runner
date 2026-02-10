@@ -118,6 +118,10 @@ program
         printSyncResults(result.syncResults, syncLimit);
       }
       console.log(`Run ${result.run.runId} finished. Success: ${result.metrics.success}, Failed: ${result.metrics.failed}, Skipped: ${result.metrics.skipped}`);
+      if (result.metrics.success > 0) {
+        const extractionsDir = `${dirname(config.report.outputDir)}/extractions/${result.run.runId}`;
+        console.log(`Extraction result(s): ${extractionsDir} (full API response JSON per file)`);
+      }
       saveLastRunId(config, result.run.runId);
       if (doReport) {
         const summary = buildSummary(result.metrics);

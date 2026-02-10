@@ -55,6 +55,8 @@ All commands use the config file at `config/config.yaml` unless you pass `-c pat
   npm start run -- --no-report  # run but do not write report
   ```
 
+  **Mock mode (offline / no API):** Set `ENTELLIEXTRACT_USE_MOCK=1` to return the fixture response from `fixtures/extract-response-success.json` instead of calling the API. Use for development or when the API is unreachable.
+
 - **Report** – generate the executive summary from the last run (or a given run ID):
 
   ```bash

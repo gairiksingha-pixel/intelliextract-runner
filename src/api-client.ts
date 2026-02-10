@@ -2,13 +2,23 @@
  * intelliExtract API client.
  * Uses POST /api/v1/spreadsheet/extract/upload (multipart/form-data file upload).
  * Auth headers (must match Swagger): X-Access-Key, X-Secret-Message, X-Signature.
+ * Set ENTELLIEXTRACT_USE_MOCK=1 to return fixture JSON instead of calling the API (for offline/dev).
  */
 
 import { config as loadEnv } from 'dotenv';
-import { basename } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import type { Config } from './types.js';
 
 loadEnv();
+
+const USE_MOCK = process.env.ENTELLIEXTRACT_USE_MOCK === '1' || process.env.ENTELLIEXTRACT_USE_MOCK === 'true';
+
+function loadMockResponse(): string | null {
+  const path = join(process.cwd(), 'fixtures', 'extract-response-success.json');
+  if (!existsSync(path)) return null;
+  return readFileSync(path, 'utf-8');
+}
 
 export interface ExtractRequest {
   filePath: string;
@@ -31,16 +41,26 @@ export function getExtractUploadUrl(config: Config): string {
   return `${base}/api/v1/spreadsheet/extract/upload`;
 }
 
-/** Auth headers exactly as Swagger: X-Access-Key, X-Signature, X-Secret-Message (raw message that was signed). */
-function buildAuthHeaders(): Record<string, string> {
+/** Headers to match Swagger: auth + Accept. Do not set Content-Type; fetch sets multipart boundary. */
+function buildHeaders(): Record<string, string> {
   const accessKey = process.env.ENTELLIEXTRACT_ACCESS_KEY ?? '';
   const secretMessage = process.env.ENTELLIEXTRACT_SECRET_MESSAGE ?? '';
   const signature = process.env.ENTELLIEXTRACT_SIGNATURE ?? '';
   return {
+    'Accept': 'application/json',
     'X-Access-Key': accessKey,
     'X-Secret-Message': secretMessage,
     'X-Signature': signature,
   };
+}
+
+/** MIME type for spreadsheet file (Swagger uses this for the file part). */
+function getSpreadsheetMimeType(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (lower.endsWith('.xls')) return 'application/vnd.ms-excel';
+  if (lower.endsWith('.csv')) return 'text/csv';
+  return 'application/octet-stream';
 }
 
 export async function extract(
@@ -48,8 +68,23 @@ export async function extract(
   request: ExtractRequest,
   abortSignal?: AbortSignal
 ): Promise<ExtractResult> {
-  const url = getExtractUploadUrl(config);
   const start = Date.now();
+
+  if (USE_MOCK) {
+    const body = loadMockResponse();
+    if (body) {
+      await new Promise((r) => setTimeout(r, 100));
+      return {
+        success: true,
+        statusCode: 200,
+        latencyMs: Date.now() - start,
+        body,
+        headers: { 'content-type': 'application/json' },
+      };
+    }
+  }
+
+  const url = getExtractUploadUrl(config);
 
   if (!request.fileContentBase64) {
     return {
@@ -63,8 +98,11 @@ export async function extract(
 
   const fileBuffer = Buffer.from(request.fileContentBase64, 'base64');
   const filename = basename(request.filePath);
+  const mimeType = getSpreadsheetMimeType(filename);
   const form = new FormData();
-  form.append('file', new Blob([fileBuffer]), filename);
+  form.append('file', new Blob([fileBuffer], { type: mimeType }), filename);
+  form.append('pattern_key', '');
+  form.append('request_metadata', '');
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.api.timeoutMs);
@@ -73,7 +111,7 @@ export async function extract(
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: buildAuthHeaders(),
+      headers: buildHeaders(),
       body: form,
       signal,
     });
@@ -93,11 +131,18 @@ export async function extract(
     clearTimeout(timeout);
     const latencyMs = Date.now() - start;
     const message = err instanceof Error ? err.message : String(err);
+    const cause =
+      err instanceof Error && err.cause instanceof Error
+        ? err.cause.message
+        : err instanceof Error && err.cause
+          ? String(err.cause)
+          : '';
+    const body = cause ? `${message} (${cause})` : message;
     return {
       success: false,
       statusCode: 0,
       latencyMs,
-      body: message,
+      body,
       headers: {},
     };
   }

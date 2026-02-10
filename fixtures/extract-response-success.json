@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "data": {
+    "notes": "1000022209",
+    "Period": "10/2/2025 - 12/18/2025",
+    "others": "2025 CMI REBATE",
+    "item_list": [
+      { "dc": "Springfield", "upc": "0208US", "po_date": "20251010", "quantity": "5", "po_number": "4501562315", "item_number": "925693", "total_amount": "2.46", "item_description": "SUNDIA FRUIT CHERRY MEDLEY W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0208US", "po_date": "20251125", "quantity": "5", "po_number": "4501570958", "item_number": "925693", "total_amount": "2.46", "item_description": "SUNDIA FRUIT CHERRY MEDLEY W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0208US", "po_date": "20251031", "quantity": "6", "po_number": "4501566357", "item_number": "925693", "total_amount": "2.95", "item_description": "SUNDIA FRUIT CHERRY MEDLEY W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0208US", "po_date": "20251114", "quantity": "6", "po_number": "4501569014", "item_number": "925693", "total_amount": "2.95", "item_description": "SUNDIA FRUIT CHERRY MEDLEY W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0208US", "po_date": "20251003", "quantity": "8", "po_number": "4501560864", "item_number": "925693", "total_amount": "3.94", "item_description": "SUNDIA FRUIT CHERRY MEDLEY W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0208US", "po_date": "20251024", "quantity": "8", "po_number": "4501565036", "item_number": "925693", "total_amount": "3.94", "item_description": "SUNDIA FRUIT CHERRY MEDLEY W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0201US", "po_date": "20250926", "quantity": "17", "po_number": "4501559557", "item_number": "925719", "total_amount": "8.36", "item_description": "SUNDIA FRUIT PEACHES W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0203US", "po_date": "20251003", "quantity": "17", "po_number": "4501560864", "item_number": "922872", "total_amount": "8.36", "item_description": "SUNDIA FRUIT MANDARIN ORANGE W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0201US", "po_date": "20251003", "quantity": "17", "po_number": "4501560864", "item_number": "925719", "total_amount": "8.36", "item_description": "SUNDIA FRUIT PEACHES W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0203US", "po_date": "20251010", "quantity": "17", "po_number": "4501562315", "item_number": "922872", "total_amount": "8.36", "item_description": "SUNDIA FRUIT MANDARIN ORANGE W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0201US", "po_date": "20251016", "quantity": "17", "po_number": "4501563343", "item_number": "925719", "total_amount": "8.36", "item_description": "SUNDIA FRUIT PEACHES W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0203US", "po_date": "20251024", "quantity": "17", "po_number": "4501565036", "item_number": "922872", "total_amount": "8.36", "item_description": "SUNDIA FRUIT MANDARIN ORANGE W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0203US", "po_date": "20251031", "quantity": "17", "po_number": "4501566357", "item_number": "922872", "total_amount": "8.36", "item_description": "SUNDIA FRUIT MANDARIN ORANGE W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0201US", "po_date": "20251107", "quantity": "17", "po_number": "4501567678", "item_number": "925719", "total_amount": "8.36", "item_description": "SUNDIA FRUIT PEACHES W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0203US", "po_date": "20251114", "quantity": "17", "po_number": "4501569014", "item_number": "922872", "total_amount": "8.36", "item_description": "SUNDIA FRUIT MANDARIN ORANGE W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0203US", "po_date": "20251121", "quantity": "17", "po_number": "4501570299", "item_number": "922872", "total_amount": "8.36", "item_description": "SUNDIA FRUIT MANDARIN ORANGE W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0201US", "po_date": "20251121", "quantity": "17", "po_number": "4501570299", "item_number": "925719", "total_amount": "8.36", "item_description": "SUNDIA FRUIT PEACHES W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0202US", "po_date": "20251205", "quantity": "17", "po_number": "4501572812", "item_number": "922898", "total_amount": "8.36", "item_description": "SUNDIA FRUIT GRAPEFRUIT RUBY W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0203US", "po_date": "20251205", "quantity": "17", "po_number": "4501572812", "item_number": "922872", "total_amount": "8.36", "item_description": "SUNDIA FRUIT MANDARIN ORANGE W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0201US", "po_date": "20251205", "quantity": "17", "po_number": "4501572812", "item_number": "925719", "total_amount": "8.36", "item_description": "SUNDIA FRUIT PEACHES W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0208US", "po_date": "20251212", "quantity": "26", "po_number": "4501574290", "item_number": "925693", "total_amount": "12.79", "item_description": "SUNDIA FRUIT CHERRY MEDLEY W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0201US", "po_date": "20251024", "quantity": "34", "po_number": "4501565036", "item_number": "925719", "total_amount": "16.73", "item_description": "SUNDIA FRUIT PEACHES W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0203US", "po_date": "20251212", "quantity": "34", "po_number": "4501574290", "item_number": "922872", "total_amount": "16.73", "item_description": "SUNDIA FRUIT MANDARIN ORANGE W/LID 7Z" },
+      { "dc": "Springfield", "upc": "0201US", "po_date": "20251212", "quantity": "34", "po_number": "4501574290", "item_number": "925719", "total_amount": "16.73", "item_description": "SUNDIA FRUIT PEACHES W/LID 7Z" }
+    ],
+    "item_list_count": 24,
+    "ded_number": "2108819396",
+    "Vendor_number": "70623",
+    "ded_description": "Vendor Purchase Rebate Report"
+  },
+  "request_metadata": null,
+  "pattern": {
+    "pattern_key": "DOT_FOODS_BACKUP_PATTERN_2",
+    "purchaser_key": "DOT_FOODS",
+    "document_type_key": "BACKUP",
+    "document_tag_key": "SUPPLIER_BILLBACK"
+  }
+}

@@ -4,8 +4,8 @@
  */
 
 import PQueue from 'p-queue';
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join, relative, dirname } from 'node:path';
 import type { Config, CheckpointRecord, S3BucketConfig } from './types.js';
 import { extract, getExtractUploadUrl } from './api-client.js';
 import { openCheckpointDb, getOrCreateRunId, getCompletedPaths, upsertCheckpoint, getRecordsForRun, closeCheckpointDb } from './checkpoint.js';
@@ -45,6 +45,38 @@ function discoverStagingFiles(stagingDir: string, buckets: S3BucketConfig[]): Fi
   return jobs;
 }
 
+/** Safe filename for extraction result JSON (one per file per run). */
+function extractionResultFilename(job: FileJob): string {
+  const safe = job.relativePath.replaceAll('/', '_').replaceAll(/[^a-zA-Z0-9._-]/g, '_');
+  const base = job.brand + '_' + (safe || 'file');
+  return base.endsWith('.json') ? base : base + '.json';
+}
+
+/** Write full API response JSON for successful extractions so you get the same shape as Swagger (success, data, item_list, etc.). */
+function writeExtractionResult(
+  config: Config,
+  runId: string,
+  job: FileJob,
+  responseBody: string
+): string | null {
+  try {
+    const extractionsDir = join(dirname(config.report.outputDir), 'extractions', runId);
+    mkdirSync(extractionsDir, { recursive: true });
+    const filename = extractionResultFilename(job);
+    const path = join(extractionsDir, filename);
+    let data: unknown;
+    try {
+      data = JSON.parse(responseBody);
+    } catch {
+      data = { raw: responseBody.slice(0, 10000) };
+    }
+    writeFileSync(path, JSON.stringify(data, null, 2), 'utf-8');
+    return path;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Run extraction against all staging files with concurrency and optional rate limit.
  * Checkpoints each file so the run can be resumed.
@@ -60,6 +92,9 @@ export async function runExtraction(
   const runId = getOrCreateRunId(db);
   const completed = config.run.skipCompleted ? getCompletedPaths(db, runId) : new Set<string>();
   initRequestResponseLogger(config, runId);
+
+  const extractionsDir = join(dirname(config.report.outputDir), 'extractions', runId);
+  if (existsSync(extractionsDir)) rmSync(extractionsDir, { recursive: true });
 
   const buckets =
     options?.tenant && options?.purchaser
@@ -152,6 +187,9 @@ export async function runExtraction(
       });
 
       const status = result.success ? 'done' : 'error';
+      if (result.success && result.body) {
+        writeExtractionResult(config, runId, job, result.body);
+      }
       upsertCheckpoint(db, {
         filePath: job.filePath,
         relativePath: job.relativePath,
