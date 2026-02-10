@@ -3,11 +3,13 @@
  * Uses POST /api/v1/spreadsheet/extract/upload (multipart/form-data file upload).
  * Auth headers (must match Swagger): X-Access-Key, X-Secret-Message, X-Signature.
  * Set ENTELLIEXTRACT_USE_MOCK=1 to return fixture JSON instead of calling the API (for offline/dev).
+ * Uses undici with a custom connect timeout (config.api.timeoutMs); Node's default fetch has a 10s connect limit.
  */
 
 import { config as loadEnv } from 'dotenv';
 import { readFileSync, existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { fetch, Agent, FormData } from 'undici';
 import type { Config } from './types.js';
 
 loadEnv();
@@ -107,6 +109,10 @@ export async function extract(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.api.timeoutMs);
   const signal = abortSignal ?? controller.signal;
+  const dispatcher = new Agent({
+    connectTimeout: config.api.timeoutMs,
+    bodyTimeout: config.api.timeoutMs,
+  });
 
   try {
     const res = await fetch(url, {
@@ -114,6 +120,7 @@ export async function extract(
       headers: buildHeaders(),
       body: form,
       signal,
+      dispatcher,
     });
     const latencyMs = Date.now() - start;
     clearTimeout(timeout);
