@@ -17,7 +17,7 @@ const ROOT = join(__dirname);
 const REPORTS_DIR = join(ROOT, 'output', 'reports');
 const STAGING_DIR = join(ROOT, 'output', 'staging');
 const SYNC_MANIFEST_PATH = join(ROOT, 'output', 'checkpoints', 'sync-manifest.json');
-const ALLOWED_EXT = new Set(['.md', '.html', '.json']);
+const ALLOWED_EXT = new Set(['.html', '.json']);
 
 function listStagingFiles(dir, baseDir, list) {
   if (!existsSync(dir)) return list;
@@ -345,7 +345,7 @@ createServer(async (req, res) => {
   }
   if (req.method === 'GET' && url === '/api/reports') {
     try {
-      const list = { md: [], html: [], json: [] };
+      const list = { html: [], json: [] };
       if (!existsSync(REPORTS_DIR)) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(list));
@@ -355,7 +355,7 @@ createServer(async (req, res) => {
         .filter((e) => e.isFile() && ALLOWED_EXT.has(extname(e.name).toLowerCase()));
       for (const f of files) {
         const ext = extname(f.name).toLowerCase();
-        const key = ext === '.md' ? 'md' : ext === '.html' ? 'html' : 'json';
+        const key = ext === '.html' ? 'html' : 'json';
         let mtime = 0;
         try {
           mtime = statSync(join(REPORTS_DIR, f.name)).mtimeMs;
@@ -378,12 +378,12 @@ createServer(async (req, res) => {
     const slash = rest.indexOf('/');
     const format = slash === -1 ? rest : rest.slice(0, slash);
     const filename = slash === -1 ? null : rest.slice(slash + 1);
-    if (!filename || !['md', 'html', 'json'].includes(format)) {
+    if (!filename || !['html', 'json'].includes(format)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid format or filename' }));
       return;
     }
-    const ext = format === 'md' ? '.md' : format === 'html' ? '.html' : '.json';
+    const ext = format === 'html' ? '.html' : '.json';
     if (!filename.endsWith(ext) || filename.includes('..') || /[\\/]/.test(filename)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid filename' }));
@@ -402,7 +402,7 @@ createServer(async (req, res) => {
         return;
       }
       const content = readFileSync(filePath, 'utf-8');
-      const contentType = format === 'html' ? 'text/html' : format === 'json' ? 'application/json' : 'text/markdown';
+      const contentType = format === 'html' ? 'text/html' : 'application/json';
       res.writeHead(200, {
         'Content-Type': contentType,
         'Content-Disposition': 'attachment; filename="' + filename.replace(/"/g, '\\"') + '"',

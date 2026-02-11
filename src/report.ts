@@ -1,5 +1,5 @@
 /**
- * Executive summary report: Markdown, HTML, and JSON.
+ * Executive summary report: HTML and JSON.
  * Includes full API extraction response(s) per file when available.
  */
 
@@ -76,44 +76,6 @@ export function buildSummary(metrics: RunMetrics): ExecutiveSummary {
     metrics,
     runDurationSeconds,
   };
-}
-
-function markdownReport(summary: ExecutiveSummary, extractionResults: ExtractionResultEntry[] = []): string {
-  const m = summary.metrics;
-  const duration = formatDuration(summary.runDurationSeconds * 1000);
-  let md = `# ${summary.title}\n\n`;
-  md += `**Generated:** ${summary.generatedAt}\n\n`;
-  md += `## Overview\n\n`;
-  md += `| Metric | Value |\n|--------|------|\n`;
-  md += `| Total files | ${m.totalFiles} |\n`;
-  md += `| Success | ${m.success} |\n`;
-  md += `| Failed | ${m.failed} |\n`;
-  md += `| Skipped | ${m.skipped} |\n`;
-  md += `| Run duration | ${duration} |\n`;
-  md += `| Throughput | ${m.throughputPerSecond.toFixed(2)} files/sec |\n`;
-  md += `| Error rate | ${(m.errorRate * 100).toFixed(2)}% |\n\n`;
-  md += `## Latency (ms)\n\n`;
-  md += `| Percentile | Value |\n|------------|-------|\n`;
-  md += `| Average | ${m.avgLatencyMs.toFixed(2)} |\n`;
-  md += `| P50 | ${m.p50LatencyMs.toFixed(2)} |\n`;
-  md += `| P95 | ${m.p95LatencyMs.toFixed(2)} |\n`;
-  md += `| P99 | ${m.p99LatencyMs.toFixed(2)} |\n\n`;
-  if (m.anomalies.length > 0) {
-    md += `## Anomalies\n\n`;
-    for (const a of m.anomalies) {
-      md += `- **${a.type}**: ${a.message}`;
-      if (a.filePath) md += ` (${a.filePath})`;
-      md += `\n`;
-    }
-  }
-  if (extractionResults.length > 0) {
-    md += `\n## Extraction results (API response per file)\n\n`;
-    for (const { filename, response } of extractionResults) {
-      md += `### ${filename}\n\n\`\`\`json\n${JSON.stringify(response, null, 2)}\n\`\`\`\n\n`;
-    }
-  }
-  md += `\n---\n*Run ID: ${m.runId}*\n`;
-  return md;
 }
 
 function htmlReport(summary: ExecutiveSummary, extractionResults: ExtractionResultEntry[] = []): string {
@@ -194,26 +156,19 @@ function escapeHtml(s: string): string {
  * Write reports to config.report.outputDir in requested formats.
  * Loads extraction result JSON from output/extractions/<runId>/ and includes it in all report formats.
  */
-export function writeReports(config: Config, summary: ExecutiveSummary): string[] {
+export function writeReports(config: Config, summary: ExecutiveSummary): void {
   const outDir = config.report.outputDir;
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 
   const runId = summary.metrics.runId;
-  const written: string[] = [];
   const allResults = loadExtractionResults(config, runId);
   const extractionResults = filterExtractionResultsForRun(config, runId, allResults);
 
   if (summary.metrics.runId) {
     const base = `report_${runId}_${Date.now()}`;
-    if (config.report.formats.includes('markdown')) {
-      const path = join(outDir, `${base}.md`);
-      writeFileSync(path, markdownReport(summary, extractionResults), 'utf-8');
-      written.push(path);
-    }
     if (config.report.formats.includes('html')) {
       const path = join(outDir, `${base}.html`);
       writeFileSync(path, htmlReport(summary, extractionResults), 'utf-8');
-      written.push(path);
     }
     if (config.report.formats.includes('json')) {
       const path = join(outDir, `${base}.json`);
@@ -221,8 +176,6 @@ export function writeReports(config: Config, summary: ExecutiveSummary): string[
         ? { ...summary, extractionResults: extractionResults.map((e) => ({ filename: e.filename, response: e.response })) }
         : summary;
       writeFileSync(path, JSON.stringify(jsonPayload, null, 2), 'utf-8');
-      written.push(path);
     }
   }
-  return written;
 }

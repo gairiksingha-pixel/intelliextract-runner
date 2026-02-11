@@ -7,26 +7,34 @@
     <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
     <style>
       :root {
-        --bg: #f3f3f3;
+        --bg: #f5f7f9;
         --surface: #ffffff;
-        --text: #1a1a1a;
-        --text-secondary: #505050;
-        --border: #b4b4b4;
-        --border-light: #d6d6d6;
-        --header-bg: #217346;
+        --text: #2c2c2c;
+        --text-secondary: #5a5a5a;
+        --border: #c5cdd1;
+        --border-light: #dfe4e8;
+        --header-bg: #216c6d;
         --header-text: #ffffff;
-        --header-border: #1a5c38;
-        --accent: #217346;
-        --accent-light: #e6f2eb;
-        --primary: #217346;
-        --primary-hover: #1a5c38;
-        --pass: #217346;
-        --pass-bg: #e6f2eb;
-        --fail: #c00000;
+        --header-border: #1a5758;
+        --accent: #2d9d5f;
+        --accent-light: #e8f5ee;
+        --primary: #2d9d5f;
+        --primary-hover: #248f54;
+        --pass: #248f54;
+        --pass-bg: #e8f5ee;
+        --fail: #c62828;
         --fail-bg: #ffebee;
-        --muted: #7f7f7f;
-        --row-alt: #f9f9f9;
+        --muted: #6b7c85;
+        --row-alt: #fafbfc;
         --cell-pad: 0.85rem 1rem;
+        --radius: 8px;
+        --radius-sm: 6px;
+        --radius-xs: 4px;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+        --shadow-md: 0 2px 8px rgba(0,0,0,0.1);
+        --shadow-lg: 0 4px 12px rgba(0,0,0,0.08);
+        --shadow-inset: inset 0 1px 2px rgba(0,0,0,0.06);
+        --shadow-btn: 0 1px 3px rgba(0,0,0,0.12);
       }
       * {
         box-sizing: border-box;
@@ -49,7 +57,7 @@
         flex-shrink: 0;
         background: var(--surface);
         border-bottom: 2px solid var(--border);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        box-shadow: var(--shadow-md);
       }
       .header-inner {
         max-width: 100%;
@@ -121,6 +129,7 @@
         height: 36px;
         padding: 0.5rem 2rem 0.5rem 0.6rem;
         border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
         background: var(--surface);
         color: var(--text);
         font-size: 0.875rem;
@@ -130,6 +139,7 @@
         background-repeat: no-repeat;
         background-position: right 0.5rem center;
         box-sizing: border-box;
+        box-shadow: var(--shadow-inset);
       }
       .header-select:disabled {
         opacity: 0.7;
@@ -152,7 +162,8 @@
         flex-direction: column;
         background: var(--surface);
         border: 1px solid var(--border);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
       }
       .table-section table {
         height: 100%;
@@ -161,12 +172,19 @@
         border-collapse: collapse;
         font-size: 0.9rem;
         background: var(--surface);
+        border-radius: var(--radius);
       }
       th, td {
         padding: var(--cell-pad);
         text-align: left;
         border: 1px solid var(--border);
         vertical-align: middle;
+      }
+      thead th:first-child {
+        border-top-left-radius: calc(var(--radius) - 1px);
+      }
+      thead th:last-child {
+        border-top-right-radius: calc(var(--radius) - 1px);
       }
       thead tr {
         height: 48px;
@@ -201,7 +219,7 @@
         background: var(--row-alt);
       }
       tbody tr:hover td {
-        background: #eff7f2;
+        background: #f0f9f4;
       }
       .op-name {
         width: 280px;
@@ -249,14 +267,21 @@
         height: 32px;
         padding: 0.35rem 0.4rem;
         border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
         font-size: 0.875rem;
         box-sizing: border-box;
+        box-shadow: var(--shadow-inset);
       }
       .limits-cell .limit-hint {
         margin-top: 0.5rem;
-        font-size: 0.75rem;
-        color: var(--muted);
-        font-style: italic;
+        padding: 0.35rem 0.5rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--primary);
+        background: var(--accent-light);
+        border-radius: var(--radius-xs);
+        border: 1px solid rgba(45, 157, 95, 0.25);
+        display: inline-block;
       }
       .limits-cell .n/a {
         color: var(--muted);
@@ -290,14 +315,17 @@
         background: var(--primary);
         color: #fff;
         border: 1px solid var(--header-border);
+        border-radius: var(--radius-sm);
         padding: 0.65rem 1.25rem;
         font-size: 0.9rem;
         font-weight: 600;
         cursor: pointer;
         font-family: inherit;
+        box-shadow: var(--shadow-btn);
       }
       button.run:hover {
         background: var(--primary-hover);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.18);
       }
       button.run:disabled {
         opacity: 0.65;
@@ -307,20 +335,24 @@
         background: var(--surface);
         color: var(--text-secondary);
         border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
         padding: 0.55rem 1rem;
         font-size: 0.85rem;
         font-weight: 600;
         cursor: pointer;
         font-family: inherit;
+        box-shadow: var(--shadow-sm);
       }
       button.reset-case:hover {
         background: var(--row-alt);
         color: var(--text);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       }
       button.reset-case.stop-btn {
         background: var(--fail);
         color: #fff;
         border-color: var(--fail);
+        box-shadow: var(--shadow-btn);
       }
       button.reset-case.stop-btn:hover {
         background: #a00;
@@ -330,12 +362,14 @@
       button.download-sync-report-btn,
       button.download-report-btn {
         border: none;
+        border-radius: var(--radius-sm);
         padding: 0.55rem 0.85rem;
         font-size: 0.85rem;
         font-weight: 600;
         cursor: pointer;
         font-family: inherit;
         box-sizing: border-box;
+        box-shadow: var(--shadow-btn);
       }
       button.download-sync-report-btn {
         background: #2f5496;
@@ -344,6 +378,7 @@
       button.download-sync-report-btn:hover {
         background: #244a7a;
         color: #fff;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       }
       button.download-report-btn {
         background: var(--accent);
@@ -352,6 +387,7 @@
       button.download-report-btn:hover {
         background: var(--primary-hover);
         color: #fff;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       }
       button.download-sync-report-btn:disabled,
       button.download-report-btn:disabled {
@@ -383,21 +419,23 @@
         white-space: pre-wrap;
         word-break: break-word;
         border: 1px solid var(--border-light);
+        border-radius: var(--radius);
         background: #fafafa;
         overflow: auto;
         box-sizing: border-box;
+        box-shadow: var(--shadow-sm);
       }
       .result.pass {
         background: var(--pass-bg);
-        border-color: #a8d4b8;
+        border-color: #b8e0c8;
       }
       .result.fail {
         background: var(--fail-bg);
-        border-color: #f5c2c2;
+        border-color: #f8d4d4;
       }
       .result.running {
         background: var(--accent-light);
-        border-color: #a8d4b8;
+        border-color: #b8e0c8;
       }
       .result.running .loading-dots::after {
         content: "";
@@ -417,13 +455,16 @@
       .result .sync-progress-bar {
         height: 8px;
         background: var(--border-light);
+        border-radius: var(--radius-xs);
         overflow: hidden;
         margin-top: 0.35rem;
         max-width: 14rem;
+        box-shadow: var(--shadow-inset);
       }
       .result .sync-progress-fill {
         height: 100%;
         background: var(--accent);
+        border-radius: var(--radius-xs);
         transition: width 0.15s ease-out;
       }
       .result .sync-progress-fill.sync-progress-indeterminate {
@@ -448,9 +489,13 @@
       }
       .result-table-wrap {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         font-size: 0.8rem;
         table-layout: fixed;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        box-shadow: var(--shadow-inset);
       }
       .result-table-wrap th,
       .result-table-wrap td {
@@ -470,6 +515,22 @@
         color: var(--text-secondary);
         word-break: break-word;
         white-space: pre-wrap;
+      }
+      .result-table-wrap tr:first-child th:first-child,
+      .result-table-wrap tr:first-child td:first-child {
+        border-top-left-radius: var(--radius-sm);
+      }
+      .result-table-wrap tr:first-child th:last-child,
+      .result-table-wrap tr:first-child td:last-child {
+        border-top-right-radius: var(--radius-sm);
+      }
+      .result-table-wrap tr:last-child th:first-child,
+      .result-table-wrap tr:last-child td:first-child {
+        border-bottom-left-radius: var(--radius-sm);
+      }
+      .result-table-wrap tr:last-child th:last-child,
+      .result-table-wrap tr:last-child td:last-child {
+        border-bottom-right-radius: var(--radius-sm);
       }
       .result-table-wrap tr.status-row th {
         border-top: none;
@@ -581,6 +642,13 @@
         return html;
       }
 
+      function getRunButtonLabel(caseId) {
+        if (caseId === "P1") return "Start Sync";
+        if (caseId === "P2") return "Start Extraction";
+        if (caseId === "PIPE") return "Start Sync and Extraction";
+        return "Run";
+      }
+
       function renderRow(c, sectionId) {
         const tr = document.createElement("tr");
         const resultCell = document.createElement("td");
@@ -592,12 +660,14 @@
           '<span class="result-placeholder-text">Select Brand and Purchaser above, then click Execute. Leave as All to run for all.</span>';
         resultCell.appendChild(resultDiv);
         const btn = document.createElement("button");
+        btn.type = "button";
         btn.className = "run";
-        btn.textContent = "Run";
+        btn.textContent = getRunButtonLabel(c.id);
         btn.onclick = function () {
           runCase(c.id, btn, resultDiv);
         };
         const resetBtn = document.createElement("button");
+        resetBtn.type = "button";
         resetBtn.className = "reset-case";
         resetBtn.textContent = "Reset";
         resetBtn.onclick = function () {
@@ -620,15 +690,18 @@
           downloadSyncReport(downloadSyncReportBtn);
         };
         tr.querySelector(".btn-row-download").appendChild(downloadSyncReportBtn);
-        const downloadReportBtn = document.createElement("button");
-        downloadReportBtn.className = "download-report-btn";
-        downloadReportBtn.textContent = "Download Report";
-        downloadReportBtn.type = "button";
-        downloadReportBtn.style.display = "none";
-        downloadReportBtn.onclick = function () {
-          downloadLatestHtmlReport(downloadReportBtn);
-        };
-        tr.querySelector(".btn-row-download").appendChild(downloadReportBtn);
+        function addReportDownloadBtn(label, format) {
+          const b = document.createElement("button");
+          b.className = "download-report-btn";
+          b.textContent = label;
+          b.type = "button";
+          b.setAttribute("data-format", format);
+          b.style.display = "none";
+          b.onclick = function () { downloadLatestReport(b, format); };
+          tr.querySelector(".btn-row-download").appendChild(b);
+        }
+        addReportDownloadBtn("Download HTML report", "html");
+        addReportDownloadBtn("Download JSON report", "json");
         tr.appendChild(resultCell);
         return tr;
       }
@@ -650,13 +723,13 @@
         var showSync = data && pass && caseId && syncCases.includes(caseId);
         var showExtract = data && pass && caseId && extractCases.includes(caseId);
         var downloadSyncReportBtn = row ? row.querySelector(".download-sync-report-btn") : null;
-        var downloadReportBtn = row ? row.querySelector(".download-report-btn") : null;
+        var downloadReportBtns = row ? row.querySelectorAll(".download-report-btn") : [];
         if (downloadSyncReportBtn) {
           downloadSyncReportBtn.style.display = showSync ? "block" : "none";
         }
-        if (downloadReportBtn) {
-          downloadReportBtn.style.display = showExtract ? "block" : "none";
-        }
+        downloadReportBtns.forEach(function (b) {
+          b.style.display = showExtract ? "block" : "none";
+        });
         if (!data) {
           var label;
           var extra = "";
@@ -688,54 +761,106 @@
             '<span class="exit">' + escapeHtml(label) + '<span class="loading-dots"></span></span>' + extra;
           return;
         }
-        var exit = data.exitCode;
         var stdoutStr = (data.stdout && String(data.stdout).trim()) || "";
         var stderrStr = (data.stderr && String(data.stderr).trim()) || "";
         var syncProgressPrefix = "SYNC_PROGRESS\t";
+        function filterResultLine(line) {
+          if (line.indexOf(syncProgressPrefix) === 0) return false;
+          if (line.indexOf("Report(s) written:") !== -1) return false;
+          if (/Run run_\S+ finished\./.test(line)) return false;
+          return true;
+        }
         var stdoutFiltered = stdoutStr
-          ? stdoutStr
-              .split("\n")
-              .filter(function (line) {
-                return line.indexOf(syncProgressPrefix) !== 0;
-              })
-              .join("\n")
-              .trim()
+          ? stdoutStr.split("\n").filter(filterResultLine).join("\n").trim()
           : "";
-        var noOutput = !stdoutFiltered && !stderrStr;
+        var stderrFiltered = stderrStr
+          ? stderrStr.split("\n").filter(filterResultLine).join("\n").trim()
+          : "";
         var statusLabel = pass ? "Pass" : "Fail";
-        var stdoutDisplay = stdoutFiltered
-          ? escapeHtml(stdoutFiltered.slice(0, 2000)) + (stdoutFiltered.length > 2000 ? "…" : "")
-          : (noOutput && exit === 0
-            ? "Command completed successfully with no console output (exit code 0). Sync, extraction, or report may have run without printing to stdout/stderr."
-            : noOutput && exit !== 0
-              ? "Command produced no output. Check server logs or run the command in a terminal for details."
-              : "—");
-        var stderrDisplay = stderrStr
-          ? escapeHtml(stderrStr.slice(0, 2000)) + (stderrStr.length > 2000 ? "…" : "")
-          : "—";
-        div.innerHTML =
-          '<table class="result-table-wrap">' +
-            '<tr class="status-row"><th>Status</th><td>' + escapeHtml(statusLabel) + '</td></tr>' +
-            '<tr><th>Standard output</th><td>' + stdoutDisplay + '</td></tr>' +
-            '<tr><th>Standard error</th><td>' + stderrDisplay + '</td></tr>' +
-          '</table>';
+        var parsed = {};
+        var lines = stdoutFiltered ? stdoutFiltered.split("\n") : [];
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          var m;
+          if ((m = /^Download limit:\s*(.+)$/.exec(line))) parsed.downloadLimit = m[1].trim();
+          else if ((m = /^Downloaded \(new\):\s*(\d+)$/.exec(line))) parsed.downloadedNew = m[1];
+          else if ((m = /^Skipped \(already present[^:]*:\s*(\d+)$/.exec(line))) parsed.skipped = m[1];
+          else if ((m = /^Errors:\s*(\d+)$/.exec(line))) parsed.errors = m[1];
+          else if ((m = /^\s+Staging path:\s*(.+)$/.exec(line))) {
+            if (!parsed.stagingPaths) parsed.stagingPaths = [];
+            parsed.stagingPaths.push(m[1].trim());
+          }           else if ((m = /^Scoped to tenant:\s*([^,]+),\s*purchaser:\s*(.+)$/.exec(line))) {
+            parsed.brandAndPurchaser = (m[1].trim() + " / " + m[2].trim()).trim();
+          } else if ((m = /^\s{2}([^:\s][^:]*)\s*$/.exec(line)) && line.trim().indexOf("/") !== -1 && !/Staging path|Downloaded:|Skipped:|Errors:/.test(line)) {
+            if (!parsed.brandAndPurchaserList) parsed.brandAndPurchaserList = [];
+            parsed.brandAndPurchaserList.push(line.trim());
+          } else if ((m = /^Extraction metrics:\s*success=(\d+),\s*failed=(\d+),\s*skipped=(\d+)$/.exec(line))) {
+            parsed.extractSuccess = m[1];
+            parsed.extractFailed = m[2];
+            parsed.extractSkipped = m[3];
+          } else if ((m = /^Extraction result\(s\):\s*(.+?)\s*\(full/.exec(line))) parsed.extractionResultsPath = m[1].trim();
+          else if ((m = /^Reports path:\s*(.+)$/.exec(line))) parsed.reportsPath = m[1].trim();
+        }
+        var syncCases = ["P1", "PIPE", "P5"];
+        var extractCases = ["P2", "PIPE", "P5", "P3"];
+        var hasSync = caseId && syncCases.indexOf(caseId) !== -1 && (parsed.downloadLimit != null || parsed.downloadedNew != null);
+        var hasExtract = caseId && extractCases.indexOf(caseId) !== -1 && (parsed.extractSuccess != null || parsed.extractionResultsPath != null || parsed.reportsPath != null);
+        var rows = [];
+        rows.push(["Status", statusLabel]);
+        if (hasSync) {
+          if (parsed.downloadLimit != null) rows.push(["Download limit", parsed.downloadLimit]);
+          if (parsed.downloadedNew != null) rows.push(["Downloaded (new)", parsed.downloadedNew]);
+          var brandPurchaser = parsed.brandAndPurchaser || (parsed.brandAndPurchaserList && parsed.brandAndPurchaserList.length ? parsed.brandAndPurchaserList.join("\n") : null);
+          if (brandPurchaser) rows.push(["Brand and purchaser", brandPurchaser]);
+          if (parsed.stagingPaths && parsed.stagingPaths.length) rows.push(["Staging path", parsed.stagingPaths.join("\n")]);
+          var overview = [];
+          if (parsed.downloadedNew != null) overview.push("Downloaded: " + parsed.downloadedNew);
+          if (parsed.skipped != null) overview.push("Skipped: " + parsed.skipped);
+          if (parsed.errors != null) overview.push("Errors: " + parsed.errors);
+          if (overview.length) rows.push(["Overview", overview.join(", ")]);
+        }
+        if (hasExtract) {
+          if (parsed.brandAndPurchaser && !hasSync) rows.push(["Brand and purchaser", parsed.brandAndPurchaser]);
+          if (parsed.extractSuccess != null || parsed.extractFailed != null || parsed.extractSkipped != null) {
+            var detail = "Success: " + (parsed.extractSuccess || "0") + ", Failed: " + (parsed.extractFailed || "0") + ", Skipped: " + (parsed.extractSkipped || "0");
+            rows.push(["Total file extracted", detail]);
+          }
+          if (parsed.extractionResultsPath) rows.push(["Staging path", parsed.extractionResultsPath]);
+          if (parsed.reportsPath) rows.push(["Reports path", parsed.reportsPath]);
+        }
+        if (!hasSync && !hasExtract && stdoutFiltered) {
+          rows.push(["Output", escapeHtml(stdoutFiltered.slice(0, 1500)) + (stdoutFiltered.length > 1500 ? "…" : "")]);
+        } else if (rows.length === 1) {
+          var noOutput = !stdoutFiltered && !stderrFiltered;
+          rows.push(["Output", noOutput && data.exitCode === 0
+            ? "Command completed successfully with no console output."
+            : noOutput ? "Command produced no output. Check server logs or run in a terminal for details." : "—"]);
+        }
+        if (stderrFiltered) rows.push(["Standard error", escapeHtml(stderrFiltered.slice(0, 2000)) + (stderrFiltered.length > 2000 ? "…" : "")]);
+        var tableRows = rows.map(function (r) {
+          return "<tr" + (r[0] === "Status" ? " class=\"status-row\"" : "") + "><th>" + escapeHtml(r[0]) + "</th><td>" + (r[0] === "Standard error" || r[0] === "Output" ? r[1] : escapeHtml(r[1]).replace(/\n/g, "<br>")) + "</td></tr>";
+        });
+        div.innerHTML = "<table class=\"result-table-wrap\">" + tableRows.join("") + "</table>";
       }
 
-      function resetCase(resultDiv) {
+      function resetCase(resultDiv, options) {
         if (!resultDiv) return;
+        var clearLimits = !options || options.clearLimits !== false;
         resultDiv.innerHTML =
           '<span class="result-placeholder-text">Select Brand and Purchaser above, then click Execute. Leave as All to run for all.</span>';
         resultDiv.className = "result result-placeholder";
         var row = resultDiv.closest("tr");
         if (row) {
-          var inputs = row.querySelectorAll(".limit-sync, .limit-extract");
-          inputs.forEach(function (input) {
-            input.value = "0";
-          });
+          if (clearLimits) {
+            var inputs = row.querySelectorAll(".limit-sync, .limit-extract");
+            inputs.forEach(function (input) {
+              input.value = "0";
+            });
+          }
           var downloadSyncReportBtn = row.querySelector(".download-sync-report-btn");
-          var downloadReportBtn = row.querySelector(".download-report-btn");
+          var downloadReportBtns = row.querySelectorAll(".download-report-btn");
           if (downloadSyncReportBtn) downloadSyncReportBtn.style.display = "none";
-          if (downloadReportBtn) downloadReportBtn.style.display = "none";
+          downloadReportBtns.forEach(function (b) { b.style.display = "none"; });
         }
       }
 
@@ -809,6 +934,22 @@
         btn.disabled = true;
         showResult(resultDiv, null, false, null, null);
         var params = getParamsFromRow(row);
+        var syncInput = row ? row.querySelector(".limit-sync") : null;
+        var extractInput = row ? row.querySelector(".limit-extract") : null;
+        var syncIsZero = syncInput && Number.parseInt(syncInput.value, 10) === 0;
+        var extractIsZero = extractInput && Number.parseInt(extractInput.value, 10) === 0;
+        var isNoLimit = syncIsZero || extractIsZero;
+        if (isNoLimit) {
+          var proceed = window.confirm(
+            "Limit is set to 0 (no limit). This will process all files and may take a long time. Continue?"
+          );
+          if (!proceed) {
+            btn.disabled = false;
+            resetCase(resultDiv, { clearLimits: false });
+            restoreResetBtn();
+            return;
+          }
+        }
         try {
           var r = await fetch("/run", {
             method: "POST",
@@ -920,19 +1061,19 @@
           });
       }
 
-      function downloadLatestHtmlReport(btn) {
+      function downloadLatestReport(btn, format) {
         if (btn) btn.disabled = true;
         fetch("/api/reports")
           .then(function (r) { return r.json(); })
           .then(function (list) {
-            var htmlReports = list.html || [];
-            if (htmlReports.length === 0) {
+            var reports = list[format] || [];
+            if (reports.length === 0) {
               if (btn) btn.disabled = false;
               return;
             }
-            var latest = htmlReports[0];
+            var latest = reports[0];
             var filename = latest.name;
-            var url = "/api/reports/html/" + encodeURIComponent(filename);
+            var url = "/api/reports/" + format + "/" + encodeURIComponent(filename);
             return fetch(url).then(function (r) { return r.blob(); }).then(function (blob) {
               var a = document.createElement("a");
               a.href = URL.createObjectURL(blob);

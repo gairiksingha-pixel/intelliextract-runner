@@ -117,7 +117,6 @@ program
       if (doSync && result.syncResults && result.syncResults.length > 0) {
         printSyncResults(result.syncResults, syncLimit);
       }
-      console.log(`Run ${result.run.runId} finished. Success: ${result.metrics.success}, Failed: ${result.metrics.failed}, Skipped: ${result.metrics.skipped}`);
       if (result.metrics.success === 0 && result.metrics.failed === 0) {
         console.log('All files in the stage are extracted. Please sync new files.');
       }
@@ -125,11 +124,12 @@ program
         const extractionsDir = `${dirname(config.report.outputDir)}/extractions/${result.run.runId}`;
         console.log(`Extraction result(s): ${extractionsDir} (full API response JSON per file)`);
       }
+      console.log(`Extraction metrics: success=${result.metrics.success}, failed=${result.metrics.failed}, skipped=${result.metrics.skipped}`);
       saveLastRunId(config, result.run.runId);
       if (doReport) {
         const summary = buildSummary(result.metrics);
-        const paths = writeReports(config, summary);
-        console.log('Report(s) written:', paths);
+        writeReports(config, summary);
+        console.log(`Reports path: ${config.report.outputDir}`);
       }
     } catch (e) {
       console.error('Run failed:', e instanceof Error ? e.message : String(e));
@@ -180,9 +180,6 @@ program
       if (result.syncResults && result.syncResults.length > 0) {
         printSyncResults(result.syncResults, limit ?? undefined);
       }
-      console.log(
-        `Run ${result.run.runId} finished. Success: ${result.metrics.success}, Failed: ${result.metrics.failed}, Skipped: ${result.metrics.skipped}`
-      );
       if (result.metrics.success === 0 && result.metrics.failed === 0) {
         console.log('All files in the stage are extracted. Please sync new files.');
       }
@@ -190,11 +187,12 @@ program
         const extractionsDir = `${dirname(config.report.outputDir)}/extractions/${result.run.runId}`;
         console.log(`Extraction result(s): ${extractionsDir} (full API response JSON per file)`);
       }
+      console.log(`Extraction metrics: success=${result.metrics.success}, failed=${result.metrics.failed}, skipped=${result.metrics.skipped}`);
       saveLastRunId(config, result.run.runId);
       if (doReport) {
         const summary = buildSummary(result.metrics);
-        const paths = writeReports(config, summary);
-        console.log('Report(s) written:', paths);
+        writeReports(config, summary);
+        console.log(`Reports path: ${config.report.outputDir}`);
       }
     } catch (e) {
       console.error('Sync-extract failed:', e instanceof Error ? e.message : String(e));
@@ -239,8 +237,8 @@ program
       if (!Number.isFinite(finishedAt) || finishedAt < startedAt) finishedAt = startedAt || Date.now();
       const metrics = computeMetrics(runId, records, new Date(startedAt), new Date(finishedAt));
       const summary = buildSummary(metrics);
-      const paths = writeReports(config, summary);
-      console.log('Report(s) written:', paths);
+      writeReports(config, summary);
+      console.log(`Reports path: ${config.report.outputDir}`);
     } catch (e) {
       console.error('Report failed:', e instanceof Error ? e.message : String(e));
       process.exit(1);

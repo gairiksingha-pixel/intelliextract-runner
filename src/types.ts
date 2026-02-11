@@ -42,7 +42,7 @@ export interface LoggingConfig {
 
 export interface ReportConfig {
   outputDir: string;
-  formats: ('markdown' | 'html' | 'json' | 'pdf')[];
+  formats: ('markdown' | 'html' | 'json')[];
 }
 
 export interface Config {
