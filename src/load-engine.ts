@@ -53,7 +53,7 @@ function extractionResultFilename(job: FileJob): string {
   return base.endsWith('.json') ? base : base + '.json';
 }
 
-/** Write full API response JSON for successful extractions so you get the same shape as Swagger (success, data, item_list, etc.). */
+/** Write full API response JSON to succeeded/ or failed/ based on response.success in the body. */
 function writeExtractionResult(
   config: Config,
   runId: string,
@@ -61,16 +61,19 @@ function writeExtractionResult(
   responseBody: string
 ): string | null {
   try {
-    const extractionsDir = join(dirname(config.report.outputDir), 'extractions', runId);
-    mkdirSync(extractionsDir, { recursive: true });
-    const filename = extractionResultFilename(job);
-    const path = join(extractionsDir, filename);
+    const baseDir = join(dirname(config.report.outputDir), 'extractions', runId);
     let data: unknown;
     try {
-      data = JSON.parse(responseBody);
+      data = JSON.parse(responseBody) as unknown;
     } catch {
       data = { raw: responseBody.slice(0, 10000) };
     }
+    const success = typeof data === 'object' && data !== null && (data as { success?: boolean }).success === true;
+    const subdir = success ? 'succeeded' : 'failed';
+    const extractionsDir = join(baseDir, subdir);
+    mkdirSync(extractionsDir, { recursive: true });
+    const filename = extractionResultFilename(job);
+    const path = join(extractionsDir, filename);
     writeFileSync(path, JSON.stringify(data, null, 2), 'utf-8');
     return path;
   } catch {
@@ -142,7 +145,7 @@ export async function extractOneFile(
   });
 
   const status = result.success ? 'done' : 'error';
-  if (result.success && result.body) {
+  if (result.body) {
     writeExtractionResult(config, runId, job, result.body);
   }
   upsertCheckpoint(db, {
@@ -272,7 +275,7 @@ export async function runExtraction(
       });
 
       const status = result.success ? 'done' : 'error';
-      if (result.success && result.body) {
+      if (result.body) {
         writeExtractionResult(config, runIdToUse, job, result.body);
       }
       upsertCheckpoint(db, {

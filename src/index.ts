@@ -176,6 +176,11 @@ program
                 process.stdout.write(`SYNC_PROGRESS\t${done}\t${total}\n`);
               }
             : undefined,
+        onExtractionProgress: stdoutPiped
+          ? (done, total) => {
+              process.stdout.write(`EXTRACTION_PROGRESS\t${done}\t${total}\n`);
+            }
+          : undefined,
       });
       if (result.syncResults && result.syncResults.length > 0) {
         printSyncResults(result.syncResults, limit ?? undefined);

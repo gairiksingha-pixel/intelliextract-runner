@@ -456,6 +456,9 @@
         font-size: 0.8rem;
         color: var(--text-secondary);
       }
+      .result .extraction-progress-wrap {
+        margin-top: 0.6rem;
+      }
       .result .sync-progress-bar {
         height: 8px;
         background: var(--border-light);
@@ -716,7 +719,7 @@
         return div.innerHTML;
       }
 
-      function showResult(div, data, pass, progress, syncProgress, caseId) {
+      function showResult(div, data, pass, progress, syncProgress, extractionProgress, caseId) {
         div.style.display = "block";
         var resultClass = "running";
         if (data) resultClass = pass ? "pass" : "fail";
@@ -737,18 +740,34 @@
         if (!data) {
           var label;
           var extra = "";
-          if (syncProgress != null && (syncProgress.done != null || syncProgress.total != null)) {
+          var hasSync = syncProgress != null && (syncProgress.done != null || syncProgress.total != null);
+          var hasExtraction = extractionProgress != null && (extractionProgress.done != null || extractionProgress.total != null);
+          if (hasSync) {
             var done = Number(syncProgress.done) || 0;
             var total = Number(syncProgress.total) || 0;
-            label = "Syncing…";
             var pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
-            extra =
+            extra +=
               '<div class="sync-progress-wrap">Downloads: ' +
               (total > 0 ? done + " / " + total : done + " file(s)") +
               '</div>' +
               (total > 0
                 ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' + pct + '%"></div></div>'
                 : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
+          }
+          if (hasExtraction) {
+            var extDone = Number(extractionProgress.done) || 0;
+            var extTotal = Number(extractionProgress.total) || 0;
+            var extPct = extTotal > 0 ? Math.min(100, Math.round((100 * extDone) / extTotal)) : 0;
+            extra +=
+              '<div class="sync-progress-wrap extraction-progress-wrap">Extraction: ' +
+              (extTotal > 0 ? extDone + " / " + extTotal : extDone + " file(s)") +
+              '</div>' +
+              (extTotal > 0
+                ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' + extPct + '%"></div></div>'
+                : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
+          }
+          if (hasSync || hasExtraction) {
+            label = hasSync && hasExtraction ? "Sync & extract…" : (hasSync ? "Syncing…" : "Extracting…");
           } else {
             var pctVal = progress && progress.percent != null ? Number(progress.percent) : null;
             var doneVal = progress && progress.done != null ? Number(progress.done) : null;
@@ -947,7 +966,7 @@
           };
         }
         btn.disabled = true;
-        showResult(resultDiv, null, false, null, null);
+        showResult(resultDiv, null, false, null, null, null);
         var params = getParamsFromRow(row);
         var syncInput = row ? row.querySelector(".limit-sync") : null;
         var extractInput = row ? row.querySelector(".limit-extract") : null;
@@ -984,13 +1003,15 @@
               var errJson = JSON.parse(errText);
               if (errJson.error) errText = errJson.error;
             } catch (_) {}
-            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: errText }, false);
+            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: errText }, false, null, null, null, caseId);
             return;
           }
           var reader = r.body.getReader();
           var decoder = new TextDecoder();
           var buffer = "";
           var data = null;
+          var lastSyncProgress = null;
+          var lastExtractionProgress = null;
           while (true) {
             var chunk = await reader.read();
             if (chunk.done) break;
@@ -1003,9 +1024,13 @@
               try {
                 var msg = JSON.parse(line);
                 if (msg.type === "progress" && msg.percent != null) {
-                  showResult(resultDiv, null, false, { percent: msg.percent, done: msg.done, total: msg.total }, null);
+                  showResult(resultDiv, null, false, { percent: msg.percent, done: msg.done, total: msg.total }, null, null, caseId);
                 } else if (msg.type === "sync_progress") {
-                  showResult(resultDiv, null, false, null, { done: msg.done, total: msg.total });
+                  lastSyncProgress = { done: msg.done, total: msg.total };
+                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId);
+                } else if (msg.type === "extraction_progress") {
+                  lastExtractionProgress = { done: msg.done, total: msg.total };
+                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId);
                 } else if (msg.type === "result") {
                   data = msg;
                 } else if (msg.error) {
@@ -1022,18 +1047,19 @@
             } catch (_) {}
           }
           if (!data) {
-            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: "No result from server" }, false, null, null, caseId);
+            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: "No result from server" }, false, null, null, null, caseId);
             return;
           }
           var expectFail = caseId.indexOf("N") === 0;
           var pass = expectFail ? data.exitCode !== 0 : data.exitCode === 0;
-          showResult(resultDiv, data, pass, null, null, caseId);
-        } catch (e) {
+          showResult(resultDiv, data, pass, null, null, null, caseId);
+          } catch (e) {
           if (e.name === "AbortError") {
             showResult(
               resultDiv,
               { exitCode: 130, stdout: "", stderr: "Stopped by user." },
               false,
+              null,
               null,
               null,
               caseId,
@@ -1043,6 +1069,7 @@
               resultDiv,
               { exitCode: 1, stdout: "", stderr: e.message },
               false,
+              null,
               null,
               null,
               caseId,

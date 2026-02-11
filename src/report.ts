@@ -12,6 +12,8 @@ import { computeMetrics } from './metrics.js';
 export interface ExtractionResultEntry {
   filename: string;
   response: unknown;
+  /** Whether the API response body had success: true (succeeded folder). */
+  extractionSuccess: boolean;
 }
 
 export interface HistoricalRunSummary {
@@ -21,30 +23,52 @@ export interface HistoricalRunSummary {
   runDurationSeconds: number;
 }
 
-/** Same naming as load-engine so we only show results for files that succeeded in this run. */
+/** Same naming as load-engine so we only show results for files that completed in this run. */
 function extractionResultFilenameFromRecord(record: { relativePath: string; brand: string }): string {
   const safe = record.relativePath.replaceAll('/', '_').replaceAll(/[^a-zA-Z0-9._-]/g, '_');
   const base = record.brand + '_' + (safe || 'file');
   return base.endsWith('.json') ? base : base + '.json';
 }
 
-function loadExtractionResults(config: Config, runId: string): ExtractionResultEntry[] {
-  const extractionsDir = join(dirname(config.report.outputDir), 'extractions', runId);
-  if (!existsSync(extractionsDir)) return [];
-  const entries = readdirSync(extractionsDir, { withFileTypes: true })
-    .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.json'))
-    .map((e) => {
-      const path = join(extractionsDir, e.name);
-      try {
-        const raw = readFileSync(path, 'utf-8');
-        const response = JSON.parse(raw) as unknown;
-        return { filename: e.name, response };
-      } catch {
-        return null;
-      }
-    })
-    .filter((x): x is ExtractionResultEntry => x !== null);
+function loadJsonEntries(dir: string, extractionSuccess: boolean): ExtractionResultEntry[] {
+  const entries: ExtractionResultEntry[] = [];
+  const files = readdirSync(dir, { withFileTypes: true }).filter(
+    (e) => e.isFile() && e.name.toLowerCase().endsWith('.json')
+  );
+  for (const e of files) {
+    const path = join(dir, e.name);
+    try {
+      const raw = readFileSync(path, 'utf-8');
+      const response = JSON.parse(raw) as unknown;
+      entries.push({ filename: e.name, response, extractionSuccess });
+    } catch {
+      // skip unreadable
+    }
+  }
   return entries;
+}
+
+function loadExtractionResults(config: Config, runId: string): ExtractionResultEntry[] {
+  const baseDir = join(dirname(config.report.outputDir), 'extractions', runId);
+  if (!existsSync(baseDir)) return [];
+
+  const succeededDir = join(baseDir, 'succeeded');
+  const failedDir = join(baseDir, 'failed');
+  const fromSucceeded = existsSync(succeededDir) ? loadJsonEntries(succeededDir, true) : [];
+  const fromFailed = existsSync(failedDir) ? loadJsonEntries(failedDir, false) : [];
+
+  if (fromSucceeded.length > 0 || fromFailed.length > 0) {
+    return [...fromSucceeded, ...fromFailed];
+  }
+
+  // Backward compatibility: load from run dir and infer extractionSuccess from response.success
+  return loadJsonEntries(baseDir, false).map((entry) => ({
+    ...entry,
+    extractionSuccess:
+      typeof entry.response === 'object' &&
+      entry.response !== null &&
+      (entry.response as { success?: boolean }).success === true,
+  }));
 }
 
 /** Keep only extraction results for files that completed successfully in this run (so report doesn't show old run's responses). */
@@ -131,18 +155,31 @@ function sectionForRun(entry: HistoricalRunSummary, isFirst: boolean): string {
     return '<li><strong>' + escapeHtml(a.type) + '</strong>: ' + escapeHtml(a.message) + pathSuffix + '</li>';
   });
   const anomaliesList = m.anomalies.length > 0 ? '<ul>' + anomalyItems.join('') + '</ul>' : '<p>None detected.</p>';
+
+  const succeededResults = entry.extractionResults.filter((e) => e.extractionSuccess);
+  const failedResults = entry.extractionResults.filter((e) => !e.extractionSuccess);
+
+  function accordionHtml(results: ExtractionResultEntry[]): string {
+    return results
+      .map(
+        ({ filename, response }) =>
+          `<details class="extraction-details"><summary class="extraction-summary"><strong>${escapeHtml(filename)}</strong></summary><pre class="extraction-json">${escapeHtml(JSON.stringify(response, null, 2))}</pre></details>`
+      )
+      .join('\n  ');
+  }
+
   const extractionSection =
     entry.extractionResults.length > 0
       ? `
   <h3>Extraction results (API response per file)</h3>
   <p class="accordion-hint">Click a filename to expand or collapse the JSON.</p>
-  <div class="extraction-accordion">
-  ${entry.extractionResults
-    .map(
-      ({ filename, response }) =>
-        `<details class="extraction-details"><summary class="extraction-summary"><strong>${escapeHtml(filename)}</strong></summary><pre class="extraction-json">${escapeHtml(JSON.stringify(response, null, 2))}</pre></details>`
-    )
-    .join('\n  ')}
+  <div class="extraction-tabs">
+    <div class="tab-headers">
+      <button type="button" class="tab-btn active" data-tab="succeeded">Succeeded (${succeededResults.length})</button>
+      <button type="button" class="tab-btn" data-tab="failed">Failed (${failedResults.length})</button>
+    </div>
+    <div class="tab-pane active extraction-accordion" data-tab-pane="succeeded">${accordionHtml(succeededResults)}</div>
+    <div class="tab-pane extraction-accordion" data-tab-pane="failed">${accordionHtml(failedResults)}</div>
   </div>`
       : '';
   const openAttr = isFirst ? ' open' : '';
@@ -213,6 +250,13 @@ function htmlReportFromHistory(historicalSummaries: HistoricalRunSummary[], gene
     details.extraction-details[open] summary.extraction-summary::before { transform: rotate(90deg); }
     details.extraction-details summary.extraction-summary:hover { background: #eee; }
     .extraction-json { margin: 0; background: #f8f8f8; padding: 1rem; overflow: auto; font-size: 0.85rem; border-top: 1px solid #ddd; max-height: 400px; }
+    .extraction-tabs { margin-top: 0.5rem; }
+    .tab-headers { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; }
+    .tab-btn { padding: 0.4rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; background: #f5f5f5; cursor: pointer; font-size: 0.9rem; }
+    .tab-btn:hover { background: #eee; }
+    .tab-btn.active { background: #216c6d; color: #fff; border-color: #216c6d; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
   </style>
 </head>
 <body>
@@ -220,6 +264,20 @@ function htmlReportFromHistory(historicalSummaries: HistoricalRunSummary[], gene
   <p class="meta">Generated: ${escapeHtml(generatedAt)} — ${historicalSummaries.length} run(s) (sync &amp; extract)</p>
   <h2>Historical runs</h2>
   ${runsHtml}
+  <script>
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var tabId = this.getAttribute('data-tab');
+        var runSection = this.closest('.run-section-body');
+        if (!runSection) return;
+        runSection.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        runSection.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
+        this.classList.add('active');
+        var pane = runSection.querySelector('.tab-pane[data-tab-pane="' + tabId + '"]');
+        if (pane) pane.classList.add('active');
+      });
+    });
+  </script>
 </body>
 </html>`;
 }
@@ -269,7 +327,11 @@ export function writeReports(config: Config, summary: ExecutiveSummary): void {
           runId: r.runId,
           metrics: r.metrics,
           runDurationSeconds: r.runDurationSeconds,
-          extractionResults: r.extractionResults.map((e) => ({ filename: e.filename, response: e.response })),
+          extractionResults: r.extractionResults.map((e) => ({
+            filename: e.filename,
+            response: e.response,
+            extractionSuccess: e.extractionSuccess,
+          })),
         })),
       };
       writeFileSync(path, JSON.stringify(jsonPayload, null, 2), 'utf-8');

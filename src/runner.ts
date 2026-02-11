@@ -35,6 +35,8 @@ export interface PipelineOptions extends RunOptions {
   limit?: number;
   /** Optional progress callback for sync phase (done, total). */
   onProgress?: (done: number, total: number) => void;
+  /** Optional progress callback for extraction phase (done, total). Total is the number of files queued for extraction. */
+  onExtractionProgress?: (done: number, total: number) => void;
 }
 
 export interface FullRunResult {
@@ -123,9 +125,17 @@ export async function runSyncExtractPipeline(options: PipelineOptions = {}): Pro
 
   const startedAt = new Date();
   let syncResults: SyncResult[] = [];
+  let extractionQueued = 0;
+  let extractionDone = 0;
 
   const onFileSynced = (job: FileJob) => {
-    extractionQueue.add(() => extractOneFile(config, runId, db, job));
+    extractionQueued++;
+    extractionQueue.add(() =>
+      extractOneFile(config, runId, db, job).finally(() => {
+        extractionDone++;
+        options.onExtractionProgress?.(extractionDone, extractionQueued);
+      })
+    );
   };
 
   syncResults = await syncAllBuckets(config, {

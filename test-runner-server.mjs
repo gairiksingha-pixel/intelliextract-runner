@@ -163,6 +163,7 @@ const CASE_COMMANDS = {
 
 const PROGRESS_REGEX = /(\d+)%\s*\((\d+)\/(\d+)\)/g;
 const SYNC_PROGRESS_PREFIX = 'SYNC_PROGRESS\t';
+const EXTRACTION_PROGRESS_PREFIX = 'EXTRACTION_PROGRESS\t';
 
 function runCase(caseId, params = {}, callbacks = null) {
   const def = CASE_COMMANDS[caseId];
@@ -172,6 +173,7 @@ function runCase(caseId, params = {}, callbacks = null) {
   const displayCmd = args ? [cmd, ...args].join(' ') : cmd;
   const onProgress = callbacks?.onProgress ?? (typeof callbacks === 'function' ? callbacks : null);
   const onSyncProgress = callbacks?.onSyncProgress ?? null;
+  const onExtractionProgress = callbacks?.onExtractionProgress ?? null;
   const onChild = callbacks?.onChild ?? null;
   return new Promise((resolve) => {
     const child = spawn(cmd, args || [], {
@@ -197,6 +199,14 @@ function runCase(caseId, params = {}, callbacks = null) {
             const done = Number(parts[0]);
             const total = Number(parts[1]);
             if (!Number.isNaN(done)) onSyncProgress(done, Number.isNaN(total) ? 0 : total);
+          }
+        }
+        if (onExtractionProgress && line.startsWith(EXTRACTION_PROGRESS_PREFIX)) {
+          const parts = line.slice(EXTRACTION_PROGRESS_PREFIX.length).split('\t');
+          if (parts.length >= 2) {
+            const done = Number(parts[0]);
+            const total = Number(parts[1]);
+            if (!Number.isNaN(done)) onExtractionProgress(done, Number.isNaN(total) ? 0 : total);
           }
         }
       }
@@ -332,6 +342,9 @@ createServer(async (req, res) => {
         },
         onSyncProgress: (done, total) => {
           writeLine({ type: 'sync_progress', done, total });
+        },
+        onExtractionProgress: (done, total) => {
+          writeLine({ type: 'extraction_progress', done, total });
         },
       });
       currentChild = null;
