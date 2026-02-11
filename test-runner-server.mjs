@@ -7,14 +7,19 @@
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, writeFileSync, existsSync, copyFileSync, statSync } from 'node:fs';
 import { join, dirname, extname, normalize, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const archiver = require('archiver');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 8765;
 const ROOT = join(__dirname);
 const REPORTS_DIR = join(ROOT, 'output', 'reports');
+const EXTRACTIONS_DIR = join(ROOT, 'output', 'extractions');
 const STAGING_DIR = join(ROOT, 'output', 'staging');
 const SYNC_MANIFEST_PATH = join(ROOT, 'output', 'checkpoints', 'sync-manifest.json');
 const ALLOWED_EXT = new Set(['.html', '.json']);
@@ -447,6 +452,33 @@ createServer(async (req, res) => {
         'Content-Disposition': 'attachment; filename="sync-report.html"',
       });
       res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === 'GET' && url === '/api/extractions-zip') {
+    try {
+      if (!existsSync(EXTRACTIONS_DIR)) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Extractions folder not found. Run extraction first.' }));
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': 'attachment; filename="extractions.zip"',
+      });
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      archive.on('error', (err) => {
+        try { res.end(); } catch (_) {}
+      });
+      archive.pipe(res);
+      const succeededDir = join(EXTRACTIONS_DIR, 'succeeded');
+      const failedDir = join(EXTRACTIONS_DIR, 'failed');
+      if (existsSync(succeededDir)) archive.directory(succeededDir, 'succeeded');
+      if (existsSync(failedDir)) archive.directory(failedDir, 'failed');
+      archive.finalize();
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(e.message) }));

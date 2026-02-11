@@ -56,13 +56,17 @@
       .header {
         flex-shrink: 0;
         background: var(--surface);
-        border-bottom: 2px solid var(--border);
-        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        margin: 1.25rem 1.5rem 0.03rem 1.5rem;
+        box-sizing: border-box;
       }
       .header-inner {
         max-width: 100%;
-        margin: 0 auto;
-        padding: 0.9rem 1.5rem;
+        margin: 0;
+        padding: 0.9rem 1.25rem;
+        box-sizing: border-box;
         display: flex;
         align-items: center;
         gap: 1.5rem;
@@ -73,12 +77,13 @@
         display: flex;
         flex-direction: column;
         align-items: flex-end;
+        justify-content: center;
         gap: 0;
         flex-shrink: 0;
       }
       .header-filter-row {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: 1rem;
         flex-wrap: wrap;
       }
@@ -253,7 +258,7 @@
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        box-shadow: var(--shadow-lg);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
       }
       .table-section table {
         height: 100%;
@@ -271,10 +276,10 @@
         vertical-align: middle;
       }
       thead th:first-child {
-        border-top-left-radius: calc(var(--radius) - 1px);
+        border-top-left-radius: 0;
       }
       thead th:last-child {
-        border-top-right-radius: calc(var(--radius) - 1px);
+        border-top-right-radius: 0;
       }
       thead tr {
         height: 48px;
@@ -393,12 +398,10 @@
         min-width: 0;
         box-sizing: border-box;
       }
-      .run-cell .btn-row,
-      .run-cell .btn-row-download {
+      .run-cell .btn-row {
         display: contents;
       }
-      .run-cell .btn-group > .btn-row > button,
-      .run-cell .btn-group > .btn-row-download > button {
+      .run-cell .btn-group > .btn-row > button {
         min-width: 0;
       }
       button.run {
@@ -507,6 +510,34 @@
       button.download-report-btn:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+      }
+      .download-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 1rem;
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: 0;
+        margin-bottom: 0;
+        flex-wrap: wrap;
+      }
+      .download-bar-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .download-bar-btns {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .download-bar-btns .download-sync-report-btn,
+      .download-bar-btns .download-report-btn {
+        margin: 0;
       }
       .result-header {
         width: 548px;
@@ -719,6 +750,10 @@
 
     <main class="main">
       <div class="table-section">
+        <div class="download-bar" id="download-bar">
+          <span class="download-bar-label">Downloads</span>
+          <div class="download-bar-btns" id="download-bar-btns"></div>
+        </div>
         <table>
           <thead>
             <tr>
@@ -824,31 +859,10 @@
           escapeHtml(c.scenario) +
           "</td>" +
           renderLimitsCell(c) +
-          '<td class="run-cell"><div class="btn-group"><div class="btn-row"></div><div class="btn-row-download"></div></div></td>';
+          '<td class="run-cell"><div class="btn-group"><div class="btn-row"></div></div></td>';
         tr.querySelector(".btn-row").appendChild(btn);
         tr.querySelector(".btn-row").appendChild(resetBtn);
         tr.querySelector(".btn-row").appendChild(resetDuringResumeBtn);
-        const downloadSyncReportBtn = document.createElement("button");
-        downloadSyncReportBtn.className = "download-sync-report-btn";
-        downloadSyncReportBtn.textContent = "Download Sync Report";
-        downloadSyncReportBtn.type = "button";
-        downloadSyncReportBtn.style.display = "none";
-        downloadSyncReportBtn.onclick = function () {
-          downloadSyncReport(downloadSyncReportBtn);
-        };
-        tr.querySelector(".btn-row-download").appendChild(downloadSyncReportBtn);
-        function addReportDownloadBtn(label, format) {
-          const b = document.createElement("button");
-          b.className = "download-report-btn download-report-" + format + "-btn";
-          b.textContent = label;
-          b.type = "button";
-          b.setAttribute("data-format", format);
-          b.style.display = "none";
-          b.onclick = function () { downloadLatestReport(b, format); };
-          tr.querySelector(".btn-row-download").appendChild(b);
-        }
-        addReportDownloadBtn("Download HTML report", "html");
-        addReportDownloadBtn("Download JSON report", "json");
         tr.appendChild(resultCell);
         return tr;
       }
@@ -865,18 +879,6 @@
         if (data) resultClass = pass ? "pass" : "fail";
         div.className = "result " + resultClass;
         var row = div.closest("tr");
-        var syncCases = ["P1", "PIPE"];
-        var extractCases = ["P2", "PIPE"];
-        var showSync = data && pass && caseId && syncCases.includes(caseId);
-        var showExtract = data && pass && caseId && extractCases.includes(caseId);
-        var downloadSyncReportBtn = row ? row.querySelector(".download-sync-report-btn") : null;
-        var downloadReportBtns = row ? row.querySelectorAll(".download-report-btn") : [];
-        if (downloadSyncReportBtn) {
-          downloadSyncReportBtn.style.display = showSync ? "block" : "none";
-        }
-        downloadReportBtns.forEach(function (b) {
-          b.style.display = showExtract ? "block" : "none";
-        });
         if (!data) {
           var label;
           var extra = "";
@@ -1031,10 +1033,6 @@
               input.value = "0";
             });
           }
-          var downloadSyncReportBtn = row.querySelector(".download-sync-report-btn");
-          var downloadReportBtns = row.querySelectorAll(".download-report-btn");
-          if (downloadSyncReportBtn) downloadSyncReportBtn.style.display = "none";
-          downloadReportBtns.forEach(function (b) { b.style.display = "none"; });
         }
       }
 
@@ -1291,6 +1289,31 @@
       ROWS.forEach(function (c) {
         tbody.appendChild(renderRow(c, "rows"));
       });
+      (function initDownloadBar() {
+        var container = document.getElementById("download-bar-btns");
+        if (!container) return;
+        var syncBtn = document.createElement("button");
+        syncBtn.className = "download-sync-report-btn";
+        syncBtn.textContent = "Staging Report";
+        syncBtn.type = "button";
+        syncBtn.title = "Download staging report (files in staging)";
+        syncBtn.onclick = function () { downloadSyncReport(syncBtn); };
+        container.appendChild(syncBtn);
+        function addReportBtn(label, format) {
+          var b = document.createElement("button");
+          b.className = "download-report-btn download-report-" + format + "-btn";
+          b.textContent = label;
+          b.type = "button";
+          b.setAttribute("data-format", format);
+          b.onclick = function () {
+            if (format === "json") downloadExtractionsZip(b);
+            else downloadLatestReport(b, format);
+          };
+          container.appendChild(b);
+        }
+        addReportBtn("Summary Report", "html");
+        addReportBtn("Extraction Results", "json");
+      })();
       document.querySelectorAll(".limit-sync, .limit-extract").forEach(function (input) {
         input.addEventListener("input", function () {
           var val = Number(this.value, 10);
@@ -1314,6 +1337,28 @@
             URL.revokeObjectURL(a.href);
           })
           .catch(function () {})
+          .then(function () {
+            if (btn) btn.disabled = false;
+          });
+      }
+
+      function downloadExtractionsZip(btn) {
+        if (btn) btn.disabled = true;
+        fetch("/api/extractions-zip")
+          .then(function (r) {
+            if (!r.ok) return r.json().then(function (err) { throw new Error(err.error || "Download failed"); });
+            return r.blob();
+          })
+          .then(function (blob) {
+            var a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "extractions.zip";
+            a.click();
+            URL.revokeObjectURL(a.href);
+          })
+          .catch(function (err) {
+            if (typeof err.message === "string") alert(err.message);
+          })
           .then(function () {
             if (btn) btn.disabled = false;
           });
