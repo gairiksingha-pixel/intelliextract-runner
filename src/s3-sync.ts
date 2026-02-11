@@ -126,6 +126,8 @@ export async function syncBucket(
     onProgress?: (done: number, total: number) => void;
     /** Used for progress: limit when set, 0 when no limit (unknown total). */
     initialLimit: number;
+    /** When set, called when a file is skipped (already present) or after sync: (skipped, totalProcessed) so UI can show "Skipping synced files". */
+    onSyncSkipProgress?: (skipped: number, totalProcessed: number) => void;
     /** When set, called after each file is successfully synced (for pipeline: trigger extraction). */
     onFileSynced?: (job: { filePath: string; relativePath: string; brand: string }) => void;
     /** When set, called before downloading a file (for resume: persist in-progress path so partial can be removed). */
@@ -165,6 +167,11 @@ export async function syncBucket(
     const shouldSkip = await skipIfUnchanged(destPath, mk, options.manifest);
     if (shouldSkip) {
       skipped++;
+      options.onSyncSkipProgress?.(skipped, skipped + synced);
+      if (options.onFileSynced) {
+        const relativePath = relative(brandDir, destPath).replace(/\\/g, '/');
+        options.onFileSynced({ filePath: destPath, relativePath, brand });
+      }
       reportProgress();
       continue;
     }
@@ -175,6 +182,7 @@ export async function syncBucket(
       const sha = await computeFileSha256(destPath);
       options.manifest[mk] = sha;
       synced++;
+      options.onSyncSkipProgress?.(skipped, skipped + synced);
       options.limitRemaining.value--;
       if (options.onFileSynced) {
         const relativePath = relative(brandDir, destPath).replace(/\\/g, '/');
@@ -203,6 +211,7 @@ export async function syncAllBuckets(
     syncLimit?: number;
     buckets?: S3BucketConfig[];
     onProgress?: (done: number, total: number) => void;
+    onSyncSkipProgress?: (skipped: number, totalProcessed: number) => void;
     onFileSynced?: (job: { filePath: string; relativePath: string; brand: string }) => void;
     onStartDownload?: (destPath: string, manifestKey: string) => void;
   }
@@ -228,6 +237,7 @@ export async function syncAllBuckets(
       limitRemaining,
       onProgress: overrides?.onProgress,
       initialLimit,
+      onSyncSkipProgress: overrides?.onSyncSkipProgress,
       onFileSynced: overrides?.onFileSynced,
       onStartDownload: overrides?.onStartDownload,
     });

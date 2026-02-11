@@ -23,13 +23,16 @@ const EXTRACTIONS_DIR = join(ROOT, 'output', 'extractions');
 const STAGING_DIR = join(ROOT, 'output', 'staging');
 const SYNC_MANIFEST_PATH = join(ROOT, 'output', 'checkpoints', 'sync-manifest.json');
 const CHECKPOINT_PATH = join(ROOT, 'output', 'checkpoints', 'checkpoint.db');
+const CHECKPOINT_JSON_PATH = join(ROOT, 'output', 'checkpoints', 'checkpoint.json');
+const LAST_PIPE_PARAMS_PATH = join(ROOT, 'output', 'checkpoints', 'last-pipe-params.json');
 const LAST_RUN_COMPLETED_PATH = join(ROOT, 'output', 'checkpoints', 'last-run-completed.txt');
 const ALLOWED_EXT = new Set(['.html', '.json']);
 
 function getCurrentRunIdFromCheckpoint() {
-  if (!existsSync(CHECKPOINT_PATH)) return null;
+  const path = existsSync(CHECKPOINT_JSON_PATH) ? CHECKPOINT_JSON_PATH : CHECKPOINT_PATH;
+  if (!existsSync(path)) return null;
   try {
-    const raw = readFileSync(CHECKPOINT_PATH, 'utf-8');
+    const raw = readFileSync(path, 'utf-8');
     const data = JSON.parse(raw);
     return data?.run_meta?.current_run_id ?? null;
   } catch (_) {
@@ -57,19 +60,27 @@ function markRunCompleted(runId) {
 
 function getRunStatusFromCheckpoint() {
   const runId = getCurrentRunIdFromCheckpoint();
-  if (!runId) return { canResume: false, runId: null, done: 0, failed: 0, total: 0 };
+  if (!runId) return { canResume: false, runId: null, done: 0, failed: 0, total: 0, syncLimit: 0 };
   const lastCompleted = getLastCompletedRunId();
+  const path = existsSync(CHECKPOINT_JSON_PATH) ? CHECKPOINT_JSON_PATH : CHECKPOINT_PATH;
   try {
-    const raw = readFileSync(CHECKPOINT_PATH, 'utf-8');
+    const raw = readFileSync(path, 'utf-8');
     const data = JSON.parse(raw);
     const checkpoints = Array.isArray(data?.checkpoints) ? data.checkpoints : [];
     const forRun = checkpoints.filter((c) => c.run_id === runId);
     const done = forRun.filter((c) => c.status === 'done').length;
     const failed = forRun.filter((c) => c.status === 'error').length;
     const canResume = forRun.length > 0 && runId !== lastCompleted;
-    return { canResume, runId, done, failed, total: forRun.length };
+    let syncLimit = 0;
+    if (existsSync(LAST_PIPE_PARAMS_PATH)) {
+      try {
+        const pipeParams = JSON.parse(readFileSync(LAST_PIPE_PARAMS_PATH, 'utf-8'));
+        syncLimit = Math.max(0, Number(pipeParams.syncLimit) || 0);
+      } catch (_) {}
+    }
+    return { canResume, runId, done, failed, total: forRun.length, syncLimit };
   } catch (_) {
-    return { canResume: false, runId: null, done: 0, failed: 0, total: 0 };
+    return { canResume: false, runId: null, done: 0, failed: 0, total: 0, syncLimit: 0 };
   }
 }
 
@@ -233,6 +244,7 @@ const PROGRESS_REGEX = /(\d+)%\s*\((\d+)\/(\d+)\)/g;
 const SYNC_PROGRESS_PREFIX = 'SYNC_PROGRESS\t';
 const EXTRACTION_PROGRESS_PREFIX = 'EXTRACTION_PROGRESS\t';
 const RESUME_SKIP_PREFIX = 'RESUME_SKIP\t';
+const RESUME_SKIP_SYNC_PREFIX = 'RESUME_SKIP_SYNC\t';
 
 function runCase(caseId, params = {}, callbacks = null, runOpts = null) {
   const def = CASE_COMMANDS[caseId];
@@ -244,6 +256,7 @@ function runCase(caseId, params = {}, callbacks = null, runOpts = null) {
   const onSyncProgress = callbacks?.onSyncProgress ?? null;
   const onExtractionProgress = callbacks?.onExtractionProgress ?? null;
   const onResumeSkip = callbacks?.onResumeSkip ?? null;
+  const onResumeSkipSync = callbacks?.onResumeSkipSync ?? null;
   const onChild = callbacks?.onChild ?? null;
   return new Promise((resolve) => {
     const child = spawn(cmd, args || [], {
@@ -285,6 +298,14 @@ function runCase(caseId, params = {}, callbacks = null, runOpts = null) {
             const skipped = Number(parts[0]);
             const total = Number(parts[1]);
             if (!Number.isNaN(skipped)) onResumeSkip(skipped, Number.isNaN(total) ? 0 : total);
+          }
+        }
+        if (onResumeSkipSync && line.startsWith(RESUME_SKIP_SYNC_PREFIX)) {
+          const parts = line.slice(RESUME_SKIP_SYNC_PREFIX.length).split('\t');
+          if (parts.length >= 2) {
+            const skipped = Number(parts[0]);
+            const total = Number(parts[1]);
+            if (!Number.isNaN(skipped)) onResumeSkipSync(skipped, Number.isNaN(total) ? 0 : total);
           }
         }
       }
@@ -404,6 +425,14 @@ createServer(async (req, res) => {
       }
       const runOpts = (resume === true) ? { resume: true, lastSyncDone, lastExtractDone } : null;
 
+      if (caseId === 'PIPE') {
+        try {
+          const dir = dirname(LAST_PIPE_PARAMS_PATH);
+          if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+          writeFileSync(LAST_PIPE_PARAMS_PATH, JSON.stringify({ syncLimit: params.syncLimit ?? 0 }), 'utf-8');
+        } catch (_) {}
+      }
+
       res.writeHead(200, {
         'Content-Type': 'application/x-ndjson',
         'Transfer-Encoding': 'chunked',
@@ -433,6 +462,9 @@ createServer(async (req, res) => {
         },
         onResumeSkip: (skipped, total) => {
           writeLine({ type: 'resume_skip', skipped, total });
+        },
+        onResumeSkipSync: (skipped, total) => {
+          writeLine({ type: 'resume_skip_sync', skipped, total });
         },
       }, runOpts);
       currentChild = null;

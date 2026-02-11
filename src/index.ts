@@ -229,6 +229,7 @@ program
       const stdoutPiped = typeof process !== 'undefined' && process.stdout?.isTTY !== true;
       const limitNum = limit !== undefined && limit > 0 ? limit : 0;
       if (stdoutPiped && limitNum > 0) process.stdout.write(`SYNC_PROGRESS\t0\t${limitNum}\n`);
+      if (stdoutPiped) process.stdout.write('EXTRACTION_PROGRESS\t0\t0\n');
       const pipelineConfig = loadConfig(globalOpts.config ?? getConfigPath());
       const result = await runSyncExtractPipeline({
         configPath: globalOpts.config,
@@ -246,6 +247,16 @@ program
         onExtractionProgress: stdoutPiped
           ? (done, total) => {
               process.stdout.write(`EXTRACTION_PROGRESS\t${done}\t${total}\n`);
+            }
+          : undefined,
+        onResumeSkip: stdoutPiped
+          ? (skipped, total) => {
+              process.stdout.write(`RESUME_SKIP\t${skipped}\t${total}\n`);
+            }
+          : undefined,
+        onSyncSkipProgress: stdoutPiped
+          ? (skipped, total) => {
+              process.stdout.write(`RESUME_SKIP_SYNC\t${skipped}\t${total}\n`);
             }
           : undefined,
         onFileComplete: doReport ? (runId) => writeReportsForRunId(pipelineConfig, runId) : undefined,

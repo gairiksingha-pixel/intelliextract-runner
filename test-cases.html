@@ -845,7 +845,7 @@
       const ROWS = [
         { id: "P1", scenario: "S3 Sync — Download files to staging.", limits: { sync: true, extract: false } },
         { id: "P2", scenario: "Extract — Run extraction with staging files (No S3 sync).", limits: { sync: false, extract: true } },
-        { id: "PIPE", scenario: "Sync & Extract — Sync from S3 and extract in one run.", limits: { pipeline: true } },
+        { id: "PIPE", scenario: "Sync & Extract — Sync from S3 then extract in one run.", limits: { pipeline: true } },
       ];
 
       function renderLimitsCell(c) {
@@ -936,7 +936,7 @@
         return div.innerHTML;
       }
 
-      function showResult(div, data, pass, progress, syncProgress, extractionProgress, caseId, resumeSkipProgress) {
+      function showResult(div, data, pass, progress, syncProgress, extractionProgress, caseId, resumeSkipSyncProgress, resumeSkipExtractProgress) {
         div.style.display = "block";
         var resultClass = "running";
         if (data) resultClass = pass ? "pass" : "fail";
@@ -945,16 +945,25 @@
         if (!data) {
           var label;
           var extra = "";
-          var hasResumeSkip = resumeSkipProgress != null && (resumeSkipProgress.skipped != null || resumeSkipProgress.total != null);
+          var hasResumeSkipSync = resumeSkipSyncProgress != null && (resumeSkipSyncProgress.skipped != null || resumeSkipSyncProgress.total != null);
+          var hasResumeSkipExtract = resumeSkipExtractProgress != null && (resumeSkipExtractProgress.skipped != null || resumeSkipExtractProgress.total != null);
           var hasSync = syncProgress != null && (syncProgress.done != null || syncProgress.total != null);
           var hasExtraction = extractionProgress != null && (extractionProgress.done != null || extractionProgress.total != null);
-          if (hasResumeSkip) {
-            var skipped = Number(resumeSkipProgress.skipped) || 0;
-            var skipTotal = Number(resumeSkipProgress.total) || 0;
-            var skipPct = skipTotal > 0 ? Math.min(100, Math.round((100 * skipped) / skipTotal)) : 100;
+          if (hasResumeSkipSync && caseId !== "PIPE") {
+            var skipSync = Number(resumeSkipSyncProgress.skipped) || 0;
+            var skipSyncTotal = Number(resumeSkipSyncProgress.total) || 0;
+            var skipSyncPct = skipSyncTotal > 0 ? Math.min(100, Math.round((100 * skipSync) / skipSyncTotal)) : 100;
             extra +=
-              '<div class="sync-progress-wrap skip-progress-wrap">Skipping completed files: ' + skipped + " / " + skipTotal + " skipped</div>" +
-              '<div class="sync-progress-bar"><div class="sync-progress-fill skip-fill" style="width:' + skipPct + '%"></div></div>';
+              '<div class="sync-progress-wrap skip-progress-wrap">Skipping synced files: ' + skipSync + " / " + skipSyncTotal + " skipped</div>" +
+              '<div class="sync-progress-bar"><div class="sync-progress-fill skip-fill" style="width:' + skipSyncPct + '%"></div></div>';
+          }
+          if (hasResumeSkipExtract) {
+            var skipExt = Number(resumeSkipExtractProgress.skipped) || 0;
+            var skipExtTotal = Number(resumeSkipExtractProgress.total) || 0;
+            var skipExtPct = skipExtTotal > 0 ? Math.min(100, Math.round((100 * skipExt) / skipExtTotal)) : 100;
+            extra +=
+              '<div class="sync-progress-wrap skip-progress-wrap">Skipping extracted files: ' + skipExt + " / " + skipExtTotal + " skipped</div>" +
+              '<div class="sync-progress-bar"><div class="sync-progress-fill skip-fill" style="width:' + skipExtPct + '%"></div></div>';
           }
           if (hasSync) {
             var done = Number(syncProgress.done) || 0;
@@ -980,22 +989,27 @@
                 ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' + extPct + '%"></div></div>'
                 : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
           }
-          if (hasResumeSkip || hasSync || hasExtraction) {
-            label = hasResumeSkip && !hasExtraction ? "Skipping completed files…" : (hasResumeSkip && hasExtraction ? "Skipped, now extracting…" : (hasSync && hasExtraction ? "Sync & extract…" : (hasSync ? "Syncing…" : "Extracting…")));
+          var showDots = true;
+          if (hasResumeSkipSync || hasResumeSkipExtract || hasSync || hasExtraction) {
+            showDots = false;
+            var showSyncSkipLabel = hasResumeSkipSync && caseId !== "PIPE";
+            label = showSyncSkipLabel ? "Skipping synced files…" : (hasResumeSkipExtract && !hasSync && !hasExtraction ? "Skipping extracted files…" : (hasResumeSkipExtract && (hasSync || hasExtraction) ? "Skipped extract, syncing/extracting…" : (hasSync && hasExtraction ? "Sync & extract…" : (hasSync ? "Syncing…" : "Extracting…"))));
           } else {
             var pctVal = progress && progress.percent != null ? Number(progress.percent) : null;
             var doneVal = progress && progress.done != null ? Number(progress.done) : null;
             var totalVal = progress && progress.total != null ? Number(progress.total) : null;
             if (pctVal != null && totalVal != null && totalVal > 0 && doneVal != null) {
               label = "Running… " + pctVal + "% (" + doneVal + " / " + totalVal + ")";
+              showDots = false;
             } else if (pctVal != null) {
               label = "Running… " + pctVal + "%";
+              showDots = false;
             } else {
               label = "Running…";
             }
           }
           div.innerHTML =
-            '<span class="exit">' + escapeHtml(label) + '<span class="loading-dots"></span></span>' + extra;
+            '<span class="exit">' + escapeHtml(label) + (showDots ? '<span class="loading-dots"></span>' : '') + '</span>' + extra;
           return;
         }
         var stdoutStr = (data.stdout && String(data.stdout).trim()) || "";
@@ -1003,6 +1017,7 @@
         var syncProgressPrefix = "SYNC_PROGRESS\t";
         function filterResultLine(line) {
           if (line.indexOf(syncProgressPrefix) === 0) return false;
+          if (line.indexOf("RESUME_SKIP\t") === 0 || line.indexOf("RESUME_SKIP_SYNC\t") === 0) return false;
           if (line.indexOf("Report(s) written:") !== -1) return false;
           if (/Run run_\S+ finished\./.test(line)) return false;
           return true;
@@ -1267,7 +1282,7 @@
         }
         btn.disabled = true;
         setOtherRowsInactive(row, OTHER_RUN_DISABLED_TITLE);
-        showResult(resultDiv, null, false, null, null, null);
+        showResult(resultDiv, null, false, null, null, null, caseId, null, null);
         var params;
         if (isResume && row && (row._resumeSyncLimit != null || row._resumeExtractLimit != null)) {
           params = {
@@ -1338,7 +1353,7 @@
               var errJson = JSON.parse(errText);
               if (errJson.error) errText = errJson.error;
             } catch (_) {}
-            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: errText }, false, null, null, null, caseId);
+            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: errText }, false, null, null, null, caseId, null, null);
             return;
           }
           var reader = r.body.getReader();
@@ -1347,7 +1362,8 @@
           var data = null;
           var lastSyncProgress = null;
           var lastExtractionProgress = null;
-          var lastResumeSkip = null;
+          var lastResumeSkipSync = null;
+          var lastResumeSkipExtract = null;
           while (true) {
             var chunk = await reader.read();
             if (chunk.done) break;
@@ -1360,16 +1376,19 @@
               try {
                 var msg = JSON.parse(line);
                 if (msg.type === "progress" && msg.percent != null) {
-                  showResult(resultDiv, null, false, { percent: msg.percent, done: msg.done, total: msg.total }, null, null, caseId, lastResumeSkip);
+                  showResult(resultDiv, null, false, { percent: msg.percent, done: msg.done, total: msg.total }, null, null, caseId, lastResumeSkipSync, lastResumeSkipExtract);
+                } else if (msg.type === "resume_skip_sync") {
+                  lastResumeSkipSync = { skipped: msg.skipped, total: msg.total };
+                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId, lastResumeSkipSync, lastResumeSkipExtract);
                 } else if (msg.type === "resume_skip") {
-                  lastResumeSkip = { skipped: msg.skipped, total: msg.total };
-                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId, lastResumeSkip);
+                  lastResumeSkipExtract = { skipped: msg.skipped, total: msg.total };
+                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId, lastResumeSkipSync, lastResumeSkipExtract);
                 } else if (msg.type === "sync_progress") {
                   lastSyncProgress = { done: msg.done, total: msg.total };
-                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId, lastResumeSkip);
+                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId, lastResumeSkipSync, lastResumeSkipExtract);
                 } else if (msg.type === "extraction_progress") {
                   lastExtractionProgress = { done: msg.done, total: msg.total };
-                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId, lastResumeSkip);
+                  showResult(resultDiv, null, false, null, lastSyncProgress, lastExtractionProgress, caseId, lastResumeSkipSync, lastResumeSkipExtract);
                 } else if (msg.type === "result") {
                   data = msg;
                 } else if (msg.error) {
@@ -1386,12 +1405,12 @@
             } catch (_) {}
           }
           if (!data) {
-            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: "No result from server" }, false, null, null, null, caseId);
+            showResult(resultDiv, { exitCode: 1, stdout: "", stderr: "No result from server" }, false, null, null, null, caseId, null, null);
             return;
           }
           var expectFail = caseId.indexOf("N") === 0;
           var pass = expectFail ? data.exitCode !== 0 : data.exitCode === 0;
-          showResult(resultDiv, data, pass, null, null, null, caseId);
+          showResult(resultDiv, data, pass, null, null, null, caseId, null, null);
           } catch (e) {
           if (e.name === "AbortError") {
             if (row) {
@@ -1428,6 +1447,8 @@
               null,
               null,
               caseId,
+              null,
+              null
             );
           }
         } finally {
@@ -1448,6 +1469,47 @@
       ROWS.forEach(function (c) {
         tbody.appendChild(renderRow(c, "rows"));
       });
+      (function restorePipelineResumeOnLoad() {
+        fetch("/api/run-status")
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (status) {
+            if (!status || !status.canResume) return;
+            var pipeRow = tbody ? tbody.querySelector("tr[data-case-id=\"PIPE\"]") : null;
+            if (!pipeRow) return;
+            var runBtn = pipeRow.querySelector("button.run");
+            var resultDiv = document.getElementById("result-PIPE");
+            var resetBtn = pipeRow.querySelector("button.reset-case:not(.reset-during-resume)");
+            var syncLimit = status.syncLimit != null ? Number(status.syncLimit) : 0;
+            if (Number.isNaN(syncLimit)) syncLimit = 0;
+            pipeRow._resumeSyncLimit = syncLimit;
+            pipeRow._resumeExtractLimit = 0;
+            pipeRow._aborted = true;
+            var limitInput = pipeRow.querySelector(".limit-sync");
+            if (limitInput) {
+              limitInput.value = String(syncLimit);
+              limitInput.disabled = true;
+            }
+            if (runBtn) runBtn.disabled = true;
+            if (resetBtn) {
+              resetBtn.textContent = "Resume";
+              resetBtn.classList.remove("stop-btn");
+              resetBtn.classList.add("resume-btn");
+              resetBtn.onclick = function () {
+                runCase("PIPE", runBtn, resultDiv, { resume: true });
+              };
+            }
+            var resetDuringResumeBtn = pipeRow.querySelector(".reset-during-resume");
+            if (resetDuringResumeBtn) resetDuringResumeBtn.classList.add("show-during-resume");
+            if (resultDiv) {
+              resultDiv.className = "result result-placeholder";
+              var done = status.done != null ? Number(status.done) : 0;
+              var total = status.total != null ? Number(status.total) : 0;
+              resultDiv.innerHTML = "<span class=\"result-placeholder-text\">Stopped (extract: " + done + "/" + total + "). Click Resume to continue from the next file.</span>";
+            }
+            setOtherRowsInactive(pipeRow, RESUME_OTHER_DISABLED_TITLE);
+          })
+          .catch(function () {});
+      })();
       (function initDownloadBar() {
         var container = document.getElementById("download-bar-btns");
         if (!container) return;

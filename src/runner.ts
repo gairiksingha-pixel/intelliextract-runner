@@ -49,6 +49,10 @@ export interface PipelineOptions extends RunOptions {
   onProgress?: (done: number, total: number) => void;
   /** Optional progress callback for extraction phase (done, total). Total is the number of files queued for extraction. */
   onExtractionProgress?: (done: number, total: number) => void;
+  /** Optional callback when resuming: (skipped, total) = already-extracted count and total for this run, so UI can show "Skipping extracted files". */
+  onResumeSkip?: (skipped: number, total: number) => void;
+  /** Optional callback during sync when files are skipped (already present): (skipped, totalProcessed) for "Skipping synced files" progress. */
+  onSyncSkipProgress?: (skipped: number, totalProcessed: number) => void;
 }
 
 export interface FullRunResult {
@@ -151,6 +155,14 @@ export async function runSyncExtractPipeline(options: PipelineOptions = {}): Pro
     : startRun(db);
   initRequestResponseLogger(config, runId);
 
+  if (options.resume && options.onResumeSkip) {
+    const records = getRecordsForRun(db, runId);
+    const doneCount = records.filter((r) => r.status === 'done').length;
+    if (doneCount > 0) {
+      options.onResumeSkip(doneCount, records.length);
+    }
+  }
+
   const concurrency = config.run.concurrency;
   const extractionQueue = new PQueue({ concurrency });
 
@@ -177,6 +189,7 @@ export async function runSyncExtractPipeline(options: PipelineOptions = {}): Pro
     syncLimit: effectiveSyncLimit,
     buckets: bucketsFilter,
     onProgress: options.onProgress,
+    onSyncSkipProgress: options.onSyncSkipProgress,
     onFileSynced,
     onStartDownload: (destPath, manifestKey) => {
       saveResumeState(config, { syncInProgressPath: destPath, syncInProgressManifestKey: manifestKey });
