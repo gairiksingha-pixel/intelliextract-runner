@@ -43,6 +43,8 @@ export interface LoggingConfig {
 export interface ReportConfig {
   outputDir: string;
   formats: ('markdown' | 'html' | 'json')[];
+  /** Keep only this many report sets (each run = one .html + one .json). Older reports are deleted after each write. Omit or 0 = keep all. */
+  retainCount?: number;
 }
 
 export interface Config {

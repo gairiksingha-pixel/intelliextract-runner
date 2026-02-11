@@ -3,8 +3,8 @@
  * Includes full API extraction response(s) per file when available.
  */
 
-import { mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync, unlinkSync, statSync } from 'node:fs';
+import { join, dirname, basename, extname } from 'node:path';
 import type { Config, RunMetrics, ExecutiveSummary } from './types.js';
 import { openCheckpointDb, getRecordsForRun, getAllRunIdsOrdered, closeCheckpointDb } from './checkpoint.js';
 import { computeMetrics } from './metrics.js';
@@ -247,6 +247,18 @@ function sectionForRun(entry: HistoricalRunSummary, isFirst: boolean): string {
     <tr><td>Total API time (sum of request latencies)</td><td>${totalApiTime}</td></tr>
     <tr><td>Error rate</td><td>${(m.errorRate * 100).toFixed(2)}%</td></tr>
   </table>
+  <h3>Load testing / API capability</h3>
+  <p>Use these as a guide for batch sizes and expected capacity at similar concurrency and file mix.</p>
+  <table>
+    <tr><th>Attribute</th><th>Value</th></tr>
+    <tr><td>Observed throughput</td><td>${throughputPerMinute.toFixed(1)} files/min, ${throughputPerSecond.toFixed(2)} files/sec</td></tr>
+    <tr><td>API response time (P50 / P95 / P99)</td><td>${m.p50LatencyMs.toFixed(0)} ms / ${m.p95LatencyMs.toFixed(0)} ms / ${m.p99LatencyMs.toFixed(0)} ms</td></tr>
+    <tr><td>Error rate at this load</td><td>${(m.errorRate * 100).toFixed(2)}%</td></tr>
+    <tr><td>Ideal extract count (≈5 min run)</td><td>~${Math.round(throughputPerMinute * 5)} files</td></tr>
+    <tr><td>Ideal extract count (≈10 min run)</td><td>~${Math.round(throughputPerMinute * 10)} files</td></tr>
+    <tr><td>Ideal extract count (≈15 min run)</td><td>~${Math.round(throughputPerMinute * 15)} files</td></tr>
+  </table>
+  <p><strong>Summary:</strong> At this run&rsquo;s load, the API handled <strong>${processed} files</strong> in <strong>${runDuration}</strong> with <strong>${(m.errorRate * 100).toFixed(2)}%</strong> errors. For a target run of about 5 minutes, aim for batches of <strong>~${Math.round(throughputPerMinute * 5)} files</strong>; for 10 minutes, <strong>~${Math.round(throughputPerMinute * 10)} files</strong>.</p>
   <h3>Latency (ms)</h3>
   <table>
     <tr><th>Percentile</th><th>Value</th></tr>
@@ -354,8 +366,42 @@ function escapeHtml(s: string): string {
 }
 
 /**
+ * Delete oldest report sets so only the most recent retainCount remain.
+ * A "report set" is a base name with .html and/or .json in the output dir.
+ */
+function pruneOldReports(outDir: string, retainCount: number): void {
+  if (retainCount <= 0) return;
+  const files = readdirSync(outDir, { withFileTypes: true })
+    .filter((e) => e.isFile() && (e.name.endsWith('.html') || e.name.endsWith('.json')));
+  const baseToMtime = new Map<string, number>();
+  for (const e of files) {
+    const base = basename(e.name, extname(e.name));
+    const path = join(outDir, e.name);
+    try {
+      const mtime = statSync(path).mtimeMs;
+      const existing = baseToMtime.get(base);
+      if (existing === undefined || mtime > existing) baseToMtime.set(base, mtime);
+    } catch {
+      // skip unreadable
+    }
+  }
+  const basesByAge = [...baseToMtime.entries()].sort((a, b) => b[1] - a[1]);
+  const toKeep = new Set(basesByAge.slice(0, retainCount).map(([base]) => base));
+  for (const e of files) {
+    const base = basename(e.name, extname(e.name));
+    if (toKeep.has(base)) continue;
+    try {
+      unlinkSync(join(outDir, e.name));
+    } catch {
+      // ignore delete errors
+    }
+  }
+}
+
+/**
  * Write reports to config.report.outputDir in requested formats.
  * Includes all historical sync & extract runs (from checkpoint) so downloaded reports have full history.
+ * If report.retainCount is set, older report sets are deleted after writing so only the last N are kept.
  */
 export function writeReports(config: Config, summary: ExecutiveSummary): void {
   const outDir = config.report.outputDir;
@@ -373,21 +419,40 @@ export function writeReports(config: Config, summary: ExecutiveSummary): void {
     }
     if (config.report.formats.includes('json')) {
       const path = join(outDir, `${base}.json`);
-      const jsonPayload = {
-        title: REPORT_TITLE,
-        generatedAt,
-        runs: historicalSummaries.map((r) => ({
+      const runsPayload = historicalSummaries.map((r) => {
+        const processed = r.metrics.success + r.metrics.failed;
+        const throughputPerMinute =
+          r.runDurationSeconds > 0 ? (processed / r.runDurationSeconds) * 60 : 0;
+        const throughputPerSecond = throughputPerMinute / 60;
+        return {
           runId: r.runId,
           metrics: r.metrics,
           runDurationSeconds: r.runDurationSeconds,
+          loadTesting: {
+            throughputPerMinute: Math.round(throughputPerMinute * 10) / 10,
+            throughputPerSecond: Math.round(throughputPerSecond * 100) / 100,
+            errorRatePercent: Math.round(r.metrics.errorRate * 10000) / 100,
+            idealExtractCount5Min: Math.round(throughputPerMinute * 5),
+            idealExtractCount10Min: Math.round(throughputPerMinute * 10),
+            idealExtractCount15Min: Math.round(throughputPerMinute * 15),
+            p50LatencyMs: r.metrics.p50LatencyMs,
+            p95LatencyMs: r.metrics.p95LatencyMs,
+            p99LatencyMs: r.metrics.p99LatencyMs,
+          },
           extractionResults: r.extractionResults.map((e) => ({
             filename: e.filename,
             response: e.response,
             extractionSuccess: e.extractionSuccess,
           })),
-        })),
-      };
+        };
+      });
+      const jsonPayload = { title: REPORT_TITLE, generatedAt, runs: runsPayload };
       writeFileSync(path, JSON.stringify(jsonPayload, null, 2), 'utf-8');
     }
+  }
+
+  const retain = config.report.retainCount;
+  if (typeof retain === 'number' && retain > 0) {
+    pruneOldReports(outDir, retain);
   }
 }

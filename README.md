@@ -76,7 +76,7 @@ All commands use the config file at `config/config.yaml` unless you pass `-c pat
 - **Sync manifest:** `output/checkpoints/sync-manifest.json` (or `s3.syncManifestPath`) – stores key → SHA-256 so already-downloaded unchanged files are skipped on the next sync.
 - **Checkpoints:** `output/checkpoints/checkpoint.json` – resumable run state; `last-run-id.txt` in the same directory stores the latest run ID for `report`.
 - **Logs:** `output/logs/request-response_<runId>.jsonl` – one JSON object per request/response for debugging.
-- **Reports:** `output/reports/report_<runId>_<ts>.md|.html|.json` – executive summary.
+- **Reports:** `output/reports/report_<runId>_<ts>.md|.html|.json` – executive summary. Set `report.retainCount` in config to keep only the last N report sets and avoid unbounded disk use.
 
 Note: Checkpoints are stored as `checkpoint.json` (same path as `checkpointPath` with `.sqlite` replaced by `.json`).
 

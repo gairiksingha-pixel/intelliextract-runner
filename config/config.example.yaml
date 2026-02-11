@@ -38,3 +38,5 @@ report:
   formats:
     - html
     - json
+  # Optional: keep only the last N report sets (each run = one .html + one .json). Older reports are deleted after each write. Omit or 0 = keep all.
+  # retainCount: 10

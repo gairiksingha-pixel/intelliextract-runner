@@ -34,6 +34,11 @@ function validateConfig(c: Config, configPath: string): void {
   if (!c.logging?.dir || typeof c.logging.dir !== 'string') missing.push('logging.dir');
   if (!c.report?.outputDir || typeof c.report.outputDir !== 'string') missing.push('report.outputDir');
   if (!Array.isArray(c.report?.formats) || c.report.formats.length === 0) missing.push('report.formats (non-empty array)');
+  if (c.report?.retainCount !== undefined) {
+    if (typeof c.report.retainCount !== 'number' || c.report.retainCount < 0 || !Number.isInteger(c.report.retainCount)) {
+      missing.push('report.retainCount (non-negative integer when set)');
+    }
+  }
   if (missing.length > 0) {
     throw new Error(`Invalid config at ${configPath}. Missing or invalid: ${missing.join(', ')}.`);
   }
