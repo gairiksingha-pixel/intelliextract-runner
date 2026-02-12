@@ -36,6 +36,7 @@ TypeScript test automation for the EntelliExtract spreadsheet extraction API. Su
      - `ENTELLIEXTRACT_SECRET_MESSAGE`
      - `ENTELLIEXTRACT_SIGNATURE`
    - For S3 sync, set AWS credentials and `S3_BUCKET`, `S3_TENANT_PURCHASERS` (JSON map of tenant folder → purchaser folders). See `.env.example` for the full list.
+   - **Encrypted secrets (optional):** To avoid storing plain secrets in `.env`, you can use [Fernet](https://github.com/fernet/spec)-encrypted values. Set `FERNET_KEY` (base64url key) and `*_ENCRYPTED` vars (e.g. `ENTELLIEXTRACT_ACCESS_KEY_ENCRYPTED`, `AWS_ACCESS_KEY_ID_ENCRYPTED`). The app decrypts them at runtime. Encrypt with Python: `Fernet(key).encrypt(b"secret").decode()` or with Node: `new Fernet(key).encrypt("secret")`. See `.env.example` for the list of supported `_ENCRYPTED` vars.
 
 4. **Build**
 

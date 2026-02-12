@@ -3,8 +3,10 @@ import { resolve } from 'node:path';
 import yaml from 'js-yaml';
 import { config as loadEnv } from 'dotenv';
 import type { Config } from './types.js';
+import { loadSecrets } from './secrets.js';
 
 loadEnv();
+loadSecrets();
 
 const CONFIG_PATH = process.env.CONFIG_PATH ?? resolve(process.cwd(), 'config', 'config.yaml');
 

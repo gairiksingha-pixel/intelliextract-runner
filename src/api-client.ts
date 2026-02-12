@@ -9,8 +9,10 @@ import { config as loadEnv } from 'dotenv';
 import { basename } from 'node:path';
 import { fetch, Agent, FormData } from 'undici';
 import type { Config } from './types.js';
+import { loadSecrets } from './secrets.js';
 
 loadEnv();
+loadSecrets();
 
 export interface ExtractRequest {
   filePath: string;
