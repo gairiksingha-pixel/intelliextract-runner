@@ -62,13 +62,13 @@
         border: 1px solid var(--border);
         border-radius: var(--radius);
         box-shadow: var(--shadow-lg);
-        margin: 1.25rem 1.5rem 0.03rem 1.5rem;
+        margin: 1.25rem 1.5rem;
         box-sizing: border-box;
       }
       .header-inner {
         max-width: 100%;
         margin: 0;
-        padding: 0.9rem 1.25rem;
+        padding: 0.5rem 1.25rem 0.1rem 1.25rem;
         box-sizing: border-box;
         display: flex;
         align-items: center;
@@ -83,6 +83,7 @@
         justify-content: center;
         gap: 0;
         flex-shrink: 0;
+        padding-top: 0.75rem;
       }
       .header-filter-row {
         display: flex;
@@ -118,15 +119,17 @@
         line-height: 1.2;
       }
       .header .logo {
-        height: 36px;
+        height: 30px;
         width: auto;
         display: block;
         object-fit: contain;
+        margin-top: -0.5rem;
       }
       .header .logo-placeholder {
-        height: 36px;
+        height: 30px;
         display: flex;
         align-items: center;
+        margin-top: -0.5rem;
         font-weight: 600;
         color: var(--accent);
         font-size: 1.1rem;
@@ -141,8 +144,8 @@
         width: 176px;
         min-width: 176px;
         max-width: 176px;
-        height: 36px;
-        padding: 0.5rem 2rem 0.5rem 0.6rem;
+        height: 32px;
+        padding: 0.35rem 2rem 0.35rem 0.6rem;
         border: 1px solid var(--border);
         border-radius: var(--radius-sm);
         background: var(--surface);
@@ -174,8 +177,8 @@
       }
       .filter-dropdown-trigger {
         width: 100%;
-        height: 36px;
-        padding: 0.5rem 2rem 0.5rem 0.6rem;
+        height: 32px;
+        padding: 0.35rem 2rem 0.35rem 0.6rem;
         border: 1px solid var(--border);
         border-radius: var(--radius-sm);
         background: var(--surface);
@@ -242,33 +245,35 @@
         align-self: flex-end;
       }
       .header-btn-reset {
-        height: 36px;
+        height: 32px;
         padding: 0 1rem;
-        border: 1px solid var(--border);
+        border: 1px solid var(--header-border);
         border-radius: var(--radius-sm);
-        background: var(--surface);
-        color: var(--text);
+        background: var(--header-bg);
+        color: var(--header-text);
         font-size: 0.875rem;
+        font-weight: 600;
         font-family: inherit;
         cursor: pointer;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.06), inset 0 1px 1px rgba(255,255,255,0.8);
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.15);
+        transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
       }
       .header-btn-reset:focus {
         outline: none;
-        border-color: var(--primary);
-        box-shadow: 0 0 0 2px rgba(45, 157, 95, 0.2), 0 2px 4px rgba(0,0,0,0.08);
+        border-color: var(--header-text);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3), 0 2px 4px rgba(0,0,0,0.1);
       }
       .header-btn-reset:hover {
-        background: var(--row-alt);
-        border-color: var(--border-light);
+        background: var(--header-border);
+        border-color: var(--header-border);
+        color: var(--header-text);
       }
       .main {
         flex: 1;
         display: flex;
         flex-direction: column;
         min-height: 0;
-        padding: 1.25rem 1.5rem;
+        padding: 0 1.5rem 1.25rem 1.5rem;
         max-width: 100%;
       }
       .table-section {

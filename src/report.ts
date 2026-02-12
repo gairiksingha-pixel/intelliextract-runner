@@ -135,16 +135,30 @@ function formatDuration(ms: number): string {
   return `${sec}s`;
 }
 
-/** Human-readable date and time for a run (e.g. "2025-02-12 14:30:52") for unique accordion labels. */
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function dayOrdinal(day: number): string {
+  const s = String(day);
+  if (day >= 11 && day <= 13) return s + 'th';
+  const last = s.slice(-1);
+  if (last === '1') return s + 'st';
+  if (last === '2') return s + 'nd';
+  if (last === '3') return s + 'rd';
+  return s + 'th';
+}
+
+/** Human-readable date and time for a run (e.g. "Feb-2nd-2026 09:32-AM") for accordion labels. */
 function formatRunDateTime(iso: string): string {
   const d = new Date(iso);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
+  const month = MONTH_NAMES[d.getMonth()];
+  const day = d.getDate();
+  const year = d.getFullYear();
+  const hours24 = d.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const h = String(hours12).padStart(2, '0');
   const min = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
-  return `${y}-${mo}-${day} ${h}:${min}:${s}`;
+  const ampm = hours24 < 12 ? 'AM' : 'PM';
+  return `${month}-${dayOrdinal(day)}-${year} ${h}:${min}-${ampm}`;
 }
 
 export function buildSummary(metrics: RunMetrics): ExecutiveSummary {
@@ -203,10 +217,14 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   const failureDetailsRows =
     (m.failureDetails?.length ?? 0) > 0
       ? m.failureDetails!
-          .map(
-            (f) =>
-              `<tr><td>${f.statusCode ?? '—'}</td><td class="file-path">${escapeHtml(f.filePath)}</td><td>${escapeHtml((f.errorMessage ?? '').slice(0, 200))}${(f.errorMessage?.length ?? 0) > 200 ? '…' : ''}</td></tr>`
-          )
+          .map((f) => {
+            const msg = (f.errorMessage ?? '').trim();
+            const snippet =
+              msg.length > 0
+                ? escapeHtml(msg.slice(0, 200)) + (msg.length > 200 ? '…' : '')
+                : '<span class="muted">(no response body)</span>';
+            return `<tr><td>${f.statusCode ?? '—'}</td><td class="file-path">${escapeHtml(f.filePath)}</td><td>${snippet}</td></tr>`;
+          })
           .join('')
       : '';
   const failureDetailsSection =
@@ -321,11 +339,12 @@ function htmlReportFromHistory(historicalSummaries: HistoricalRunSummary[], gene
     .run-section-body { padding: 0 0.75rem 0.75rem; }
     .extraction-note { color: #555; font-size: 0.9rem; margin: 0.5rem 0; }
     td.file-path { word-break: break-all; max-width: 400px; }
+    .muted { color: #888; font-style: italic; }
   </style>
 </head>
 <body>
   <h1>${escapeHtml(REPORT_TITLE)}</h1>
-  <p class="meta">Generated: ${escapeHtml(generatedAt)} — ${historicalSummaries.length} run(s) (sync &amp; extract)</p>
+  <p class="meta">Generated: ${escapeHtml(formatRunDateTime(generatedAt))} — ${historicalSummaries.length} run(s) (sync &amp; extract)</p>
   <h2>Historical runs</h2>
   ${runsHtml}
 </body>
