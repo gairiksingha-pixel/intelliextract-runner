@@ -55,6 +55,32 @@ TypeScript test automation for the EntelliExtract spreadsheet extraction API. Su
    npm run build
    ```
 
+## Quick start (HTML UI – recommended)
+
+Use the browser-based test runner first to explore commands and verify your setup.
+
+1. **Build** the project (ensures `dist/index.js` exists):
+
+   ```bash
+   npm run build
+   ```
+
+2. **Start the test runner server** from the project root:
+
+   ```bash
+   npm run test-runner
+   ```
+
+3. **Open the HTML UI** in your browser:
+
+   - Visit `http://localhost:8765/`.
+   - Click **Run** next to any test case to execute it; the command, exit code, stdout, and stderr are shown inline.
+
+4. **Review reports and logs**:
+
+   - Open the generated HTML report under `output/reports/` to see throughput, error rate, and per-run details.
+   - Inspect `output/logs/request-response_<runId>.jsonl` for full API request/response traces.
+
 ## Commands
 
 All commands use the config file at `config/config.yaml` unless you pass `-c path/to/config.yaml`. If you just cloned the repo, create it with `cp config/config.example.yaml config/config.yaml` (see Setup).
@@ -146,34 +172,6 @@ Use a single run with fixed concurrency to establish a baseline:
 1. Set in `config.yaml`: `run.concurrency: 10`, `run.requestsPerSecond: 10` (or your desired cap).
 2. Run: `npm start run -- --no-sync` (after staging is populated).
 3. Open the generated report for **throughput (files/sec)**, **average latency**, **P95 latency**, and **error rate**.
-
-## Example Run Output
-
-After `npm start run` you should see something like:
-
-```
-Sync Summary
-------------
-Download limit: no limit
-Downloaded (new): 60
-Skipped (already present, unchanged): 5
-Errors: 0
-
-By brand (staging path → counts):
-  no-cow-026090539970-prod / DOT_FOODS
-    Staging path: output/staging/no-cow-026090539970-prod__DOT_FOODS/DOT_FOODS
-    Downloaded: 42, Skipped: 5, Errors: 0
-  sundia-026090539970-prod / KEHE
-    Staging path: output/staging/sundia-026090539970-prod__KEHE/KEHE
-    Downloaded: 18, Skipped: 0, Errors: 0
-
-Run run_1739123456789_abc1234 finished. Success: 88, Failed: 0, Skipped: 3
-Report(s) written: [ 'output/reports/report_run_1739123456789_abc1234_1739123500000.md', ... ]
-```
-
-See `output/reports/` for the full executive summary (total files, run time, success/failure, P95 latency, anomalies).
-
----
 
 ## How to Run & Test
 
