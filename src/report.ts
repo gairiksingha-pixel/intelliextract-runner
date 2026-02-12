@@ -34,6 +34,10 @@ export interface HistoricalRunSummary {
   metrics: RunMetrics;
   extractionResults: ExtractionResultEntry[];
   runDurationSeconds: number;
+  /** When all records in a run share the same brand, include it for display. */
+  brand?: string;
+  /** When all records in a run share the same purchaser (stagingDir/<brand>/<purchaser>/...), include it for display. */
+  purchaser?: string;
 }
 
 function extractionResultFilenameFromRecord(record: {
@@ -187,6 +191,22 @@ export function loadHistoricalRunSummaries(
     const { start, end } = minMaxDatesFromRecords(records);
     const metrics = computeMetrics(runId, records, start, end);
 
+    // Derive brand and purchaser for this run from checkpoint records.
+    // Structure: stagingDir/<brand>/<purchaser>/<key after prefix>.
+    const brandSet = new Set<string>();
+    const purchaserSet = new Set<string>();
+    for (const r of records) {
+      if (r.brand) brandSet.add(r.brand);
+      if (r.relativePath) {
+        const firstSegment = r.relativePath.split(/[\\/]/)[0];
+        if (firstSegment) purchaserSet.add(firstSegment);
+      }
+    }
+    const brands = [...brandSet];
+    const purchasers = [...purchaserSet];
+    const brand = brands.length === 1 ? brands[0] : undefined;
+    const purchaser = purchasers.length === 1 ? purchasers[0] : undefined;
+
     const allResults = loadExtractionResults(config, runId);
     const extractionResults = filterExtractionResultsForRun(
       config,
@@ -201,6 +221,8 @@ export function loadHistoricalRunSummaries(
       metrics,
       extractionResults,
       runDurationSeconds,
+      brand,
+      purchaser,
     });
   }
 
@@ -430,9 +452,18 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       : '<p class="muted">No notable anomalies detected.</p>';
 
   const runLabel = formatRunDateTime(m.startedAt);
+  let prefix = "";
+  if (entry.brand && entry.purchaser) {
+    prefix = `${entry.brand}-${entry.purchaser}-`;
+  } else if (entry.brand) {
+    prefix = `${entry.brand}-`;
+  } else if (entry.purchaser) {
+    prefix = `${entry.purchaser}-`;
+  }
+  const labelWithPrefix = `${prefix}${runLabel}`;
   return `
   <details class="run-section">
-  <summary class="run-section-summary"><strong>${escapeHtml(runLabel)}</strong> — ${displaySuccess} successful responses, ${displayFailed} failed responses, ${m.skipped} skipped</summary>
+  <summary class="run-section-summary"><strong>${escapeHtml(labelWithPrefix)}</strong> — ${displaySuccess} successful responses, ${displayFailed} failed responses, ${m.skipped} skipped</summary>
   <div class="run-section-body">
   <h3>Overview</h3>
   <table>
