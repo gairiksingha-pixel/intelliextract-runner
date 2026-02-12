@@ -1,7 +1,7 @@
 {
-  "name": "entelliextract-runner",
+  "name": "intelliextract-runner",
   "version": "1.0.0",
-  "description": "Runner and browser app for EntelliExtract API — S3 sync, extraction, checkpointing, load testing, and reporting",
+  "description": "Runner and browser app for IntelliExtract API — S3 sync, extraction, checkpointing, load testing, and reporting",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -14,7 +14,7 @@
     "app": "node app-server.mjs"
   },
   "keywords": [
-    "entelliextract",
+    "intelliextract",
     "test-automation",
     "s3",
     "extraction",

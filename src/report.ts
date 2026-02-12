@@ -283,7 +283,7 @@ export function buildSummary(metrics: RunMetrics): ExecutiveSummary {
   const end = new Date(metrics.finishedAt).getTime();
   const runDurationSeconds = (end - start) / 1000;
   return {
-    title: "EntelliExtract Test Run – Executive Summary",
+    title: "IntelliExtract Test Run – Executive Summary",
     generatedAt: new Date().toISOString(),
     metrics,
     runDurationSeconds,
@@ -303,7 +303,10 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   // Reclassify successes as failures when API response.success === false,
   // but always keep total processed = m.success + m.failed.
   const reclassifiedFailuresFromResponses = failedCount;
-  const displaySuccess = Math.max(0, m.success - reclassifiedFailuresFromResponses);
+  const displaySuccess = Math.max(
+    0,
+    m.success - reclassifiedFailuresFromResponses,
+  );
   const displayFailed = m.failed + reclassifiedFailuresFromResponses;
   const processed = m.success + m.failed;
   const throughputPerSecond =
@@ -441,7 +444,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   }
   if (agentSummaryPoints.length === 0 && processed > 0) {
     agentSummaryPoints.push(
-      `Run completed without notable anomalies: ${processed} files in ${runDuration} at ${(throughputPerMinute).toFixed(1)} files/min.`,
+      `Run completed without notable anomalies: ${processed} files in ${runDuration} at ${throughputPerMinute.toFixed(1)} files/min.`,
     );
   }
   const agentSummaryHtml =
@@ -510,7 +513,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   </details>`;
 }
 
-const REPORT_TITLE = "EntelliExtract Test Run – Executive Summary";
+const REPORT_TITLE = "IntelliExtract Test Run – Executive Summary";
 
 function htmlReportFromHistory(
   historicalSummaries: HistoricalRunSummary[],

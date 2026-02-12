@@ -1,12 +1,12 @@
-# EntelliExtract Runner
+# IntelliExtract Runner
 
-TypeScript runner and browser app for the EntelliExtract spreadsheet extraction API. Supports S3 sync from a single bucket with tenant/purchaser folders, file-level checkpointing (resumable runs), configurable concurrency and rate limiting, full request/response logging, and executive summary reports (Markdown, HTML, JSON).
+TypeScript runner and browser app for the IntelliExtract spreadsheet extraction API. Supports S3 sync from a single bucket with tenant/purchaser folders, file-level checkpointing (resumable runs), configurable concurrency and rate limiting, full request/response logging, and executive summary reports (Markdown, HTML, JSON).
 
 ## Features & capabilities
 
 - **S3 sync to staging**: Syncs from a single S3 bucket with tenant/purchaser folders into a local `output/staging/...` tree, with optional sync limits and SHA-256 based skip-on-checksum.
 - **File-level checkpointing**: Stores status per file (`done`, `error`, `skipped`) in `checkpoint.json` so runs can be resumed without reprocessing completed files.
-- **Configurable load (RPS + concurrency)**: `run.concurrency` and `run.requestsPerSecond` let you simulate different load profiles against the EntelliExtract API.
+- **Configurable load (RPS + concurrency)**: `run.concurrency` and `run.requestsPerSecond` let you simulate different load profiles against the IntelliExtract API.
 - **Full request/response logging**: Writes JSONL logs per run with request, response, headers, and timing for every API call.
 - **Extraction result classification**: For every file, the full extract API JSON response is stored and classified using the response body’s `success` flag (`"success": true` → successful response, `"success": false` → failed response). Upload/read failures are counted as **failed file uploads**.
 - **Executive summary reporting**: Generates Markdown, HTML, and JSON executive summaries with throughput, latency percentiles, error rate, anomaly detection, and per-file extraction results (linked to the stored JSON).
@@ -23,12 +23,11 @@ TypeScript runner and browser app for the EntelliExtract spreadsheet extraction 
 1. **Clone and install**
 
    ```bash
-   cd entelliextract-runner
+   cd intelliextract-runner
    npm install
    ```
 
 2. **Configuration**
-
    - **Create** `config/config.yaml` from the example (the repo does not commit `config.yaml` so you keep your own copy):
      ```bash
      cp config/config.example.yaml config/config.yaml
@@ -36,18 +35,17 @@ TypeScript runner and browser app for the EntelliExtract spreadsheet extraction 
    - Edit `config/config.yaml` (staging dir, concurrency, report options). S3 buckets are built from `.env` when `S3_BUCKET` and `S3_TENANT_PURCHASERS` are set.
 
 3. **Environment (credentials)**
-
    - Create `.env` from the example (the repo does not commit `.env`):
      ```bash
      cp .env.example .env
      ```
-   - Edit `.env` with your EntelliExtract API credentials:
-     - `ENTELLIEXTRACT_BASE_URL` – API base URL
-     - `ENTELLIEXTRACT_ACCESS_KEY`
-     - `ENTELLIEXTRACT_SECRET_MESSAGE`
-     - `ENTELLIEXTRACT_SIGNATURE`
+   - Edit `.env` with your IntelliExtract API credentials:
+     - `INTELLIEXTRACT_BASE_URL` – API base URL
+     - `INTELLIEXTRACT_ACCESS_KEY`
+     - `INTELLIEXTRACT_SECRET_MESSAGE`
+     - `INTELLIEXTRACT_SIGNATURE`
    - For S3 sync, set AWS credentials and `S3_BUCKET`, `S3_TENANT_PURCHASERS` (JSON map of tenant folder → purchaser folders). See `.env.example` for the full list.
-   - **Encrypted secrets (optional):** To avoid storing plain secrets in `.env`, you can use [Fernet](https://github.com/fernet/spec)-encrypted values. Set `FERNET_KEY` (base64url key) and `*_ENCRYPTED` vars (e.g. `ENTELLIEXTRACT_ACCESS_KEY_ENCRYPTED`, `AWS_ACCESS_KEY_ID_ENCRYPTED`). The app decrypts them at runtime. Encrypt with Python: `Fernet(key).encrypt(b"secret").decode()` or with Node: `new Fernet(key).encrypt("secret")`. See `.env.example` for the list of supported `_ENCRYPTED` vars.
+   - **Encrypted secrets (optional):** To avoid storing plain secrets in `.env`, you can use [Fernet](https://github.com/fernet/spec)-encrypted values. Set `FERNET_KEY` (base64url key) and `*_ENCRYPTED` vars (e.g. `INTELLIEXTRACT_ACCESS_KEY_ENCRYPTED`, `AWS_ACCESS_KEY_ID_ENCRYPTED`). The app decrypts them at runtime. Encrypt with Python: `Fernet(key).encrypt(b"secret").decode()` or with Node: `new Fernet(key).encrypt("secret")`. See `.env.example` for the list of supported `_ENCRYPTED` vars.
 
 4. **Build**
 
@@ -72,12 +70,10 @@ Use the browser app to run sync, extract, and pipeline scenarios and verify your
    ```
 
 3. **Open the app** in your browser:
-
    - Visit [http://localhost:8765/](http://localhost:8765/).
    - Select **Brand** and **Purchaser**, set limits if needed, then click **Run** to execute a scenario; output appears inline.
 
 4. **Review reports and logs**:
-
    - Open the generated HTML report under `output/reports/` to see throughput, error rate, and per-run details.
    - Inspect `output/logs/request-response_<runId>.jsonl` for full API request/response traces.
 
@@ -87,7 +83,7 @@ All commands use the config file at `config/config.yaml` unless you pass `-c pat
 
 You can run commands in three equivalent ways (after `npm install`):
 
-- **Recommended (auto-build)** – scripts that *always* compile TypeScript before running:
+- **Recommended (auto-build)** – scripts that _always_ compile TypeScript before running:
 
   ```bash
   npm run sync      # build + sync
@@ -189,6 +185,7 @@ Benchmarking is done entirely through the **run metrics and reports** – there 
    - **Error rate**: percentage of failed responses (from `metrics.errorRate` plus the extraction result reclassification logic).
 
 Example: if you see in the report:
+
 - “Observed throughput: 80.0 files/min, 1.33 files/sec”
 - “API response time (P50 / P95 / P99): 200 ms / 500 ms / 900 ms”
 - “Error rate at this load: 2.50%”
@@ -199,24 +196,24 @@ then at `concurrency = 10` and `requestsPerSecond = 10`, your single test run is
 
 ### Build and run commands
 
-| Action | Command |
-|--------|--------|
-| Build only | `npm run build` |
-| Sync S3 → staging | `npm run sync` or `node dist/index.js sync` |
-| Full run (sync + extract + report) | `npm run extract` or `npm start run` |
-| Extract only (no sync) | `npm start run -- --no-sync` |
-| Run without writing report | `npm start run -- --no-report` |
-| Report from last run | `npm run report` or `npm start report` |
-| Report for specific run ID | `npm start report -- --run-id <runId>` |
-| Sync/run for one tenant+purchaser | `npm run sync -- --tenant <tenant> --purchaser <purchaser>` (same for `run`) |
-| Use custom config | `npm run sync -c path/to/config.yaml` (any command) |
-| Sync-extract pipeline | `node dist/index.js sync-extract --limit <n>` |
-| Start browser app | `npm run app` or `node app-server.mjs` |
+| Action                             | Command                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| Build only                         | `npm run build`                                                              |
+| Sync S3 → staging                  | `npm run sync` or `node dist/index.js sync`                                  |
+| Full run (sync + extract + report) | `npm run extract` or `npm start run`                                         |
+| Extract only (no sync)             | `npm start run -- --no-sync`                                                 |
+| Run without writing report         | `npm start run -- --no-report`                                               |
+| Report from last run               | `npm run report` or `npm start report`                                       |
+| Report for specific run ID         | `npm start report -- --run-id <runId>`                                       |
+| Sync/run for one tenant+purchaser  | `npm run sync -- --tenant <tenant> --purchaser <purchaser>` (same for `run`) |
+| Use custom config                  | `npm run sync -c path/to/config.yaml` (any command)                          |
+| Sync-extract pipeline              | `node dist/index.js sync-extract --limit <n>`                                |
+| Start browser app                  | `npm run app` or `node app-server.mjs`                                       |
 
 ### Prerequisites for testing
 
 - **Config:** `config/config.yaml`.
-- **Env:** `.env` with EntelliExtract API vars, `S3_BUCKET`, `S3_TENANT_PURCHASERS`, and AWS credentials for S3 sync.
+- **Env:** `.env` with IntelliExtract API vars, `S3_BUCKET`, `S3_TENANT_PURCHASERS`, and AWS credentials for S3 sync.
 - **Build:** `npm run build` before running `npm start ...` (or use `npm run sync` / `npm run extract` / `npm run report`, which build then run).
 
 ---

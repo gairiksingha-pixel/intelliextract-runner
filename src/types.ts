@@ -1,5 +1,5 @@
 /**
- * Shared types for EntelliExtract test stub
+ * Shared types for IntelliExtract test stub
  */
 
 export interface ApiConfig {
@@ -46,7 +46,7 @@ export interface LoggingConfig {
 
 export interface ReportConfig {
   outputDir: string;
-  formats: ('markdown' | 'html' | 'json')[];
+  formats: ("markdown" | "html" | "json")[];
   /** Keep only this many report sets (each run = one .html + one .json). Older reports are deleted after each write. Omit or 0 = keep all. */
   retainCount?: number;
 }
@@ -59,7 +59,12 @@ export interface Config {
   report: ReportConfig;
 }
 
-export type CheckpointStatus = 'pending' | 'running' | 'done' | 'error' | 'skipped';
+export type CheckpointStatus =
+  | "pending"
+  | "running"
+  | "done"
+  | "error"
+  | "skipped";
 
 export interface CheckpointRecord {
   filePath: string;
@@ -131,11 +136,15 @@ export interface RunMetrics {
   /** Failure count per brand (only brands with at least one failure). */
   failureCountByBrand: { brand: string; count: number }[];
   /** Per-failure API status and message (for debugging 4xx/5xx). */
-  failureDetails?: { filePath: string; statusCode?: number; errorMessage?: string }[];
+  failureDetails?: {
+    filePath: string;
+    statusCode?: number;
+    errorMessage?: string;
+  }[];
 }
 
 export interface Anomaly {
-  type: 'high_latency' | 'error_spike' | 'timeout' | 'unexpected_status';
+  type: "high_latency" | "error_spike" | "timeout" | "unexpected_status";
   message: string;
   filePath?: string;
   value?: number;
