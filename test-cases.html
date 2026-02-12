@@ -52,7 +52,8 @@
         background: var(--bg);
         color: var(--text);
         line-height: 1.4;
-        font-size: 14px;
+        /* Slightly smaller base font size for better fit on lower resolutions */
+        font-size: 12px;
         display: flex;
         flex-direction: column;
       }
@@ -119,7 +120,7 @@
         line-height: 1.2;
       }
       .header .logo {
-        height: 30px;
+        height: 26px;
         width: auto;
         display: block;
         object-fit: contain;
@@ -354,9 +355,9 @@
         cursor: not-allowed;
       }
       .op-name {
-        width: 252px;
-        min-width: 252px;
-        max-width: 252px;
+        width: 214px;
+        min-width: 214px;
+        max-width: 214px;
         font-weight: 600;
       }
       thead th.op-name {
@@ -383,20 +384,20 @@
       }
       .limits-cell .limit-row {
         display: grid;
-        grid-template-columns: auto 56px;
+        grid-template-columns: auto 48px;
         gap: 0.5rem 0.75rem;
         align-items: center;
-        min-height: 2.5rem;
+        min-height: 2.2rem;
       }
       .limits-cell .limit-label {
         white-space: nowrap;
         font-weight: 500;
       }
       .limits-cell input[type="number"] {
-        width: 56px;
-        min-width: 56px;
-        max-width: 56px;
-        height: 34px;
+        width: 48px;
+        min-width: 48px;
+        max-width: 48px;
+        height: 30px;
         padding: 0.4rem 0.5rem;
         border: 1px solid var(--border);
         border-radius: var(--radius-sm);
@@ -437,9 +438,9 @@
         font-style: italic;
       }
       .run-cell {
-        width: 189px;
-        min-width: 189px;
-        max-width: 189px;
+        width: 161px;
+        min-width: 161px;
+        max-width: 161px;
         text-align: center;
         vertical-align: top;
       }
@@ -606,14 +607,14 @@
         margin: 0;
       }
       .result-header {
-        width: 558px;
-        min-width: 558px;
-        max-width: 558px;
+        width: 474px;
+        min-width: 474px;
+        max-width: 474px;
       }
       .result-cell {
-        width: 558px;
-        min-width: 558px;
-        max-width: 558px;
+        width: 474px;
+        min-width: 474px;
+        max-width: 474px;
         vertical-align: top;
         overflow: hidden;
         position: relative;
@@ -1126,11 +1127,18 @@
 
       function resetCase(resultDiv, options) {
         if (!resultDiv) return;
+        var row = resultDiv.closest("tr");
+        // If this row has an active controller (in-flight run), abort it so reset truly stops execution.
+        if (row && row._activeController && !row._activeController.signal.aborted) {
+          row._abortedByHardReset = true;
+          try {
+            row._activeController.abort();
+          } catch (_) {}
+        }
         var clearLimits = !options || options.clearLimits !== false;
         resultDiv.innerHTML =
           '<span class="result-placeholder-text">Select at least one brand or purchaser in the filter above, then click Run.</span>';
         resultDiv.className = "result result-placeholder";
-        var row = resultDiv.closest("tr");
         if (row) {
           var inputs = row.querySelectorAll(".limit-sync, .limit-extract");
           inputs.forEach(function (input) { input.disabled = false; });
@@ -1277,6 +1285,10 @@
         if (!row) row = btn.closest("tr");
         var resetBtn = row ? row.querySelector(".reset-case") : null;
         var controller = new AbortController();
+        if (row) {
+          row._activeController = controller;
+          row._abortedByHardReset = false;
+        }
         function restoreResetBtn() {
           if (resetBtn) {
             resetBtn.textContent = "Reset";
@@ -1431,31 +1443,41 @@
           showResult(resultDiv, data, pass, null, null, null, caseId, null, null);
           } catch (e) {
           if (e.name === "AbortError") {
-            if (row) {
-              row._aborted = true;
-              row._resumeSync = lastSyncProgress;
-              row._resumeExtract = lastExtractionProgress;
-              var limitInputs = row.querySelectorAll(".limit-sync, .limit-extract");
-              limitInputs.forEach(function (input) { input.disabled = true; });
+            // If abort was triggered via a hard reset, fully reset UI/state and do not enter resume mode.
+            if (row && row._abortedByHardReset) {
+              row._abortedByHardReset = false;
+              if (row._resumeSync !== undefined) delete row._resumeSync;
+              if (row._resumeExtract !== undefined) delete row._resumeExtract;
+              if (row._resumeSyncLimit !== undefined) delete row._resumeSyncLimit;
+              if (row._resumeExtractLimit !== undefined) delete row._resumeExtractLimit;
+              resetCase(resultDiv);
+            } else {
+              if (row) {
+                row._aborted = true;
+                row._resumeSync = lastSyncProgress;
+                row._resumeExtract = lastExtractionProgress;
+                var limitInputs = row.querySelectorAll(".limit-sync, .limit-extract");
+                limitInputs.forEach(function (input) { input.disabled = true; });
+              }
+              if (resetBtn) {
+                resetBtn.textContent = "Resume";
+                resetBtn.classList.remove("stop-btn");
+                resetBtn.classList.add("resume-btn");
+                resetBtn.onclick = function () {
+                  runCase(caseId, btn, resultDiv, { resume: true });
+                };
+              }
+              var resetDuringResumeBtn = row ? row.querySelector(".reset-during-resume") : null;
+              if (resetDuringResumeBtn) resetDuringResumeBtn.classList.add("show-during-resume");
+              var syncDone = lastSyncProgress && lastSyncProgress.done != null ? lastSyncProgress.done : 0;
+              var extDone = lastExtractionProgress && lastExtractionProgress.done != null ? lastExtractionProgress.done : 0;
+              var msg = "Stopped. Click Resume to continue from where you left off.";
+              if (syncDone > 0 || extDone > 0) {
+                msg = "Stopped (sync: " + syncDone + ", extract: " + extDone + "). Click Resume to continue from the next file.";
+              }
+              resultDiv.className = "result result-placeholder";
+              resultDiv.innerHTML = '<span class="result-placeholder-text">' + escapeHtml(msg) + '</span>';
             }
-            if (resetBtn) {
-              resetBtn.textContent = "Resume";
-              resetBtn.classList.remove("stop-btn");
-              resetBtn.classList.add("resume-btn");
-              resetBtn.onclick = function () {
-                runCase(caseId, btn, resultDiv, { resume: true });
-              };
-            }
-            var resetDuringResumeBtn = row ? row.querySelector(".reset-during-resume") : null;
-            if (resetDuringResumeBtn) resetDuringResumeBtn.classList.add("show-during-resume");
-            var syncDone = lastSyncProgress && lastSyncProgress.done != null ? lastSyncProgress.done : 0;
-            var extDone = lastExtractionProgress && lastExtractionProgress.done != null ? lastExtractionProgress.done : 0;
-            var msg = "Stopped. Click Resume to continue from where you left off.";
-            if (syncDone > 0 || extDone > 0) {
-              msg = "Stopped (sync: " + syncDone + ", extract: " + extDone + "). Click Resume to continue from the next file.";
-            }
-            resultDiv.className = "result result-placeholder";
-            resultDiv.innerHTML = '<span class="result-placeholder-text">' + escapeHtml(msg) + '</span>';
           } else {
             showResult(
               resultDiv,
@@ -1470,6 +1492,7 @@
             );
           }
         } finally {
+          if (row) row._activeController = null;
           if (row && row._aborted) {
             row._aborted = false;
             btn.disabled = false;
