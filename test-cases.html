@@ -279,7 +279,7 @@
       .table-section {
         flex: 1 1 0%;
         min-height: 0;
-        overflow: hidden;
+        overflow: auto;
         display: flex;
         flex-direction: column;
         background: var(--surface);
@@ -445,7 +445,7 @@
       }
       .run-cell .btn-group {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         gap: 0.5rem;
         width: 100%;
         margin: 0 auto;
@@ -469,6 +469,12 @@
         cursor: pointer;
         font-family: inherit;
         box-shadow: var(--shadow-btn);
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       button.run:hover:not(:disabled) {
         background: var(--primary-hover);
@@ -489,6 +495,12 @@
         cursor: pointer;
         font-family: inherit;
         box-shadow: var(--shadow-sm);
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       button.reset-case:hover {
         background: var(--row-alt);
@@ -879,7 +891,7 @@
       function getRunButtonLabel(caseId) {
         if (caseId === "P1") return "Start Sync";
         if (caseId === "P2") return "Start Extraction";
-        if (caseId === "PIPE") return "Start Sync and Extraction";
+        if (caseId === "PIPE") return "Sync & Extract";
         return "Run";
       }
 
@@ -897,6 +909,7 @@
         btn.type = "button";
         btn.className = "run";
         btn.textContent = getRunButtonLabel(c.id);
+        btn.title = btn.textContent;
         btn.onclick = function () {
           runCase(c.id, btn, resultDiv, null);
         };
@@ -1131,7 +1144,7 @@
           var runBtn = row.querySelector("button.run");
           if (runBtn) {
             runBtn.disabled = false;
-            runBtn.title = "";
+            runBtn.title = runBtn.textContent || "";
           }
           setOtherRowsActive();
         }
@@ -1168,7 +1181,7 @@
           var runBtn = tr.querySelector("button.run");
           if (runBtn) {
             runBtn.disabled = false;
-            runBtn.title = "";
+            runBtn.title = runBtn.textContent || "";
           }
           tr.querySelectorAll("button.reset-case").forEach(function (b) { b.disabled = false; });
           tr.querySelectorAll(".limit-sync, .limit-extract").forEach(function (input) { input.disabled = false; });
@@ -1659,6 +1672,7 @@
           var caseId = tr.getAttribute("data-case-id");
           var resultDiv = document.getElementById("result-" + caseId);
           runBtn.textContent = getRunButtonLabel(caseId);
+          runBtn.title = runBtn.textContent || "";
           runBtn.classList.remove("resume-btn");
           runBtn.onclick = function () { runCase(caseId, runBtn, resultDiv, null); };
           if (tr._resumeSync !== undefined) delete tr._resumeSync;
