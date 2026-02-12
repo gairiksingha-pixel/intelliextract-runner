@@ -165,13 +165,35 @@ In `config.yaml` under `s3`:
 
 Example: with 1000 objects in S3, set `syncLimit: 10` to download at most 10 **new** files per run. Files already on disk with matching SHA-256 are **skipped** and do not count toward the limit (e.g. limit 1 with 3 already synced → "Downloaded: 1, Skipped: 3"). Sync logs are structured and show download limit, downloaded count, skipped count, and per-brand staging paths.
 
-## Benchmark (one App Runner instance)
+## How benchmarking works in this project
 
-Use a single run with fixed concurrency to establish a baseline:
+Benchmarking is done entirely through the **run metrics and reports** – there is no separate benchmark command.
 
-1. Set in `config.yaml`: `run.concurrency: 10`, `run.requestsPerSecond: 10` (or your desired cap).
-2. Run: `npm start run -- --no-sync` (after staging is populated).
-3. Open the generated report for **throughput (files/sec)**, **average latency**, **P95 latency**, and **error rate**.
+1. Configure a fixed load profile in `config.yaml`:
+   ```yaml
+   run:
+     concurrency: 10
+     requestsPerSecond: 10
+   ```
+2. Populate staging (once) with S3 sync:
+   ```bash
+   npm run sync
+   ```
+3. Run extraction at that load without syncing again:
+   ```bash
+   npm start run -- --no-sync
+   ```
+4. Open the generated HTML report under `output/reports/`:
+   - **Observed throughput**: `files/sec` and `files/min` (from `metrics.throughputPerSecond` / `throughputPerMinute`).
+   - **Latency percentiles**: `avg`, `P50`, `P95`, `P99` (from `metrics.avgLatencyMs`, `p50LatencyMs`, `p95LatencyMs`, `p99LatencyMs`).
+   - **Error rate**: percentage of failed responses (from `metrics.errorRate` plus the extraction result reclassification logic).
+
+Example: if you see in the report:
+- “Observed throughput: 80.0 files/min, 1.33 files/sec”
+- “API response time (P50 / P95 / P99): 200 ms / 500 ms / 900 ms”
+- “Error rate at this load: 2.50%”
+
+then at `concurrency = 10` and `requestsPerSecond = 10`, your single test run is effectively a **benchmark** showing that **one instance** handled about **80 files per minute** with **P95 ≈ 500 ms** and **~2.5% errors** for that dataset and configuration.
 
 ## How to Run & Test
 

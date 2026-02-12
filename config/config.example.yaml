@@ -10,10 +10,12 @@ api:
 # S3: buckets are built from .env S3_BUCKET + S3_TENANT_PURCHASERS (single bucket, tenant/purchaser folders).
 # Use --tenant and --purchaser on sync/run to scope to one tenant's purchaser.
 s3:
-  buckets:
-    - name: tenant__purchaser
-      bucket: your-bucket
-      prefix: "tenant-id/purchaser-id/"
+  # Buckets are normally built from environment:
+  #   S3_BUCKET (physical bucket name)
+  #   S3_TENANT_PURCHASERS (JSON map: { "brand": ["PURCHASER1","PURCHASER2"] })
+  # When those env vars are set, this array is replaced at runtime (see src/config.ts).
+  # Keep it empty here so there is no unused template entry.
+  buckets: []
   stagingDir: ./output/staging
   region: us-west-2
   syncLimit: 0
