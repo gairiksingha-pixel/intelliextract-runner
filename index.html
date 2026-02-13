@@ -833,6 +833,26 @@
       .result-table-wrap tr:last-child td:last-child {
         border-bottom-right-radius: var(--radius-sm);
       }
+      .info-icon {
+        display: inline-block;
+        margin-left: 0.15rem;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 1px solid var(--primary);
+        color: var(--primary);
+        font-size: 0.8rem;
+        font-weight: 700;
+        line-height: 14px;
+        text-align: center;
+        cursor: default;
+        background: var(--accent-light);
+        vertical-align: middle;
+      }
+      .info-icon:hover {
+        border-color: var(--primary-hover);
+        color: var(--primary-hover);
+      }
       .result-table-wrap tr.status-row th {
         border-top: none;
       }
@@ -1366,12 +1386,20 @@
               rows.push(["Staging path", parsed.stagingPaths.join("\n")]);
             var overview = [];
             if (parsed.downloadedNew != null)
-              overview.push("Downloaded: " + parsed.downloadedNew);
-            if (parsed.skipped != null)
-              overview.push("Skipped: " + parsed.skipped);
+              overview.push(
+                "Downloaded: " + escapeHtml(parsed.downloadedNew),
+              );
+            if (parsed.skipped != null) {
+              var skippedLabel = escapeHtml(parsed.skipped);
+              var skippedHtml =
+                'Skipped<span class="info-icon" title="These files were already synced in a previous run and are unchanged, so they were skipped.">i</span>: ' +
+                skippedLabel;
+              overview.push(skippedHtml);
+            }
             if (parsed.errors != null)
-              overview.push("Errors: " + parsed.errors);
-            if (overview.length) rows.push(["Download overview", overview.join(", ")]);
+              overview.push("Errors: " + escapeHtml(parsed.errors));
+            if (overview.length)
+              rows.push(["Download overview", overview.join(", ")]);
           }
           if (hasExtract) {
             if (parsed.brandAndPurchaser && !hasSync)
@@ -1381,14 +1409,17 @@
               parsed.extractFailed != null ||
               parsed.extractSkipped != null
             ) {
+              var successVal = parsed.extractSuccess || "0";
+              var skippedVal = parsed.extractSkipped || "0";
+              var failedVal = parsed.extractFailed || "0";
+              var skippedLabel2 = escapeHtml(skippedVal);
               var detail =
                 "Success: " +
-                (parsed.extractSuccess || "0") +
-                ", Skipped: " +
-                (parsed.extractSkipped || "0") +
+                escapeHtml(successVal) +
+                ', Skipped<span class="info-icon" title="These files were already extracted in a previous run, so they were skipped this time.">i</span>: ' +
+                skippedLabel2 +
                 ", Failed: " +
-                (parsed.extractFailed || "0");
-              // Only show total extracted summary row; no separate Overview row for P2/P3.
+                escapeHtml(failedVal);
               rows.push(["Extraction overview", detail]);
             }
             if (parsed.extractionResultsPath)
@@ -1427,7 +1458,10 @@
             "><th>" +
             escapeHtml(r[0]) +
             "</th><td>" +
-            (r[0] === "Standard error" || r[0] === "Output"
+            (r[0] === "Standard error" ||
+            r[0] === "Output" ||
+            r[0] === "Download overview" ||
+            r[0] === "Extraction overview"
               ? r[1]
               : escapeHtml(r[1]).replace(/\n/g, "<br>")) +
             "</td></tr>"
