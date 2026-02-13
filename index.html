@@ -1385,7 +1385,9 @@
                 ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' +
                   pct +
                   '%"></div></div>'
-                : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
+                : done === 0
+                  ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:100%"></div></div>'
+                  : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
           }
           if (hasExtraction) {
             var extDone = Number(extractionProgress.done) || 0;
@@ -1404,7 +1406,9 @@
                 ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' +
                   extPct +
                   '%"></div></div>'
-                : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
+                : extDone === 0
+                  ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:100%"></div></div>'
+                  : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
           }
           var showDots = true;
           if (
