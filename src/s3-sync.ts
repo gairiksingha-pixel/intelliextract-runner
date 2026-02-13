@@ -4,13 +4,24 @@
  * Supports syncLimit (max files to download) and SHA-256 skip for already-downloaded unchanged files.
  */
 
-import { ListObjectsV2Command, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { createWriteStream, createReadStream, mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
-import { pipeline } from 'node:stream/promises';
-import { Readable } from 'node:stream';
-import { createHash } from 'node:crypto';
-import type { Config, S3BucketConfig } from './types.js';
+import {
+  ListObjectsV2Command,
+  GetObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import {
+  createWriteStream,
+  createReadStream,
+  mkdirSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { join, dirname, relative } from "node:path";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
+import { createHash } from "node:crypto";
+import type { Config, S3BucketConfig } from "./types.js";
 
 function getS3Client(region: string): S3Client {
   return new S3Client({ region });
@@ -19,7 +30,7 @@ function getS3Client(region: string): S3Client {
 async function listAllKeys(
   client: S3Client,
   bucket: string,
-  prefix: string
+  prefix: string,
 ): Promise<{ key: string }[]> {
   const keys: { key: string }[] = [];
   let continuationToken: string | undefined;
@@ -54,27 +65,30 @@ export function getStagingSubdir(bucket: S3BucketConfig): string {
 function loadSyncManifest(manifestPath: string): Record<string, string> {
   if (!existsSync(manifestPath)) return {};
   try {
-    const raw = readFileSync(manifestPath, 'utf-8');
+    const raw = readFileSync(manifestPath, "utf-8");
     const data = JSON.parse(raw) as Record<string, string>;
-    return typeof data === 'object' && data !== null ? data : {};
+    return typeof data === "object" && data !== null ? data : {};
   } catch {
     return {};
   }
 }
 
-function saveSyncManifest(manifestPath: string, data: Record<string, string>): void {
+function saveSyncManifest(
+  manifestPath: string,
+  data: Record<string, string>,
+): void {
   const dir = dirname(manifestPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(manifestPath, JSON.stringify(data, null, 0), 'utf-8');
+  writeFileSync(manifestPath, JSON.stringify(data, null, 0), "utf-8");
 }
 
 async function computeFileSha256(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const hash = createHash('sha256');
+    const hash = createHash("sha256");
     const rs = createReadStream(filePath);
-    rs.on('data', (chunk: Buffer | string) => hash.update(chunk));
-    rs.on('end', () => resolve(hash.digest('hex')));
-    rs.on('error', reject);
+    rs.on("data", (chunk: Buffer | string) => hash.update(chunk));
+    rs.on("end", () => resolve(hash.digest("hex")));
+    rs.on("error", reject);
   });
 }
 
@@ -82,7 +96,7 @@ async function computeFileSha256(filePath: string): Promise<string> {
 async function skipIfUnchanged(
   destPath: string,
   keyInManifest: string,
-  manifest: Record<string, string>
+  manifest: Record<string, string>,
 ): Promise<boolean> {
   if (!existsSync(destPath)) return false;
   const expectedSha = manifest[keyInManifest];
@@ -99,7 +113,7 @@ async function downloadToFile(
   client: S3Client,
   bucket: string,
   key: string,
-  destPath: string
+  destPath: string,
 ): Promise<void> {
   const dir = dirname(destPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -129,12 +143,22 @@ export async function syncBucket(
     /** When set, called when a file is skipped (already present) or after sync: (skipped, totalProcessed) so UI can show "Skipping synced files". */
     onSyncSkipProgress?: (skipped: number, totalProcessed: number) => void;
     /** When set, called after each file is successfully synced (for pipeline: trigger extraction). */
-    onFileSynced?: (job: { filePath: string; relativePath: string; brand: string }) => void;
+    onFileSynced?: (job: {
+      filePath: string;
+      relativePath: string;
+      brand: string;
+    }) => void;
     /** When set, called before downloading a file (for resume: persist in-progress path so partial can be removed). */
     onStartDownload?: (destPath: string, manifestKey: string) => void;
-  }
-): Promise<{ brand: string; stagingPath: string; synced: number; skipped: number; errors: number }> {
-  const prefix = bucketConfig.prefix ?? '';
+  },
+): Promise<{
+  brand: string;
+  stagingPath: string;
+  synced: number;
+  skipped: number;
+  errors: number;
+}> {
+  const prefix = bucketConfig.prefix ?? "";
   const keys = await listAllKeys(client, bucketConfig.bucket, prefix);
   let synced = 0;
   let skipped = 0;
@@ -143,25 +167,29 @@ export async function syncBucket(
   const brandDir = join(stagingDir, brand);
   const purchaser =
     bucketConfig.purchaser ??
-    (bucketConfig.name.includes('__') ? bucketConfig.name.split('__')[1] : '');
+    (bucketConfig.name.includes("__") ? bucketConfig.name.split("__")[1] : "");
   if (!existsSync(brandDir)) mkdirSync(brandDir, { recursive: true });
   const stagingPathForResult = purchaser ? join(brandDir, purchaser) : brandDir;
 
   const reportProgress = () => {
     if (!options.onProgress) return;
-    const total = options.initialLimit;
+    const total = options.initialLimit > 0 ? options.initialLimit : keys.length;
     const done =
-      total > 0
-        ? total - options.limitRemaining.value
+      options.initialLimit > 0
+        ? options.initialLimit - options.limitRemaining.value
         : synced + skipped + errors;
     options.onProgress(done, total);
   };
+  reportProgress(); // Initial reporting of 0/Total (or 0/0)
 
   for (const { key } of keys) {
     if (options.limitRemaining.value <= 0) break;
 
-    const keyAfterPrefix = prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
-    const destPath = purchaser ? join(brandDir, purchaser, keyAfterPrefix) : join(brandDir, key);
+    const keyAfterPrefix =
+      prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
+    const destPath = purchaser
+      ? join(brandDir, purchaser, keyAfterPrefix)
+      : join(brandDir, key);
     const mk = manifestKey(brand, key);
 
     const shouldSkip = await skipIfUnchanged(destPath, mk, options.manifest);
@@ -169,7 +197,7 @@ export async function syncBucket(
       skipped++;
       options.onSyncSkipProgress?.(skipped, skipped + synced);
       if (options.onFileSynced) {
-        const relativePath = relative(brandDir, destPath).replace(/\\/g, '/');
+        const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
         options.onFileSynced({ filePath: destPath, relativePath, brand });
       }
       reportProgress();
@@ -185,17 +213,21 @@ export async function syncBucket(
       options.onSyncSkipProgress?.(skipped, skipped + synced);
       options.limitRemaining.value--;
       if (options.onFileSynced) {
-        const relativePath = relative(brandDir, destPath).replace(/\\/g, '/');
+        const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
         options.onFileSynced({ filePath: destPath, relativePath, brand });
       }
       reportProgress();
     } catch (e) {
       errors++;
-      console.error(`Failed to download s3://${bucketConfig.bucket}/${key}:`, e);
+      console.error(
+        `Failed to download s3://${bucketConfig.bucket}/${key}:`,
+        e,
+      );
       reportProgress();
     }
   }
 
+  reportProgress();
   return { brand, stagingPath: stagingPathForResult, synced, skipped, errors };
 }
 
@@ -212,20 +244,27 @@ export async function syncAllBuckets(
     buckets?: S3BucketConfig[];
     onProgress?: (done: number, total: number) => void;
     onSyncSkipProgress?: (skipped: number, totalProcessed: number) => void;
-    onFileSynced?: (job: { filePath: string; relativePath: string; brand: string }) => void;
+    onFileSynced?: (job: {
+      filePath: string;
+      relativePath: string;
+      brand: string;
+    }) => void;
     onStartDownload?: (destPath: string, manifestKey: string) => void;
-  }
+  },
 ): Promise<SyncResult[]> {
   const client = getS3Client(config.s3.region);
   const stagingDir = config.s3.stagingDir;
   if (!existsSync(stagingDir)) mkdirSync(stagingDir, { recursive: true });
 
   const limit = overrides?.syncLimit ?? config.s3.syncLimit;
-  const limitRemaining = { value: limit !== undefined && limit > 0 ? limit : Number.MAX_SAFE_INTEGER };
+  const limitRemaining = {
+    value: limit !== undefined && limit > 0 ? limit : Number.MAX_SAFE_INTEGER,
+  };
   const initialLimit = limit !== undefined && limit > 0 ? limit : 0;
 
   const manifestPath =
-    config.s3.syncManifestPath ?? join(dirname(config.run.checkpointPath), 'sync-manifest.json');
+    config.s3.syncManifestPath ??
+    join(dirname(config.run.checkpointPath), "sync-manifest.json");
   const manifest = loadSyncManifest(manifestPath);
 
   const buckets = overrides?.buckets ?? config.s3.buckets;
@@ -260,35 +299,42 @@ export interface SyncResult {
  * Print structured sync summary. Clarifies: download limit applies only to new downloads;
  * skipped = already present and unchanged (do not count toward limit).
  */
-export function printSyncResults(results: SyncResult[], syncLimit?: number): void {
+export function printSyncResults(
+  results: SyncResult[],
+  syncLimit?: number,
+): void {
   const totalSynced = results.reduce((s, r) => s + r.synced, 0);
   const totalSkipped = results.reduce((s, r) => s + r.skipped, 0);
   const totalErrors = results.reduce((s, r) => s + r.errors, 0);
   const limitLabel =
-    syncLimit !== undefined && syncLimit > 0 ? `${syncLimit} new file(s)` : 'no limit';
+    syncLimit !== undefined && syncLimit > 0
+      ? `${syncLimit} new file(s)`
+      : "no limit";
 
   const lines: string[] = [
-    'Sync Summary',
-    '------------',
+    "Sync Summary",
+    "------------",
     `Download limit: ${limitLabel}`,
     `Downloaded (new): ${totalSynced}`,
     `Skipped (already present, unchanged): ${totalSkipped}`,
     `Errors: ${totalErrors}`,
-    '',
+    "",
   ];
 
   if (results.length > 0) {
-    lines.push('By brand (staging path → counts):');
+    lines.push("By brand (staging path → counts):");
     for (const r of results) {
-      const [tenant, purchaser] = r.brand.includes('__') ? r.brand.split('__') : [r.brand, ''];
+      const [tenant, purchaser] = r.brand.includes("__")
+        ? r.brand.split("__")
+        : [r.brand, ""];
       const label = purchaser ? `${tenant} / ${purchaser}` : r.brand;
       lines.push(
         `  ${label}`,
         `    Staging path: ${r.stagingPath}`,
-        `    Downloaded: ${r.synced}, Skipped: ${r.skipped}, Errors: ${r.errors}`
+        `    Downloaded: ${r.synced}, Skipped: ${r.skipped}, Errors: ${r.errors}`,
       );
     }
   }
 
-  console.log(lines.join('\n'));
+  console.log(lines.join("\n"));
 }
