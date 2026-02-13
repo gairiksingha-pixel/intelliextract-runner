@@ -209,6 +209,7 @@ export async function syncBucket(
       await downloadToFile(client, bucketConfig.bucket, key, destPath);
       const sha = await computeFileSha256(destPath);
       options.manifest[mk] = sha;
+      saveSyncManifest(options.manifestPath, options.manifest);
       synced++;
       options.onSyncSkipProgress?.(skipped, skipped + synced);
       options.limitRemaining.value--;
