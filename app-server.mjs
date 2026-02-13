@@ -661,6 +661,24 @@ function registerScheduleJob(schedule) {
       const caseId = "PIPE"; // Cron jobs always run PIPE
       const start = new Date().toISOString();
 
+      // Skip if any manual (non-scheduled) run is currently active
+      const manualRunning = Array.from(ACTIVE_RUNS.entries()).find(
+        ([key]) => !key.endsWith(":scheduled"),
+      );
+      if (manualRunning) {
+        appendScheduleLog({
+          level: "warn",
+          message:
+            "Scheduled job skipped — a manual process (" +
+            manualRunning[1].caseId +
+            ") is currently running",
+          scheduleId: schedule.id,
+          skippedAt: start,
+          activeManualCase: manualRunning[1].caseId,
+        });
+        return;
+      }
+
       appendScheduleLog({
         level: "info",
         message: "Scheduled job started",

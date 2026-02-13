@@ -2995,9 +2995,13 @@
           "</div>" +
           '<div id="schedule-error" class="schedule-error"></div>' +
           "</div>" +
+          '<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;padding:0.5rem 0.75rem;margin-top:0.5rem;font-size:0.8rem;color:#e65100;line-height:1.4;">' +
+          "<strong>⚠ Note:</strong> Make sure no Sync &amp; Extract or any other process is running at the scheduled time. If any manual process is active when the cron triggers, the scheduled run will be <strong>skipped</strong>." +
+          "</div>" +
           '<div class="modal-footer" style="margin-top:0.85rem;"><button type="button" id="schedule-cancel-btn" class="btn-secondary">Cancel</button><button type="button" id="schedule-save-btn" class="download-report-btn download-report-schedule-btn">' +
           (schedule ? "Update schedule" : "Save schedule") +
           "</button></div>";
+
         refreshSchedulePurchaserOptions();
         var brandTrigger = document.getElementById(
           "sched-brand-dropdown-trigger",
