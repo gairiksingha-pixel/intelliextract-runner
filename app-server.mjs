@@ -30,10 +30,31 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
+const dotenv = require("dotenv");
+
+dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 8765;
 const ROOT = join(__dirname);
+
+// Build brand-purchaser map from S3_TENANT_PURCHASERS env variable
+function loadBrandPurchasers() {
+  const raw = process.env.S3_TENANT_PURCHASERS;
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+    ) {
+      return parsed;
+    }
+  } catch (_) {}
+  return {};
+}
+const BRAND_PURCHASERS = loadBrandPurchasers();
 const REPORTS_DIR = join(ROOT, "output", "reports");
 const EXTRACTIONS_DIR = join(ROOT, "output", "extractions");
 const STAGING_DIR = join(ROOT, "output", "staging");
@@ -616,6 +637,16 @@ createServer(async (req, res) => {
           res.end();
         } catch (_) {}
       }
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === "GET" && url === "/api/config") {
+    try {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ brandPurchasers: BRAND_PURCHASERS }));
     } catch (e) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: String(e.message) }));

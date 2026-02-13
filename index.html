@@ -877,21 +877,7 @@
                   class="filter-dropdown-panel"
                   role="listbox"
                 >
-                  <label class="filter-dropdown-option"
-                    ><input type="checkbox" value="no-cow-026090539970-prod" />
-                    no-cow-026090539970-prod</label
-                  >
-                  <label class="filter-dropdown-option"
-                    ><input type="checkbox" value="sundia-026090539970-prod" />
-                    sundia-026090539970-prod</label
-                  >
-                  <label class="filter-dropdown-option"
-                    ><input
-                      type="checkbox"
-                      value="tractor-beverage-026090539970-prod"
-                    />
-                    tractor-beverage-026090539970-prod</label
-                  >
+                  <!-- brand options populated dynamically from /api/config -->
                 </div>
               </div>
               <div
@@ -1395,9 +1381,9 @@
               parsed.extractSkipped != null
             ) {
               var detail =
-                "Success Response: " +
+                "Success: " +
                 (parsed.extractSuccess || "0") +
-                ", Failed Response: " +
+                ", Failed: " +
                 (parsed.extractFailed || "0") +
                 ", Skipped: " +
                 (parsed.extractSkipped || "0");
@@ -2211,24 +2197,54 @@
           });
       }
 
-      var BRAND_PURCHASERS = {
-        "no-cow-026090539970-prod": [
-          "DOT_FOODS",
-          "KEHE",
-          "UNFI",
-          "8c03bc63-a173-49d2-9ef4-d3f4c540fae8",
-          "a451e439-c9d1-41c5-b107-868b65b596b8",
-        ],
-        "sundia-026090539970-prod": ["DOT_FOODS", "KEHE"],
-        "tractor-beverage-026090539970-prod": ["DOT_FOODS"],
-      };
-      var ALL_PURCHASERS = [
-        "DOT_FOODS",
-        "KEHE",
-        "UNFI",
-        "8c03bc63-a173-49d2-9ef4-d3f4c540fae8",
-        "a451e439-c9d1-41c5-b107-868b65b596b8",
-      ];
+      var BRAND_PURCHASERS = {};
+      var ALL_PURCHASERS = [];
+      function renderBrandOptions() {
+        var panel = document.getElementById("brand-dropdown-panel");
+        if (!panel) return;
+        var brands = Object.keys(BRAND_PURCHASERS);
+        panel.innerHTML = brands
+          .map(function (b) {
+            return (
+              '<label class="filter-dropdown-option"><input type="checkbox" value="' +
+              b +
+              '"> ' +
+              b +
+              "</label>"
+            );
+          })
+          .join("");
+        panel.querySelectorAll("input[type=checkbox]").forEach(function (cb) {
+          cb.addEventListener("change", function () {
+            updateFilterDropdownTrigger("brand");
+            clearBrandError();
+            refreshPurchaserOptions();
+          });
+        });
+      }
+      function fetchConfig() {
+        return fetch("/api/config")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            if (data && data.brandPurchasers) {
+              BRAND_PURCHASERS = data.brandPurchasers;
+              var set = new Set();
+              Object.values(BRAND_PURCHASERS).forEach(function (arr) {
+                arr.forEach(function (p) {
+                  set.add(p);
+                });
+              });
+              ALL_PURCHASERS = Array.from(set).sort();
+              renderBrandOptions();
+              refreshPurchaserOptions();
+            }
+          })
+          .catch(function (err) {
+            console.error("Failed to load config:", err);
+          });
+      }
       function refreshPurchaserOptions() {
         var panel = document.getElementById("purchaser-dropdown-panel");
         var trigger = document.getElementById("purchaser-dropdown-trigger");
@@ -2410,15 +2426,6 @@
             e.stopPropagation();
             toggleDropdown(brandPanel, brandTrigger);
           });
-          brandPanel
-            .querySelectorAll("input[type=checkbox]")
-            .forEach(function (cb) {
-              cb.addEventListener("change", function () {
-                updateFilterDropdownTrigger("brand");
-                clearBrandError();
-                refreshPurchaserOptions();
-              });
-            });
         }
         if (purchaserTrigger && purchaserPanel) {
           purchaserTrigger.addEventListener("click", function (e) {
@@ -2442,7 +2449,7 @@
           resetBtn.addEventListener("click", function () {
             resetFilter();
           });
-        refreshPurchaserOptions();
+        fetchConfig();
       })();
     </script>
   </body>
