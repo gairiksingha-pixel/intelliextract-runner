@@ -286,7 +286,7 @@ program
           );
         }
         console.log(
-          `Extraction metrics: success=${result.metrics.success}, failed=${result.metrics.failed}, skipped=${result.metrics.skipped}`,
+          `Extraction metrics: success=${result.metrics.success}, skipped=${result.metrics.skipped}, failed=${result.metrics.failed}`,
         );
         saveLastRunId(config, result.run.runId);
         if (doReport) {
@@ -431,7 +431,7 @@ program
           );
         }
         console.log(
-          `Extraction metrics: success=${result.metrics.success}, failed=${result.metrics.failed}, skipped=${result.metrics.skipped}`,
+          `Extraction metrics: success=${result.metrics.success}, skipped=${result.metrics.skipped}, failed=${result.metrics.failed}`,
         );
         saveLastRunId(result.config, result.run.runId);
         if (doReport) {

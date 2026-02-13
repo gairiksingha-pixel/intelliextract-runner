@@ -805,8 +805,8 @@
       .result-table-wrap th {
         font-weight: 600;
         color: var(--text);
-        width: 97.75px;
-        min-width: 97.75px;
+        width: 195.5px;
+        min-width: 195.5px;
       }
       .result-table-wrap td {
         color: var(--text-secondary);
@@ -1349,10 +1349,6 @@
           rows.push(["Message", "No files found to sync or extract."]);
         } else {
           if (hasSync) {
-            if (parsed.downloadLimit != null)
-              rows.push(["Download limit", parsed.downloadLimit]);
-            if (parsed.downloadedNew != null)
-              rows.push(["Downloaded (new)", parsed.downloadedNew]);
             var brandPurchaser =
               parsed.brandAndPurchaser ||
               (parsed.brandAndPurchaserList &&
@@ -1383,14 +1379,14 @@
               var detail =
                 "Success: " +
                 (parsed.extractSuccess || "0") +
-                ", Failed: " +
-                (parsed.extractFailed || "0") +
                 ", Skipped: " +
-                (parsed.extractSkipped || "0");
+                (parsed.extractSkipped || "0") +
+                ", Failed: " +
+                (parsed.extractFailed || "0");
               rows.push(["Total file extracted", detail]);
             }
             if (parsed.extractionResultsPath)
-              rows.push(["Staging path", parsed.extractionResultsPath]);
+              rows.push(["Extraction path", parsed.extractionResultsPath]);
             if (parsed.reportsPath)
               rows.push(["Reports path", parsed.reportsPath]);
           }

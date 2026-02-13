@@ -307,14 +307,17 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     0,
     m.success - reclassifiedFailuresFromResponses,
   );
-  const displayFailed = m.failed + reclassifiedFailuresFromResponses;
+  const displayInfraFailed = m.failed;
+  const displayApiFailed = reclassifiedFailuresFromResponses;
   const processed = m.success + m.failed;
   const throughputPerSecond =
     entry.runDurationSeconds > 0 ? processed / entry.runDurationSeconds : 0;
   const throughputPerMinute = throughputPerSecond * 60;
   const totalApiTime = formatDuration(m.totalProcessingTimeMs);
   const displayErrorRate =
-    processed > 0 ? displayFailed / processed : m.errorRate;
+    processed > 0
+      ? (displayInfraFailed + displayApiFailed) / processed
+      : m.errorRate;
   const anomalyItems = m.anomalies.map((a) => {
     const pathSuffix = a.filePath ? " (" + escapeHtml(a.filePath) + ")" : "";
     return (
@@ -421,9 +424,9 @@ function sectionForRun(entry: HistoricalRunSummary): string {
 
   // Lightweight "agent-style" summary: highlight top anomalies and hotspots.
   const agentSummaryPoints: string[] = [];
-  if (displayFailed > 0) {
+  if (displayInfraFailed + displayApiFailed > 0) {
     agentSummaryPoints.push(
-      `Error rate is ${(displayErrorRate * 100).toFixed(2)}% with ${displayFailed} failed responses.`,
+      `Error rate is ${(displayErrorRate * 100).toFixed(2)}% with ${displayInfraFailed + displayApiFailed} total failures (${displayApiFailed} from API).`,
     );
   }
   if (m.failureCountByBrand.length > 0) {
@@ -466,15 +469,15 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   const labelWithPrefix = `${prefix}${runLabel}`;
   return `
   <details class="run-section">
-  <summary class="run-section-summary"><strong>${escapeHtml(labelWithPrefix)}</strong> — ${displaySuccess} successful responses, ${displayFailed} failed responses, ${m.skipped} skipped</summary>
+  <summary class="run-section-summary"><strong>${escapeHtml(labelWithPrefix)}</strong> — Successful Response (Success: true): ${displaySuccess}, Successful Response (Success: false): ${displayApiFailed}, Failure: ${displayInfraFailed}</summary>
   <div class="run-section-body">
   <h3>Overview</h3>
   <table>
     <tr><th>Metric</th><th>Value</th></tr>
     <tr><td>Total files</td><td>${m.totalFiles}</td></tr>
-    <tr><td>Successful responses</td><td>${displaySuccess}</td></tr>
-    <tr><td>Failed responses</td><td>${displayFailed}</td></tr>
-    <tr><td>Skipped</td><td>${m.skipped}</td></tr>
+    <tr><td>Successful Response (Success: true)</td><td>${displaySuccess}</td></tr>
+    <tr><td>Successful Response (Success: false)</td><td>${displayApiFailed}</td></tr>
+    <tr><td>Failure</td><td>${displayInfraFailed}</td></tr>
     <tr><td>Run duration (wall clock)</td><td>${runDuration}</td></tr>
     <tr><td>Throughput</td><td>${throughputPerSecond.toFixed(2)} files/sec, ${throughputPerMinute.toFixed(2)} files/min</td></tr>
     <tr><td>Total API time (sum of request latencies)</td><td>${totalApiTime}</td></tr>
@@ -491,7 +494,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     <tr><td>Ideal extract count (≈10 min run)</td><td>~${Math.round(throughputPerMinute * 10)} files</td></tr>
     <tr><td>Ideal extract count (≈15 min run)</td><td>~${Math.round(throughputPerMinute * 15)} files</td></tr>
   </table>
-  <p><strong>Summary:</strong> At this run&rsquo;s load, the API handled <strong>${processed} files</strong> in <strong>${runDuration}</strong> with <strong>${(displayErrorRate * 100).toFixed(2)}%</strong> errors. For a target run of about 5 minutes, aim for batches of <strong>~${Math.round(throughputPerMinute * 5)} files</strong>; for 10 minutes, <strong>~${Math.round(throughputPerMinute * 10)} files</strong>.</p>
+  <p><strong>Summary:</strong> At this run&rsquo;s load, the API handled <strong>${processed} files</strong> in <strong>${runDuration}</strong> with <strong>${(displayErrorRate * 100).toFixed(2)}%</strong> total errors. For a target run of about 5 minutes, aim for batches of <strong>~${Math.round(throughputPerMinute * 5)} files</strong>; for 10 minutes, <strong>~${Math.round(throughputPerMinute * 10)} files</strong>.</p>
   <h3>Latency (ms)</h3>
   <table>
     <tr><th>Percentile</th><th>Value</th></tr>

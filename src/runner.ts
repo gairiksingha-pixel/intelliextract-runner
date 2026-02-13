@@ -2,20 +2,32 @@
  * Runner: orchestrates sync (optional) and extraction run, then returns result for reporting.
  */
 
-import PQueue from 'p-queue';
-import { loadConfig } from './config.js';
-import { syncAllBuckets, type SyncResult } from './s3-sync.js';
+import PQueue from "p-queue";
+import { loadConfig } from "./config.js";
+import { syncAllBuckets, type SyncResult } from "./s3-sync.js";
 import {
   runExtraction,
   extractOneFile,
   type FileJob,
   type LoadEngineResult,
-} from './load-engine.js';
-import { openCheckpointDb, getOrCreateRunId, getCurrentRunId, startRun, getRecordsForRun, closeCheckpointDb } from './checkpoint.js';
-import { saveResumeState, clearResumeState } from './resume-state.js';
-import { initRequestResponseLogger, closeRequestResponseLogger } from './logger.js';
-import { computeMetrics } from './metrics.js';
-import type { Config, RunMetrics } from './types.js';
+} from "./load-engine.js";
+import {
+  openCheckpointDb,
+  getOrCreateRunId,
+  getCurrentRunId,
+  startRun,
+  getCompletedPaths,
+  upsertCheckpoint,
+  getRecordsForRun,
+  closeCheckpointDb,
+} from "./checkpoint.js";
+import { saveResumeState, clearResumeState } from "./resume-state.js";
+import {
+  initRequestResponseLogger,
+  closeRequestResponseLogger,
+} from "./logger.js";
+import { computeMetrics } from "./metrics.js";
+import type { Config, RunMetrics } from "./types.js";
 
 export interface TenantPurchaserPair {
   tenant: string;
@@ -63,35 +75,48 @@ export interface FullRunResult {
 }
 
 function filterBucketsByTenantPurchaser(
-  buckets: Config['s3']['buckets'],
+  buckets: Config["s3"]["buckets"],
   tenant?: string,
-  purchaser?: string
-): Config['s3']['buckets'] {
+  purchaser?: string,
+): Config["s3"]["buckets"] {
   if (!tenant || !purchaser) return buckets;
-  return buckets.filter((b) => b.tenant === tenant && b.purchaser === purchaser);
+  return buckets.filter(
+    (b) => b.tenant === tenant && b.purchaser === purchaser,
+  );
 }
 
 function filterBucketsByPairs(
-  buckets: Config['s3']['buckets'],
-  pairs: { tenant: string; purchaser: string }[]
-): Config['s3']['buckets'] {
+  buckets: Config["s3"]["buckets"],
+  pairs: { tenant: string; purchaser: string }[],
+): Config["s3"]["buckets"] {
   if (!pairs || pairs.length === 0) return buckets;
-  const set = new Set(pairs.map(({ tenant, purchaser }) => `${tenant}\0${purchaser}`));
+  const set = new Set(
+    pairs.map(({ tenant, purchaser }) => `${tenant}\0${purchaser}`),
+  );
   return buckets.filter(
-    (b) => b.tenant != null && b.purchaser != null && set.has(`${b.tenant}\0${b.purchaser}`)
+    (b) =>
+      b.tenant != null &&
+      b.purchaser != null &&
+      set.has(`${b.tenant}\0${b.purchaser}`),
   );
 }
 
 /**
  * Sync S3, run extraction with checkpointing, and compute metrics.
  */
-export async function runFull(options: RunOptions = {}): Promise<FullRunResult> {
+export async function runFull(
+  options: RunOptions = {},
+): Promise<FullRunResult> {
   const config = loadConfig(options.configPath);
   const bucketsFilter =
     options.pairs && options.pairs.length > 0
       ? filterBucketsByPairs(config.s3.buckets, options.pairs)
       : options.tenant && options.purchaser
-        ? filterBucketsByTenantPurchaser(config.s3.buckets, options.tenant, options.purchaser)
+        ? filterBucketsByTenantPurchaser(
+            config.s3.buckets,
+            options.tenant,
+            options.purchaser,
+          )
         : undefined;
 
   let syncResults: SyncResult[] | undefined;
@@ -113,7 +138,7 @@ export async function runFull(options: RunOptions = {}): Promise<FullRunResult> 
     runResult.runId,
     runResult.records,
     runResult.startedAt,
-    runResult.finishedAt
+    runResult.finishedAt,
   );
 
   return {
@@ -127,7 +152,9 @@ export async function runFull(options: RunOptions = {}): Promise<FullRunResult> 
 /**
  * Run extraction only (no sync). Use when staging is already populated.
  */
-export async function runExtractionOnly(options: RunOptions = {}): Promise<FullRunResult> {
+export async function runExtractionOnly(
+  options: RunOptions = {},
+): Promise<FullRunResult> {
   return runFull({ ...options, skipSync: true });
 }
 
@@ -136,13 +163,19 @@ export async function runExtractionOnly(options: RunOptions = {}): Promise<FullR
  * When sync finishes, wait for all extraction jobs to complete, then return metrics and report.
  * limit 0 or undefined = no limit (sync and extract all).
  */
-export async function runSyncExtractPipeline(options: PipelineOptions = {}): Promise<FullRunResult> {
+export async function runSyncExtractPipeline(
+  options: PipelineOptions = {},
+): Promise<FullRunResult> {
   const config = loadConfig(options.configPath);
   const bucketsFilter =
     options.pairs && options.pairs.length > 0
       ? filterBucketsByPairs(config.s3.buckets, options.pairs)
       : options.tenant && options.purchaser
-        ? filterBucketsByTenantPurchaser(config.s3.buckets, options.tenant, options.purchaser)
+        ? filterBucketsByTenantPurchaser(
+            config.s3.buckets,
+            options.tenant,
+            options.purchaser,
+          )
         : undefined;
 
   const limit = options.limit;
@@ -155,9 +188,13 @@ export async function runSyncExtractPipeline(options: PipelineOptions = {}): Pro
     : startRun(db);
   initRequestResponseLogger(config, runId);
 
+  const completed = config.run.skipCompleted
+    ? getCompletedPaths(db)
+    : new Set<string>();
+
   if (options.resume && options.onResumeSkip) {
     const records = getRecordsForRun(db, runId);
-    const doneCount = records.filter((r) => r.status === 'done').length;
+    const doneCount = records.filter((r) => r.status === "done").length;
     if (doneCount > 0) {
       options.onResumeSkip(doneCount, records.length);
     }
@@ -174,6 +211,23 @@ export async function runSyncExtractPipeline(options: PipelineOptions = {}): Pro
   const onFileSynced = (job: FileJob) => {
     clearResumeState(config);
     extractionQueued++;
+
+    if (completed.has(job.filePath)) {
+      extractionDone++;
+      options.onExtractionProgress?.(extractionDone, extractionQueued);
+      // Persistent skip: record it for the current run
+      upsertCheckpoint(db, {
+        filePath: job.filePath,
+        relativePath: job.relativePath,
+        brand: job.brand,
+        status: "skipped",
+        runId,
+      });
+      try {
+        options.onFileComplete?.(runId);
+      } catch (_) {}
+      return; // Skip adding to queue
+    }
     extractionQueue.add(() =>
       extractOneFile(config, runId, db, job).finally(() => {
         extractionDone++;
@@ -181,7 +235,7 @@ export async function runSyncExtractPipeline(options: PipelineOptions = {}): Pro
         try {
           options.onFileComplete?.(runId);
         } catch (_) {}
-      })
+      }),
     );
   };
 
@@ -192,7 +246,10 @@ export async function runSyncExtractPipeline(options: PipelineOptions = {}): Pro
     onSyncSkipProgress: options.onSyncSkipProgress,
     onFileSynced,
     onStartDownload: (destPath, manifestKey) => {
-      saveResumeState(config, { syncInProgressPath: destPath, syncInProgressManifestKey: manifestKey });
+      saveResumeState(config, {
+        syncInProgressPath: destPath,
+        syncInProgressManifestKey: manifestKey,
+      });
     },
   });
 
