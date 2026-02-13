@@ -163,7 +163,16 @@ export function isCompleted(
 }
 
 export function getCompletedPaths(db: CheckpointDb): Set<string> {
-  const rows = db._data.checkpoints.filter((c) => c.status === "done");
+  // Treat both "done" and "skipped" as "completed" for the purpose of
+  // future runs. This ensures that:
+  // - Files successfully processed in a prior run ("done") are not
+  //   re-processed when skipCompleted is enabled.
+  // - Files explicitly marked as "skipped" in a later run (because they
+  //   were already completed) continue to be treated as completed even
+  //   if older "done" rows are no longer present in the checkpoint file.
+  const rows = db._data.checkpoints.filter(
+    (c) => c.status === "done" || c.status === "skipped",
+  );
   return new Set(rows.map((r) => r.file_path));
 }
 
