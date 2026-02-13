@@ -32,15 +32,15 @@
         --fail-bg: #ffebee;
         --muted: #6b7c85;
         --row-alt: #fafbfc;
-        --cell-pad: 0.85rem 1rem;
-        --radius: 8px;
-        --radius-sm: 6px;
-        --radius-xs: 4px;
-        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-        --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08);
-        --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.06);
-        --shadow-btn: 0 1px 3px rgba(0, 0, 0, 0.12);
+        --cell-pad: 0.722rem 0.85rem;
+        --radius: 6.8px;
+        --radius-sm: 5.1px;
+        --radius-xs: 3.4px;
+        --shadow-sm: 0 0.85px 2.55px rgba(0, 0, 0, 0.08);
+        --shadow-md: 0 1.7px 6.8px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 3.4px 10.2px rgba(0, 0, 0, 0.08);
+        --shadow-inset: inset 0 0.85px 1.7px rgba(0, 0, 0, 0.06);
+        --shadow-btn: 0 0.85px 2.55px rgba(0, 0, 0, 0.12);
       }
       * {
         box-sizing: border-box;
@@ -64,20 +64,20 @@
       .header {
         flex-shrink: 0;
         background: var(--surface);
-        border: 1px solid var(--border);
+        border: 0.85px solid var(--border);
         border-radius: var(--radius);
         box-shadow: var(--shadow-lg);
-        margin: 1.25rem 1.5rem;
+        margin: 1.062rem 1.275rem;
         box-sizing: border-box;
       }
       .header-inner {
         max-width: 100%;
         margin: 0;
-        padding: 0.5rem 1.25rem 0.1rem 1.25rem;
+        padding: 0.425rem 1.062rem 0.085rem 1.062rem;
         box-sizing: border-box;
         display: flex;
         align-items: center;
-        gap: 1.5rem;
+        gap: 1.275rem;
         flex-wrap: wrap;
       }
       .header-right {
@@ -88,21 +88,21 @@
         justify-content: center;
         gap: 0;
         flex-shrink: 0;
-        padding-top: 0.75rem;
+        padding-top: 0.637rem;
       }
       .header-filter-row {
         display: flex;
         align-items: center;
-        gap: 1rem;
+        gap: 0.85rem;
         flex-wrap: wrap;
       }
       .header-field-wrap {
         display: grid;
-        grid-template-columns: auto minmax(11rem, 1fr);
-        grid-template-rows: auto minmax(1.25em, auto);
+        grid-template-columns: auto minmax(9.35rem, 1fr);
+        grid-template-rows: auto minmax(1.062em, auto);
         align-items: center;
-        column-gap: 0.5rem;
-        row-gap: 0.2rem;
+        column-gap: 0.425rem;
+        row-gap: 0.17rem;
         justify-content: start;
       }
       .header-field-wrap > .header-label {
@@ -120,21 +120,21 @@
       .header-field-error {
         color: var(--fail);
         font-size: 0.75rem;
-        min-height: 1.25em;
+        min-height: 1.062em;
         line-height: 1.2;
       }
       .header .logo {
-        height: 26px;
+        height: 22.1px;
         width: auto;
         display: block;
         object-fit: contain;
-        margin-top: -0.5rem;
+        margin-top: -0.425rem;
       }
       .header .logo-placeholder {
-        height: 30px;
+        height: 25.5px;
         display: flex;
         align-items: center;
-        margin-top: -0.5rem;
+        margin-top: -0.425rem;
         font-weight: 600;
         color: var(--accent);
         font-size: 1.1rem;
@@ -146,12 +146,12 @@
         font-weight: 600;
       }
       .header-select {
-        width: 176px;
-        min-width: 176px;
-        max-width: 176px;
-        height: 32px;
-        padding: 0.35rem 2rem 0.35rem 0.6rem;
-        border: 1px solid var(--border);
+        width: 149.6px;
+        min-width: 149.6px;
+        max-width: 149.6px;
+        height: 27.2px;
+        padding: 0.297rem 1.7rem 0.297rem 0.51rem;
+        border: 0.85px solid var(--border);
         border-radius: var(--radius-sm);
         background: var(--surface);
         color: var(--text);
@@ -160,11 +160,11 @@
         appearance: none;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
-        background-position: right 0.5rem center;
+        background-position: right 0.425rem center;
         box-sizing: border-box;
         box-shadow:
-          0 1px 2px rgba(0, 0, 0, 0.06),
-          inset 0 1px 1px rgba(255, 255, 255, 0.8);
+          0 0.85px 1.7px rgba(0, 0, 0, 0.06),
+          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.8);
         transition:
           border-color 0.15s ease,
           box-shadow 0.15s ease;
@@ -173,9 +173,9 @@
         outline: none;
         border-color: var(--primary);
         box-shadow:
-          0 0 0 2px rgba(45, 157, 95, 0.2),
-          0 2px 4px rgba(0, 0, 0, 0.08),
-          inset 0 1px 1px rgba(255, 255, 255, 0.9);
+          0 0 0 1.7px rgba(45, 157, 95, 0.2),
+          0 1.7px 3.4px rgba(0, 0, 0, 0.08),
+          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
       }
       .header-select:disabled {
         opacity: 0.7;
@@ -184,14 +184,14 @@
       }
       .filter-dropdown {
         position: relative;
-        width: 176px;
-        min-width: 176px;
+        width: 149.6px;
+        min-width: 149.6px;
       }
       .filter-dropdown-trigger {
         width: 100%;
-        height: 32px;
-        padding: 0.35rem 2rem 0.35rem 0.6rem;
-        border: 1px solid var(--border);
+        height: 27.2px;
+        padding: 0.297rem 1.7rem 0.297rem 0.51rem;
+        border: 0.85px solid var(--border);
         border-radius: var(--radius-sm);
         background: var(--surface);
         color: var(--text);
@@ -201,14 +201,14 @@
         cursor: pointer;
         box-sizing: border-box;
         box-shadow:
-          0 1px 2px rgba(0, 0, 0, 0.06),
-          inset 0 1px 1px rgba(255, 255, 255, 0.8);
+          0 0.85px 1.7px rgba(0, 0, 0, 0.06),
+          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.8);
         transition:
           border-color 0.15s ease,
           box-shadow 0.15s ease;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
-        background-position: right 0.5rem center;
+        background-position: right 0.425rem center;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -216,32 +216,32 @@
       .filter-dropdown-trigger:hover {
         border-color: var(--border-light);
         box-shadow:
-          0 2px 4px rgba(0, 0, 0, 0.08),
-          inset 0 1px 1px rgba(255, 255, 255, 0.9);
+          0 1.7px 3.4px rgba(0, 0, 0, 0.08),
+          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
       }
       .filter-dropdown-trigger:focus {
         outline: none;
         border-color: var(--primary);
         box-shadow:
-          0 0 0 2px rgba(45, 157, 95, 0.2),
-          0 2px 4px rgba(0, 0, 0, 0.08),
-          inset 0 1px 1px rgba(255, 255, 255, 0.9);
+          0 0 0 1.7px rgba(45, 157, 95, 0.2),
+          0 1.7px 3.4px rgba(0, 0, 0, 0.08),
+          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
       }
       .filter-dropdown-panel {
         display: none;
         position: absolute;
         top: 100%;
         left: 0;
-        margin-top: 2px;
+        margin-top: 1.7px;
         min-width: 100%;
-        max-height: 220px;
+        max-height: 187px;
         overflow-y: auto;
-        border: 1px solid var(--border);
+        border: 0.85px solid var(--border);
         border-radius: var(--radius-sm);
         background: var(--surface);
         box-shadow: var(--shadow-md);
         z-index: 100;
-        padding: 0.35rem 0;
+        padding: 0.297rem 0;
       }
       .filter-dropdown-panel.open {
         display: block;
@@ -249,8 +249,8 @@
       .filter-dropdown-option {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.4rem 0.6rem;
+        gap: 0.425rem;
+        padding: 0.34rem 0.51rem;
         font-size: 0.875rem;
         cursor: pointer;
         white-space: nowrap;
@@ -266,9 +266,9 @@
         align-self: flex-end;
       }
       .header-btn-reset {
-        height: 32px;
-        padding: 0 1rem;
-        border: 1px solid var(--header-border);
+        height: 27.2px;
+        padding: 0 0.85rem;
+        border: 0.85px solid var(--header-border);
         border-radius: var(--radius-sm);
         background: var(--header-bg);
         color: var(--header-text);
@@ -277,8 +277,8 @@
         font-family: inherit;
         cursor: pointer;
         box-shadow:
-          0 1px 2px rgba(0, 0, 0, 0.1),
-          inset 0 1px 0 rgba(255, 255, 255, 0.15);
+          0 0.85px 1.7px rgba(0, 0, 0, 0.1),
+          inset 0 0.85px 0 rgba(255, 255, 255, 0.15);
         transition:
           background 0.15s ease,
           border-color 0.15s ease,
@@ -288,8 +288,8 @@
         outline: none;
         border-color: var(--header-text);
         box-shadow:
-          0 0 0 2px rgba(255, 255, 255, 0.3),
-          0 2px 4px rgba(0, 0, 0, 0.1);
+          0 0 0 1.7px rgba(255, 255, 255, 0.3),
+          0 1.7px 3.4px rgba(0, 0, 0, 0.1);
       }
       .header-btn-reset:hover {
         background: var(--header-border);
@@ -301,7 +301,7 @@
         display: flex;
         flex-direction: column;
         min-height: 0;
-        padding: 0 1.5rem 1.25rem 1.5rem;
+        padding: 0 1.275rem 1.062rem 1.275rem;
         max-width: 100%;
       }
       .table-section {
@@ -311,11 +311,11 @@
         display: flex;
         flex-direction: column;
         background: var(--surface);
-        border: 1px solid var(--border);
+        border: 0.85px solid var(--border);
         border-radius: var(--radius);
         box-shadow:
-          0 4px 20px rgba(0, 0, 0, 0.1),
-          0 2px 8px rgba(0, 0, 0, 0.06);
+          0 3.4px 17px rgba(0, 0, 0, 0.1),
+          0 1.7px 6.8px rgba(0, 0, 0, 0.06);
       }
       .table-section table {
         height: 100%;
@@ -330,7 +330,7 @@
       td {
         padding: var(--cell-pad);
         text-align: left;
-        border: 1px solid var(--border);
+        border: 0.85px solid var(--border);
         vertical-align: middle;
       }
       thead th:first-child {
@@ -340,10 +340,10 @@
         border-top-right-radius: 0;
       }
       thead tr {
-        height: 48px;
+        height: 40.8px;
       }
       thead th {
-        height: 48px;
+        height: 40.8px;
         box-sizing: border-box;
       }
       tbody {
@@ -385,9 +385,9 @@
         cursor: not-allowed;
       }
       .op-name {
-        width: 214px;
-        min-width: 214px;
-        max-width: 214px;
+        width: 181.9px;
+        min-width: 181.9px;
+        max-width: 181.9px;
         font-weight: 600;
       }
       thead th.op-name {
@@ -402,9 +402,9 @@
         background: var(--header-bg);
       }
       .limits-col {
-        width: 149px;
-        min-width: 149px;
-        max-width: 149px;
+        width: 126.65px;
+        min-width: 126.65px;
+        max-width: 126.65px;
       }
       .limits-cell {
         font-size: 0.85rem;
@@ -414,22 +414,22 @@
       }
       .limits-cell .limit-row {
         display: grid;
-        grid-template-columns: auto 48px;
-        gap: 0.5rem 0.75rem;
+        grid-template-columns: auto 40.8px;
+        gap: 0.425rem 0.637rem;
         align-items: center;
-        min-height: 2.2rem;
+        min-height: 1.87rem;
       }
       .limits-cell .limit-label {
         white-space: nowrap;
         font-weight: 500;
       }
       .limits-cell input[type="number"] {
-        width: 48px;
-        min-width: 48px;
-        max-width: 48px;
-        height: 30px;
-        padding: 0.4rem 0.5rem;
-        border: 1px solid var(--border);
+        width: 40.8px;
+        min-width: 40.8px;
+        max-width: 40.8px;
+        height: 25.5px;
+        padding: 0.34rem 0.425rem;
+        border: 0.85px solid var(--border);
         border-radius: var(--radius-sm);
         font-size: 0.875rem;
         font-weight: 500;
@@ -437,8 +437,8 @@
         background: var(--surface);
         box-sizing: border-box;
         box-shadow:
-          0 1px 2px rgba(0, 0, 0, 0.06),
-          inset 0 1px 1px rgba(255, 255, 255, 0.8);
+          0 0.85px 1.7px rgba(0, 0, 0, 0.06),
+          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.8);
         transition:
           border-color 0.15s ease,
           box-shadow 0.15s ease;
@@ -446,30 +446,30 @@
       .limits-cell input[type="number"]:hover:not(:disabled) {
         border-color: var(--border-light);
         box-shadow:
-          0 2px 4px rgba(0, 0, 0, 0.08),
-          inset 0 1px 1px rgba(255, 255, 255, 0.9);
+          0 1.7px 3.4px rgba(0, 0, 0, 0.08),
+          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
       }
       .limits-cell input[type="number"]:focus {
         outline: none;
         border-color: var(--primary);
         box-shadow:
-          0 0 0 2px rgba(45, 157, 95, 0.2),
-          0 2px 4px rgba(0, 0, 0, 0.08),
-          inset 0 1px 1px rgba(255, 255, 255, 0.9);
+          0 0 0 1.7px rgba(45, 157, 95, 0.2),
+          0 1.7px 3.4px rgba(0, 0, 0, 0.08),
+          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
       }
       .limits-cell input[type="number"]:disabled {
         background: var(--row-alt);
-        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        box-shadow: inset 0 0.85px 1.7px rgba(0, 0, 0, 0.05);
       }
       .limits-cell .limit-hint {
-        margin-top: 0.5rem;
-        padding: 0.35rem 0.5rem;
+        margin-top: 0.425rem;
+        padding: 0.297rem 0.425rem;
         font-size: 0.8rem;
         font-weight: 600;
         color: var(--primary);
         background: var(--accent-light);
         border-radius: var(--radius-xs);
-        border: 1px solid rgba(45, 157, 95, 0.25);
+        border: 0.85px solid rgba(45, 157, 95, 0.25);
         display: inline-block;
       }
       .limits-cell .n/a {
@@ -477,16 +477,16 @@
         font-style: italic;
       }
       .run-cell {
-        width: 161px;
-        min-width: 161px;
-        max-width: 161px;
+        width: 136.85px;
+        min-width: 136.85px;
+        max-width: 136.85px;
         text-align: center;
         vertical-align: top;
       }
       .run-cell .btn-group {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 0.5rem;
+        gap: 0.425rem;
         width: 100%;
         margin: 0 auto;
         min-width: 0;
@@ -501,9 +501,9 @@
       button.run {
         background: var(--primary);
         color: #fff;
-        border: 1px solid var(--header-border);
+        border: 0.85px solid var(--header-border);
         border-radius: var(--radius-sm);
-        padding: 0.65rem 1.25rem;
+        padding: 0.552rem 1.062rem;
         font-size: 0.9rem;
         font-weight: 600;
         cursor: pointer;
@@ -518,7 +518,7 @@
       }
       button.run:hover:not(:disabled) {
         background: var(--primary-hover);
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+        box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.18);
       }
       button.run:disabled {
         opacity: 0.65;
@@ -527,9 +527,9 @@
       button.reset-case {
         background: var(--surface);
         color: var(--text-secondary);
-        border: 1px solid var(--border);
+        border: 0.85px solid var(--border);
         border-radius: var(--radius-sm);
-        padding: 0.55rem 1rem;
+        padding: 0.468rem 0.85rem;
         font-size: 0.85rem;
         font-weight: 600;
         cursor: pointer;
@@ -545,7 +545,7 @@
       button.reset-case:hover {
         background: var(--row-alt);
         color: var(--text);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1.7px 3.4px rgba(0, 0, 0, 0.1);
       }
       button.reset-case.stop-btn {
         background: var(--fail);
@@ -573,16 +573,16 @@
       button.reset-during-resume.show-during-resume {
         display: block !important;
         width: 100%;
-        min-height: 2.75rem;
+        min-height: 2.337rem;
         box-sizing: border-box;
-        padding: 0.65rem 1.25rem;
+        padding: 0.552rem 1.062rem;
         font-size: 0.9rem;
       }
       button.download-sync-report-btn,
       button.download-report-btn {
         border: none;
         border-radius: var(--radius-sm);
-        padding: 0.55rem 0.85rem;
+        padding: 0.468rem 0.722rem;
         font-size: 0.85rem;
         font-weight: 600;
         cursor: pointer;
@@ -596,21 +596,21 @@
       }
       button.download-sync-report-btn:hover:not(:disabled) {
         background: #244a7a;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.2);
       }
       button.download-report-btn.download-report-html-btn {
         background: #216c6d;
       }
       button.download-report-btn.download-report-html-btn:hover:not(:disabled) {
         background: #1a5758;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.2);
       }
       button.download-report-btn.download-report-json-btn {
         background: #5c4d7a;
       }
       button.download-report-btn.download-report-json-btn:hover:not(:disabled) {
         background: #4a3f62;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.2);
       }
       button.download-sync-report-btn:disabled,
       button.download-report-btn:disabled {
@@ -620,10 +620,10 @@
       .download-bar {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        padding: 0.6rem 1rem;
+        gap: 0.637rem;
+        padding: 0.51rem 0.85rem;
         background: var(--surface);
-        border: 1px solid var(--border-light);
+        border: 0.85px solid var(--border-light);
         border-radius: 0;
         margin-bottom: 0;
         flex-wrap: wrap;
@@ -638,7 +638,7 @@
       .download-bar-btns {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.425rem;
         flex-wrap: wrap;
       }
       .download-bar-btns .download-sync-report-btn,
@@ -646,30 +646,30 @@
         margin: 0;
       }
       .result-header {
-        width: 474px;
-        min-width: 474px;
-        max-width: 474px;
+        width: 402.9px;
+        min-width: 402.9px;
+        max-width: 402.9px;
       }
       .result-cell {
-        width: 474px;
-        min-width: 474px;
-        max-width: 474px;
+        width: 402.9px;
+        min-width: 402.9px;
+        max-width: 402.9px;
         vertical-align: top;
         overflow: hidden;
         position: relative;
       }
       .result {
         position: absolute;
-        top: 0.85rem;
-        left: 1rem;
-        right: 1rem;
-        bottom: 0.85rem;
+        top: 0.722rem;
+        left: 0.85rem;
+        right: 0.85rem;
+        bottom: 0.722rem;
         font-family: "JetBrains Mono", "Consolas", "Courier New", monospace;
         font-size: 0.8rem;
-        padding: 0.6rem 0.75rem;
+        padding: 0.51rem 0.637rem;
         white-space: pre-wrap;
         word-break: break-word;
-        border: 1px solid var(--border-light);
+        border: 0.85px solid var(--border-light);
         border-radius: var(--radius);
         background: #fafafa;
         overflow: auto;
@@ -709,19 +709,19 @@
         }
       }
       .result .sync-progress-wrap {
-        margin-top: 0.6rem;
+        margin-top: 0.51rem;
         font-size: 1.05rem;
         font-weight: 600;
         color: var(--text);
       }
       .result .sync-progress-wrap:first-of-type {
-        margin-top: 0.5rem;
+        margin-top: 0.425rem;
       }
       .result .extraction-progress-wrap {
-        margin-top: 0.75rem;
+        margin-top: 0.637rem;
       }
       .result .skip-progress-wrap {
-        margin-top: 0.5rem;
+        margin-top: 0.425rem;
         color: var(--muted);
       }
       .result .sync-progress-fill.skip-fill {
@@ -729,15 +729,15 @@
       }
       .result .sync-progress-bar {
         width: 100%;
-        height: 22px;
+        height: 18.7px;
         background: var(--border-light);
         border-radius: var(--radius-sm);
         overflow: hidden;
-        margin-top: 0.5rem;
+        margin-top: 0.425rem;
         box-shadow:
-          0 1px 2px rgba(0, 0, 0, 0.06),
-          inset 0 1px 2px rgba(0, 0, 0, 0.06);
-        border: 1px solid var(--border);
+          0 0.85px 1.7px rgba(0, 0, 0, 0.06),
+          inset 0 0.85px 1.7px rgba(0, 0, 0, 0.06);
+        border: 0.85px solid var(--border);
       }
       .result .sync-progress-fill {
         height: 100%;
@@ -746,9 +746,9 @@
           var(--primary) 0%,
           var(--primary-hover) 100%
         );
-        border-radius: calc(var(--radius-sm) - 1px);
+        border-radius: calc(var(--radius-sm) - 0.85px);
         transition: width 0.2s ease-out;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        box-shadow: inset 0 0.85px 0 rgba(255, 255, 255, 0.25);
       }
       .result .sync-progress-fill.sync-progress-indeterminate {
         animation: sync-indeterminate 1.2s ease-in-out infinite;
@@ -770,15 +770,15 @@
       .result.result-validation-alert .result-placeholder-text {
         color: var(--fail);
         font-style: normal;
-        padding: 0.5rem 0.75rem;
+        padding: 0.425rem 0.637rem;
         background: var(--fail-bg);
-        border: 1px solid rgba(198, 40, 40, 0.25);
+        border: 0.85px solid rgba(198, 40, 40, 0.25);
         border-radius: var(--radius-sm);
         display: inline-block;
       }
       .result .exit {
         font-weight: 600;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.17rem;
         color: var(--text);
       }
       .result .out {
@@ -796,17 +796,17 @@
       }
       .result-table-wrap th,
       .result-table-wrap td {
-        padding: 0.4rem 0.6rem;
+        padding: 0.34rem 0.51rem;
         text-align: left;
         vertical-align: top;
-        border: 1px solid var(--border-light);
+        border: 0.85px solid var(--border-light);
         background: rgba(255, 255, 255, 0.5);
       }
       .result-table-wrap th {
         font-weight: 600;
         color: var(--text);
-        width: 115px;
-        min-width: 115px;
+        width: 97.75px;
+        min-width: 97.75px;
       }
       .result-table-wrap td {
         color: var(--text-secondary);
@@ -956,7 +956,7 @@
         <table>
           <thead>
             <tr>
-              <th class="op-name">Test scenario</th>
+              <th class="op-name">Operations</th>
               <th class="limits-col">Batch limits</th>
               <th class="run-cell">Run controls</th>
               <th class="result-header">Run output</th>
