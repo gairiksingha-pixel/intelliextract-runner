@@ -1382,11 +1382,13 @@
               (total > 0 ? done + " / " + total : done + " file(s)") +
               "</div>" +
               (total > 0
-                ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' +
-                  pct +
-                  '%"></div></div>'
+                ? done === 0
+                  ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>'
+                  : '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' +
+                    pct +
+                    '%"></div></div>'
                 : done === 0
-                  ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:100%"></div></div>'
+                  ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>'
                   : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
           }
           if (hasExtraction) {
@@ -1403,11 +1405,13 @@
                 : extDone + " file(s)") +
               "</div>" +
               (extTotal > 0
-                ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' +
-                  extPct +
-                  '%"></div></div>'
+                ? extDone === 0
+                  ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>'
+                  : '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:' +
+                    extPct +
+                    '%"></div></div>'
                 : extDone === 0
-                  ? '<div class="sync-progress-bar"><div class="sync-progress-fill" style="width:100%"></div></div>'
+                  ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>'
                   : '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>');
           }
           var showDots = true;
@@ -1462,6 +1466,9 @@
             escapeHtml(label) +
             (showDots ? '<span class="loading-dots"></span>' : "") +
             "</span>" +
+            (showDots
+              ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>'
+              : "") +
             extra;
           return;
         }
