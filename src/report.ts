@@ -132,23 +132,27 @@ function filterExtractionResultsForRun(
   allResults: ExtractionResultEntry[],
 ): ExtractionResultEntry[] {
   const db = openCheckpointDb(config.run.checkpointPath);
-  const records = getRecordsForRun(db, runId);
-  closeCheckpointDb(db);
 
-  const doneFilenames = new Set(
-    records
-      .filter((r) => r.status === "done")
-      .map((r) =>
-        extractionResultFilenameFromRecord({
-          relativePath: r.relativePath,
-          brand: r.brand,
-        }),
-      ),
+  // Include ALL successful files from any run + all files from current run
+  // This ensures resumed runs show complete history, not just newly processed files
+  const relevantRecords = db._data.checkpoints.filter(
+    (r) => r.status === "done" || r.run_id === runId,
   );
 
-  if (doneFilenames.size === 0) return [];
+  closeCheckpointDb(db);
 
-  return allResults.filter((e) => doneFilenames.has(e.filename));
+  const relevantFilenames = new Set(
+    relevantRecords.map((r) =>
+      extractionResultFilenameFromRecord({
+        relativePath: r.relative_path,
+        brand: r.brand,
+      }),
+    ),
+  );
+
+  if (relevantFilenames.size === 0) return [];
+
+  return allResults.filter((e) => relevantFilenames.has(e.filename));
 }
 
 function minMaxDatesFromRecords(

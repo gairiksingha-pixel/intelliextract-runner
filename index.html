@@ -270,9 +270,9 @@
         height: 34px;
         padding: 0 0.85rem;
         min-width: 180px;
-        border: 0.85px solid var(--header-border);
+        border: 0.85px solid #244a7a;
         border-radius: var(--radius-sm);
-        background: var(--header-bg);
+        background: #2f5496;
         color: var(--header-text);
         font-size: 0.875rem;
         font-weight: 600;
@@ -294,8 +294,8 @@
           0 1.7px 3.4px rgba(0, 0, 0, 0.1);
       }
       .header-btn-reset:hover {
-        background: var(--header-border);
-        border-color: var(--header-border);
+        background: #244a7a;
+        border-color: #244a7a;
         color: var(--header-text);
       }
       .main {
@@ -606,26 +606,26 @@
         box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.2);
       }
       button.download-report-btn.download-report-html-btn {
-        background: #216c6d;
+        background: #2f5496;
       }
       button.download-report-btn.download-report-html-btn:hover:not(:disabled) {
-        background: #1a5758;
+        background: #244a7a;
         box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.2);
       }
       button.download-report-btn.download-report-json-btn {
-        background: #5c4d7a;
+        background: #2f5496;
       }
       button.download-report-btn.download-report-json-btn:hover:not(:disabled) {
-        background: #4a3f62;
+        background: #244a7a;
         box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.2);
       }
       button.download-report-btn.download-report-schedule-btn {
-        background: #d97706;
+        background: #2f5496;
       }
       button.download-report-btn.download-report-schedule-btn:hover:not(
           :disabled
         ) {
-        background: #b45309;
+        background: #244a7a;
         box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.2);
       }
       button.download-sync-report-btn:disabled,
@@ -1902,8 +1902,40 @@
             });
           }
         }
+        if (isResume) row._aborted = false;
+        if (row && !isResume && row._activeController) {
+          if (resetBtn) {
+            resetBtn.textContent = "Resume";
+            resetBtn.classList.remove("stop-btn");
+            resetBtn.classList.add("resume-btn");
+            resetBtn.onclick = function () {
+              runCase(caseId, btn, resultDiv, { resume: true });
+            };
+            var limitInputs = row.querySelectorAll(
+              ".limit-sync, .limit-extract",
+            );
+            if (limitInputs) {
+              limitInputs.forEach(function (input) {
+                input.disabled = false;
+              });
+            }
+          }
+        }
+
+        // Save state to localStorage as backup
+        try {
+          localStorage.setItem(
+            "intelliextract-run-state-" + caseId,
+            JSON.stringify({
+              startTime: new Date().toISOString(),
+              params: params,
+              status: "running",
+            }),
+          );
+        } catch (_) {}
+
         if (resetBtn) {
-          resetBtn.textContent = "Stop";
+          resetBtn.textContent = "Pause";
           resetBtn.classList.remove("resume-btn");
           resetBtn.classList.add("stop-btn");
           resetBtn.onclick = function () {
@@ -2188,14 +2220,9 @@
                 : null;
               if (resetDuringResumeBtn)
                 resetDuringResumeBtn.classList.add("show-during-resume");
-              var syncDone =
-                lastSyncProgress && lastSyncProgress.done != null
-                  ? lastSyncProgress.done
-                  : 0;
+              var syncDone = row && row._resumeSync ? row._resumeSync.done : 0;
               var extDone =
-                lastExtractionProgress && lastExtractionProgress.done != null
-                  ? lastExtractionProgress.done
-                  : 0;
+                row && row._resumeExtract ? row._resumeExtract.done : 0;
               var msg =
                 "Stopped. Click Resume to continue from where you left off.";
               if (syncDone > 0 || extDone > 0) {
@@ -2224,6 +2251,10 @@
               null,
               null,
             );
+            // Clear localStorage on error
+            try {
+              localStorage.removeItem("intelliextract-run-state-" + caseId);
+            } catch (_) {}
           }
         } finally {
           if (row) row._activeController = null;
@@ -2239,6 +2270,10 @@
               : null;
             if (resetDuringResumeBtn)
               resetDuringResumeBtn.classList.remove("show-during-resume");
+            // Clear localStorage on successful completion
+            try {
+              localStorage.removeItem("intelliextract-run-state-" + caseId);
+            } catch (_) {}
           }
         }
       }
@@ -2247,61 +2282,203 @@
       ROWS.forEach(function (c) {
         tbody.appendChild(renderRow(c, "rows"));
       });
-      (function restorePipelineResumeOnLoad() {
-        fetch("/api/run-status")
+
+      (function restoreAllCasesOnLoad() {
+        // Step 1: Check for actively running processes
+        fetch("/api/active-runs")
           .then(function (r) {
             return r.ok ? r.json() : null;
           })
-          .then(function (status) {
-            if (!status || !status.canResume) return;
-            var pipeRow = tbody
-              ? tbody.querySelector('tr[data-case-id="PIPE"]')
-              : null;
-            if (!pipeRow) return;
-            var runBtn = pipeRow.querySelector("button.run");
-            var resultDiv = document.getElementById("result-PIPE");
-            var resetBtn = pipeRow.querySelector(
-              "button.reset-case:not(.reset-during-resume)",
-            );
-            var syncLimit =
-              status.syncLimit != null ? Number(status.syncLimit) : 0;
-            if (Number.isNaN(syncLimit)) syncLimit = 0;
-            pipeRow._resumeSyncLimit = syncLimit;
-            pipeRow._resumeExtractLimit = 0;
-            pipeRow._aborted = true;
-            var limitInput = pipeRow.querySelector(".limit-sync");
-            if (limitInput) {
-              limitInput.value = String(syncLimit);
-              limitInput.disabled = true;
-            }
-            if (runBtn) runBtn.disabled = true;
-            if (resetBtn) {
-              resetBtn.textContent = "Resume";
-              resetBtn.classList.remove("stop-btn");
-              resetBtn.classList.add("resume-btn");
-              resetBtn.onclick = function () {
-                runCase("PIPE", runBtn, resultDiv, { resume: true });
-              };
-            }
-            var resetDuringResumeBtn = pipeRow.querySelector(
-              ".reset-during-resume",
-            );
-            if (resetDuringResumeBtn)
-              resetDuringResumeBtn.classList.add("show-during-resume");
-            if (resultDiv) {
-              resultDiv.className = "result result-placeholder";
-              var done = status.done != null ? Number(status.done) : 0;
-              var total = status.total != null ? Number(status.total) : 0;
-              resultDiv.innerHTML =
-                '<span class="result-placeholder-text">Stopped (extract: ' +
-                done +
-                "/" +
-                total +
-                "). Click Resume to continue from the next file.</span>";
-            }
-            setOtherRowsInactive(pipeRow, RESUME_OTHER_DISABLED_TITLE);
+          .then(function (data) {
+            if (!data || !data.activeRuns || data.activeRuns.length === 0)
+              return;
+
+            // Restore running state for active processes
+            data.activeRuns.forEach(function (run) {
+              var caseRow = tbody
+                ? tbody.querySelector('tr[data-case-id="' + run.caseId + '"]')
+                : null;
+              if (!caseRow) return;
+
+              var runBtn = caseRow.querySelector("button.run");
+              var resultDiv = document.getElementById("result-" + run.caseId);
+              var resetBtn = caseRow.querySelector(
+                "button.reset-case:not(.reset-during-resume)",
+              );
+
+              // Handle Scheduled Runs (Non-blocking)
+              if (run.origin === "scheduled") {
+                // Show just a "Running in background" chip in the output cell — no stop button here
+                if (resultDiv) {
+                  resultDiv.className = "result result-placeholder";
+                  resultDiv.innerHTML =
+                    '<span style="background:#e0f2f1;color:#00695c;padding:3px 10px;border-radius:14px;font-size:0.85em;font-weight:600;border:1px solid #b2dfdb;white-space:nowrap;">Running in background</span>';
+                }
+                // Move "Stop Auto Extraction" to the actions column (resetBtn)
+                if (resetBtn) {
+                  resetBtn.textContent = "Stop Auto Extraction";
+                  resetBtn.classList.remove("resume-btn");
+                  resetBtn.classList.add("stop-btn");
+                  resetBtn.onclick = function () {
+                    window.stopBackgroundJob(run.caseId);
+                  };
+                }
+                if (runBtn) runBtn.disabled = true;
+                setOtherRowsInactive(
+                  caseRow,
+                  "Background auto extraction is running. Stop it to run another case.",
+                );
+                return; // processing done for scheduled run
+              }
+
+              // Handle Manual Runs (Blocking - Existing Logic)
+              if (runBtn) runBtn.disabled = true;
+              if (resetBtn) {
+                resetBtn.textContent = "Pause";
+                resetBtn.classList.remove("resume-btn");
+                resetBtn.classList.add("stop-btn");
+                // Note: We can't set onclick to actually stop since the process is in memory
+                // User will need to manually refresh or the process will complete
+              }
+
+              if (resultDiv) {
+                resultDiv.className = "result running";
+                var msg = "Running";
+                if (run.progress) {
+                  msg +=
+                    "… " +
+                    run.progress.percent +
+                    "% (" +
+                    run.progress.done +
+                    " / " +
+                    run.progress.total +
+                    ")";
+                } else if (run.syncProgress) {
+                  msg +=
+                    "… Syncing (" +
+                    run.syncProgress.done +
+                    " / " +
+                    run.syncProgress.total +
+                    ")";
+                } else if (run.extractProgress) {
+                  msg +=
+                    "… Extracting (" +
+                    run.extractProgress.done +
+                    " / " +
+                    run.extractProgress.total +
+                    ")";
+                } else {
+                  msg += "…";
+                }
+                resultDiv.innerHTML =
+                  '<span class="exit">' +
+                  escapeHtml(msg) +
+                  '<span class="loading-dots"></span></span>';
+              }
+
+              setOtherRowsInactive(caseRow, "A process is already running");
+            });
           })
           .catch(function () {});
+
+        // Step 2: Check for resumable stopped processes
+        var resumableCases = ["P1", "P2", "PIPE", "P5", "P6"];
+
+        resumableCases.forEach(function (caseId) {
+          fetch("/api/run-status?caseId=" + caseId)
+            .then(function (r) {
+              return r.ok ? r.json() : null;
+            })
+            .then(function (status) {
+              if (!status || !status.canResume || status.isRunning) return;
+
+              var caseRow = tbody
+                ? tbody.querySelector('tr[data-case-id="' + caseId + '"]')
+                : null;
+              if (!caseRow) return;
+
+              var runBtn = caseRow.querySelector("button.run");
+              var resultDiv = document.getElementById("result-" + caseId);
+              var resetBtn = caseRow.querySelector(
+                "button.reset-case:not(.reset-during-resume)",
+              );
+
+              // Set up resume state from saved state
+              var savedState = status.state || {};
+
+              if (savedState.params) {
+                if (savedState.params.syncLimit != null) {
+                  caseRow._resumeSyncLimit = savedState.params.syncLimit;
+                }
+                if (savedState.params.extractLimit != null) {
+                  caseRow._resumeExtractLimit = savedState.params.extractLimit;
+                }
+              }
+
+              if (savedState.syncProgress) {
+                caseRow._resumeSync = savedState.syncProgress;
+              }
+              if (savedState.extractProgress) {
+                caseRow._resumeExtract = savedState.extractProgress;
+              }
+
+              caseRow._aborted = true;
+
+              // Disable limit inputs
+              var limitInputs = caseRow.querySelectorAll(
+                ".limit-sync, .limit-extract",
+              );
+              limitInputs.forEach(function (input) {
+                input.disabled = true;
+              });
+
+              if (runBtn) runBtn.disabled = true;
+
+              if (resetBtn) {
+                resetBtn.textContent = "Resume";
+                resetBtn.classList.remove("stop-btn");
+                resetBtn.classList.add("resume-btn");
+                resetBtn.onclick = function () {
+                  runCase(caseId, runBtn, resultDiv, { resume: true });
+                };
+              }
+
+              var resetDuringResumeBtn = caseRow.querySelector(
+                ".reset-during-resume",
+              );
+              if (resetDuringResumeBtn) {
+                resetDuringResumeBtn.classList.add("show-during-resume");
+              }
+
+              if (resultDiv) {
+                resultDiv.className = "result result-placeholder";
+                var msg = "Stopped";
+                if (savedState.syncProgress && savedState.extractProgress) {
+                  msg +=
+                    " (sync: " +
+                    savedState.syncProgress.done +
+                    ", extract: " +
+                    savedState.extractProgress.done +
+                    ")";
+                } else if (savedState.syncProgress) {
+                  msg += " (sync: " + savedState.syncProgress.done + ")";
+                } else if (savedState.extractProgress) {
+                  msg += " (extract: " + savedState.extractProgress.done + ")";
+                }
+                msg += ". Click Resume to continue from the next file.";
+                resultDiv.innerHTML =
+                  '<span class="result-placeholder-text">' +
+                  escapeHtml(msg) +
+                  "</span>";
+              }
+
+              setOtherRowsInactive(
+                caseRow,
+                "Resume the stopped process or reset it to enable other runs",
+              );
+            })
+            .catch(function () {});
+        });
       })();
       (function initDownloadBar() {
         var container = document.getElementById("download-bar-btns");
@@ -3270,6 +3447,70 @@
           });
         fetchConfig();
       })();
+      window.stopBackgroundJob = function (caseId) {
+        if (confirm("Are you sure you want to stop auto extraction?")) {
+          var resultDiv = document.getElementById("result-" + caseId);
+          var tbody = document.getElementById("rows");
+          var caseRow = tbody
+            ? tbody.querySelector('tr[data-case-id="' + caseId + '"]')
+            : null;
+          var resetBtn = caseRow
+            ? caseRow.querySelector(
+                "button.reset-case:not(.reset-during-resume)",
+              )
+            : null;
+
+          if (resetBtn) {
+            resetBtn.disabled = true;
+            resetBtn.textContent = "Stopping...";
+          }
+
+          fetch("/api/stop-run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ caseId: caseId, origin: "scheduled" }),
+          })
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (data) {
+              if (data.error) {
+                alert("Error stopping auto extraction: " + data.error);
+                if (resetBtn) {
+                  resetBtn.disabled = false;
+                  resetBtn.textContent = "Stop Auto Extraction";
+                }
+              } else {
+                // Success — reset UI back to default state
+                if (resultDiv) {
+                  resultDiv.className = "result result-placeholder";
+                  resultDiv.innerHTML =
+                    '<span class="result-placeholder-text">Select at least one brand or purchaser in the filter above, then click Run.</span>';
+                }
+                if (resetBtn) {
+                  resetBtn.disabled = false;
+                  resetBtn.textContent = "Reset";
+                  resetBtn.classList.remove("stop-btn");
+                  resetBtn.onclick = function () {
+                    resetCase(resultDiv);
+                  };
+                }
+                var runBtn = caseRow
+                  ? caseRow.querySelector("button.run")
+                  : null;
+                if (runBtn) runBtn.disabled = false;
+                setOtherRowsActive();
+              }
+            })
+            .catch(function (e) {
+              alert("Network error: " + e.message);
+              if (resetBtn) {
+                resetBtn.disabled = false;
+                resetBtn.textContent = "Stop Auto Extraction";
+              }
+            });
+        }
+      };
     </script>
   </body>
 </html>
