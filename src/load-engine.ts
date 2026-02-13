@@ -451,6 +451,14 @@ export async function runExtraction(
             : attempts > 1
               ? `${baseErrorSnippet} (after ${attempts} attempt${attempts === 1 ? "" : "s"})`
               : baseErrorSnippet;
+        let patternKey: string | undefined;
+        if (result.success && result.body) {
+          try {
+            const parsed = JSON.parse(result.body);
+            patternKey = parsed.pattern?.pattern_key;
+          } catch (_) {}
+        }
+
         upsertCheckpoint(db, {
           filePath: job.filePath,
           relativePath: job.relativePath,
@@ -461,6 +469,7 @@ export async function runExtraction(
           latencyMs: result.latencyMs,
           statusCode: result.statusCode,
           errorMessage,
+          patternKey,
           runId: runIdToUse,
         });
       })

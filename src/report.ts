@@ -396,17 +396,17 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   const topSlowestRows = m.topSlowestFiles
     .map(
       (e) =>
-        `<tr><td class="file-path">${escapeHtml(e.filePath)}</td><td>${e.latencyMs.toFixed(0)}</td></tr>`,
+        `<tr><td class="file-path">${escapeHtml(e.filePath)}</td><td>${e.latencyMs.toFixed(0)}</td><td>${escapeHtml(e.patternKey ?? "—")}</td></tr>`,
     )
     .join("");
   const topSlowestSection =
     m.topSlowestFiles.length > 0
       ? `
-  <h3>Top ${m.topSlowestFiles.length} slowest files (by processing time)</h3>
-  <table>
-    <tr><th>File</th><th>Latency (ms)</th></tr>
-    ${topSlowestRows}
-  </table>`
+<h3>Top ${m.topSlowestFiles.length} slowest files (by processing time)</h3>
+<table>
+  <tr><th>File</th><th>Latency (ms)</th><th>Pattern Key</th></tr>
+  ${topSlowestRows}
+</table>`
       : "";
 
   const failuresByBrandRows = m.failureCountByBrand

@@ -20,6 +20,7 @@ interface CheckpointRow {
   latency_ms: number | null;
   status_code: number | null;
   error_message: string | null;
+  pattern_key: string | null;
   run_id: string;
 }
 
@@ -67,6 +68,7 @@ function rowToRecord(r: CheckpointRow): CheckpointRecord {
     latencyMs: r.latency_ms ?? undefined,
     statusCode: r.status_code ?? undefined,
     errorMessage: r.error_message ?? undefined,
+    patternKey: r.pattern_key ?? undefined,
     runId: r.run_id,
   };
 }
@@ -82,6 +84,7 @@ function recordToRow(record: CheckpointRecord): CheckpointRow {
     latency_ms: record.latencyMs ?? null,
     status_code: record.statusCode ?? null,
     error_message: record.errorMessage ?? null,
+    pattern_key: record.patternKey ?? null,
     run_id: record.runId,
   };
 }

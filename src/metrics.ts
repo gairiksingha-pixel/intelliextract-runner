@@ -47,7 +47,11 @@ function computeTopSlowestFiles(
     .filter((r) => typeof r.latencyMs === "number" && r.latencyMs >= 0)
     .sort((a, b) => (b.latencyMs ?? 0) - (a.latencyMs ?? 0))
     .slice(0, TOP_SLOWEST_N)
-    .map((r) => ({ filePath: r.filePath, latencyMs: r.latencyMs! }));
+    .map((r) => ({
+      filePath: r.filePath,
+      latencyMs: r.latencyMs!,
+      patternKey: r.patternKey,
+    }));
 }
 
 function computeFailureCountByBrand(

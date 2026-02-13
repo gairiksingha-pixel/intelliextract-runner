@@ -76,6 +76,7 @@ export interface CheckpointRecord {
   latencyMs?: number;
   statusCode?: number;
   errorMessage?: string;
+  patternKey?: string;
   runId: string;
 }
 
@@ -132,7 +133,11 @@ export interface RunMetrics {
   /** Failure counts by error type (only when failed > 0). */
   failureBreakdown: FailureBreakdown;
   /** Top 5 slowest files by processing time (from completed requests). */
-  topSlowestFiles: { filePath: string; latencyMs: number }[];
+  topSlowestFiles: {
+    filePath: string;
+    latencyMs: number;
+    patternKey?: string;
+  }[];
   /** Failure count per brand (only brands with at least one failure). */
   failureCountByBrand: { brand: string; count: number }[];
   /** Per-failure API status and message (for debugging 4xx/5xx). */

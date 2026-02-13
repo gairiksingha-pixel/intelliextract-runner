@@ -402,9 +402,9 @@
         background: var(--header-bg);
       }
       .limits-col {
-        width: 126.65px;
-        min-width: 126.65px;
-        max-width: 126.65px;
+        width: 156.35px;
+        min-width: 156.35px;
+        max-width: 156.35px;
       }
       .limits-cell {
         font-size: 0.85rem;
@@ -414,7 +414,7 @@
       }
       .limits-cell .limit-row {
         display: grid;
-        grid-template-columns: auto 40.8px;
+        grid-template-columns: auto 70.5px;
         gap: 0.425rem 0.637rem;
         align-items: center;
         min-height: 1.87rem;
@@ -424,10 +424,10 @@
         font-weight: 500;
       }
       .limits-cell input[type="number"] {
-        width: 40.8px;
-        min-width: 40.8px;
-        max-width: 40.8px;
-        height: 25.5px;
+        width: 70.5px;
+        min-width: 70.5px;
+        max-width: 70.5px;
+        height: 28.05px;
         padding: 0.34rem 0.425rem;
         border: 0.85px solid var(--border);
         border-radius: var(--radius-sm);
@@ -442,6 +442,10 @@
         transition:
           border-color 0.15s ease,
           box-shadow 0.15s ease;
+      }
+      .limits-cell input[type="number"]::-webkit-inner-spin-button,
+      .limits-cell input[type="number"]::-webkit-outer-spin-button {
+        opacity: 1;
       }
       .limits-cell input[type="number"]:hover:not(:disabled) {
         border-color: var(--border-light);
