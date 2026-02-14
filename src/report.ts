@@ -218,17 +218,24 @@ export function loadHistoricalRunSummaries(
   const db = openCheckpointDb(config.run.checkpointPath);
   const runIds = getAllRunIdsOrdered(db);
 
-  const out: HistoricalRunSummary[] = [];
+  // 1. Collect raw data for all runs
+  const rawSummaries: Array<{
+    runId: string;
+    records: any[];
+    start: Date;
+    end: Date;
+    brand?: string;
+    purchaser?: string;
+    results: ExtractionResultEntry[];
+  }> = [];
 
   for (const runId of runIds) {
     const records = getRecordsForRun(db, runId);
     if (records.length === 0) continue;
 
     const { start, end } = minMaxDatesFromRecords(records);
-    const metrics = computeMetrics(runId, records, start, end);
 
-    // Derive brand and purchaser for this run from checkpoint records.
-    // Structure: stagingDir/<brand>/<purchaser>/<key after prefix>.
+    // Find brand and purchaser
     const brandSet = new Set<string>();
     const purchaserSet = new Set<string>();
     for (const r of records) {
@@ -244,26 +251,140 @@ export function loadHistoricalRunSummaries(
     const purchaser = purchasers.length === 1 ? purchasers[0] : undefined;
 
     const allResults = loadExtractionResults(config, runId);
-    const extractionResults = filterExtractionResultsForRun(
-      config,
-      runId,
-      allResults,
-    );
+    const results = filterExtractionResultsForRun(config, runId, allResults);
 
-    const runDurationSeconds = (end.getTime() - start.getTime()) / 1000;
-
-    out.push({
+    rawSummaries.push({
       runId,
-      metrics,
-      extractionResults,
-      runDurationSeconds,
+      records,
+      start,
+      end,
       brand,
       purchaser,
+      results,
     });
   }
-
   closeCheckpointDb(db);
-  return out;
+
+  // 2. Group by Brand + Purchaser
+  const groups = new Map<string, typeof rawSummaries>();
+  for (const s of rawSummaries) {
+    const key = (s.brand || "") + "|" + (s.purchaser || "");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(s);
+  }
+
+  const out: HistoricalRunSummary[] = [];
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+  // 3. Cluster by time and Merge
+  for (const [, groupItems] of groups) {
+    // Sort by start time just in case
+    groupItems.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    const clusters: Array<typeof groupItems> = [];
+    if (groupItems.length > 0) {
+      let currentCluster = [groupItems[0]];
+      for (let i = 1; i < groupItems.length; i++) {
+        const prev = groupItems[i - 1];
+        const curr = groupItems[i];
+        // Merge if gap between rounds is <= 2 hours
+        if (curr.start.getTime() - prev.end.getTime() <= TWO_HOURS_MS) {
+          currentCluster.push(curr);
+        } else {
+          clusters.push(currentCluster);
+          currentCluster = [curr];
+        }
+      }
+      clusters.push(currentCluster);
+    }
+
+    for (const cluster of clusters) {
+      const latestRun = cluster[cluster.length - 1];
+      const allRecordsPooled = cluster.flatMap((c) => c.records);
+      const allResultsPooled = cluster.flatMap((c) => c.results);
+
+      // Dedupe records by filePath.
+      // Priority: done > error > skipped. Within same status, latest wins.
+      const statusPriority = {
+        done: 3,
+        error: 2,
+        skipped: 1,
+        pending: 0,
+        running: 0,
+      };
+      const recordMap = new Map<string, any>();
+      for (const r of allRecordsPooled) {
+        const existing = recordMap.get(r.filePath);
+        if (!existing) {
+          recordMap.set(r.filePath, r);
+          continue;
+        }
+        const pExisting =
+          statusPriority[existing.status as keyof typeof statusPriority] ?? 0;
+        const pCurr =
+          statusPriority[r.status as keyof typeof statusPriority] ?? 0;
+        if (pCurr > pExisting) {
+          recordMap.set(r.filePath, r);
+        } else if (pCurr === pExisting) {
+          const tExisting = new Date(
+            existing.finishedAt || existing.startedAt || 0,
+          ).getTime();
+          const tCurr = new Date(r.finishedAt || r.startedAt || 0).getTime();
+          if (tCurr >= tExisting) {
+            recordMap.set(r.filePath, r);
+          }
+        }
+      }
+      const dedupedRecords = Array.from(recordMap.values());
+
+      // Dedupe results by filename. Keep latest (latest cluster member)
+      const resultsMap = new Map<string, ExtractionResultEntry>();
+      for (const res of allResultsPooled) {
+        const existing = resultsMap.get(res.filename);
+        if (!existing || res.extractionSuccess) {
+          resultsMap.set(res.filename, res);
+        }
+      }
+      const dedupedResults = Array.from(resultsMap.values());
+
+      const clusterStart = new Date(
+        Math.min(...cluster.map((c) => c.start.getTime())),
+      );
+      const clusterEnd = new Date(
+        Math.max(...cluster.map((c) => c.end.getTime())),
+      );
+
+      // Recompute metrics for the whole cluster using deduped records
+      const metrics = computeMetrics(
+        latestRun.runId,
+        dedupedRecords,
+        clusterStart,
+        clusterEnd,
+      );
+
+      // Fix for the title: the user wants the latest timestamp for the accordion title.
+      metrics.startedAt = latestRun.start.toISOString();
+
+      const runDurationSeconds =
+        (clusterEnd.getTime() - clusterStart.getTime()) / 1000;
+
+      out.push({
+        runId: latestRun.runId,
+        metrics,
+        extractionResults: dedupedResults,
+        runDurationSeconds,
+        brand: latestRun.brand,
+        purchaser: latestRun.purchaser,
+      });
+    }
+  }
+
+  // Final sort by start time descending (newest groups first)
+  return out.sort(
+    (a, b) =>
+      new Date(b.metrics.startedAt).getTime() -
+      new Date(a.metrics.startedAt).getTime(),
+  );
 }
 
 function formatDuration(ms: number): string {
