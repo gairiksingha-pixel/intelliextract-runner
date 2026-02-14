@@ -3695,11 +3695,17 @@
             which === "brand" ? "Select brand" : "Select purchaser";
           trigger.title = defaultTitle;
         } else if (selected.length === 1) {
-          trigger.textContent = formatBrandName(selected[0]);
-          trigger.title = formatBrandName(selected[0]);
+          var label =
+            which === "brand"
+              ? formatBrandName(selected[0])
+              : formatPurchaserName(selected[0]);
+          trigger.textContent = label;
+          trigger.title = label;
         } else {
           trigger.textContent = selected.length + " selected";
-          trigger.title = selected.map(formatBrandName).join(", ");
+          var formatter =
+            which === "brand" ? formatBrandName : formatPurchaserName;
+          trigger.title = selected.map(formatter).join(", ");
         }
         clearValidationAlertWhenFilterSelected();
         clearResumeStateFromAllRows();
