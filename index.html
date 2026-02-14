@@ -979,15 +979,27 @@
       }
       .schedule-list {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         font-size: 0.8rem;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        border: 0.85px solid var(--border-light);
       }
       .schedule-list th,
       .schedule-list td {
         padding: 0.34rem 0.51rem;
-        border: 0.85px solid var(--border-light);
+        border-bottom: 0.85px solid var(--border-light);
+        border-right: 0.85px solid var(--border-light);
         text-align: left;
         vertical-align: top;
+      }
+      .schedule-list tr:last-child td {
+        border-bottom: none;
+      }
+      .schedule-list tr th:last-child,
+      .schedule-list tr td:last-child {
+        border-right: none;
       }
       .schedule-outcome-skipped {
         display: inline-block;
@@ -2649,7 +2661,7 @@
         if (!container) return;
         var syncBtn = document.createElement("button");
         syncBtn.className = "download-sync-report-btn";
-        syncBtn.textContent = "Staging Report";
+        syncBtn.textContent = "Staging Inventory";
         syncBtn.type = "button";
         syncBtn.title = "Download staging report (files in staging)";
         syncBtn.onclick = function () {
@@ -2669,9 +2681,20 @@
           };
           container.appendChild(b);
         }
-        addReportBtn("Summary Report", "html");
-        addReportBtn("Extraction Results", "json");
+        addReportBtn("Run Summary", "html");
+        addReportBtn("Download Data", "json");
       })();
+
+      function getTimestampForFilename() {
+        var now = new Date();
+        var year = now.getFullYear();
+        var month = String(now.getMonth() + 1).padStart(2, "0");
+        var day = String(now.getDate()).padStart(2, "0");
+        var h = String(now.getHours()).padStart(2, "0");
+        var m = String(now.getMinutes()).padStart(2, "0");
+        var s = String(now.getSeconds()).padStart(2, "0");
+        return year + month + day + "-" + h + m + "-" + s;
+      }
 
       (function initScheduleButton() {
         var bar = document.getElementById("download-bar");
@@ -2713,7 +2736,8 @@
           .then(function (blob) {
             var a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "sync-report.html";
+            a.download =
+              "Staging-Inventory-" + getTimestampForFilename() + ".html";
             a.click();
             URL.revokeObjectURL(a.href);
           })
@@ -2736,7 +2760,7 @@
           .then(function (blob) {
             var a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "extractions.zip";
+            a.download = "Download-Data-" + getTimestampForFilename() + ".zip";
             a.click();
             URL.revokeObjectURL(a.href);
           })
@@ -2770,13 +2794,32 @@
             var filename = latest.name;
             var url =
               "/api/reports/" + format + "/" + encodeURIComponent(filename);
-            var a = document.createElement("a");
-            a.href = url;
-            a.download = filename;
-            a.style.display = "none";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+
+            fetch(url)
+              .then(function (resp) {
+                if (!resp.ok) throw new Error("Failed to fetch report file");
+                return resp.blob();
+              })
+              .then(function (blob) {
+                var a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                if (format === "html") {
+                  a.download =
+                    "Run-Summary-" + getTimestampForFilename() + ".html";
+                } else {
+                  a.download = filename;
+                }
+                a.style.display = "none";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+                if (btn) btn.disabled = false;
+              })
+              .catch(function (err) {
+                alert("Download failed: " + err.message);
+                if (btn) btn.disabled = false;
+              });
           })
           .catch(function (err) {
             alert(
@@ -2793,17 +2836,36 @@
 
       var BRAND_PURCHASERS = {};
       var ALL_PURCHASERS = [];
+      function formatBrandName(brandId) {
+        if (!brandId) return "";
+        if (brandId.includes("no-cow")) return "No Cow";
+        if (brandId.includes("sundia")) return "Sundia";
+        if (brandId.includes("tractor-beverage")) return "Tractor";
+        return brandId;
+      }
+
+      function formatPurchaserName(purchaserId) {
+        if (!purchaserId) return "";
+        if (purchaserId.includes("8c03bc63-a173-49d2-9ef4-d3f4c540fae8"))
+          return "Temp 1";
+        if (purchaserId.includes("a451e439-c9d1-41c5-b107-868b65b596b8"))
+          return "Temp 2";
+        return purchaserId;
+      }
+
       function renderBrandOptions() {
         var panel = document.getElementById("brand-dropdown-panel");
         if (!panel) return;
-        var brands = Object.keys(BRAND_PURCHASERS);
+        var brands = Object.keys(BRAND_PURCHASERS).sort(function (a, b) {
+          return formatBrandName(a).localeCompare(formatBrandName(b));
+        });
         panel.innerHTML = brands
           .map(function (b) {
             return (
               '<label class="filter-dropdown-option"><input type="checkbox" value="' +
-              b +
+              escapeHtml(b) +
               '"> ' +
-              b +
+              escapeHtml(formatBrandName(b)) +
               "</label>"
             );
           })
@@ -2856,6 +2918,9 @@
                 });
                 return Array.from(set).sort();
               })();
+        opts.sort(function (a, b) {
+          return formatPurchaserName(a).localeCompare(formatPurchaserName(b));
+        });
         var currentChecked = getSelectedPurchasers();
         panel.innerHTML = opts
           .map(function (p) {
@@ -2866,7 +2931,7 @@
               '"' +
               checked +
               "> " +
-              p +
+              escapeHtml(formatPurchaserName(p)) +
               "</label>"
             );
           })
@@ -2903,6 +2968,47 @@
         loadSchedulesIntoModal();
       }
 
+      function getOrdinalSuffix(day) {
+        if (day > 3 && day < 21) return "th";
+        switch (day % 10) {
+          case 1:
+            return "st";
+          case 2:
+            return "nd";
+          case 3:
+            return "rd";
+          default:
+            return "th";
+        }
+      }
+
+      function formatDateWithSuffix(dateStr) {
+        if (!dateStr) return "";
+        var date = new Date(dateStr);
+        var day = date.getDate();
+        var month = date.toLocaleString("default", { month: "short" });
+        var year = date.getFullYear();
+        return day + getOrdinalSuffix(day) + " " + month + " " + year;
+      }
+
+      function formatCronWithTime(cron) {
+        if (!cron) return "";
+        var parts = cron.trim().split(" ");
+        if (parts.length >= 2) {
+          var m = parseInt(parts[0], 10);
+          var h = parseInt(parts[1], 10);
+          if (!isNaN(m) && !isNaN(h)) {
+            var displayHour = ((h + 11) % 12) + 1;
+            var ampm = h < 12 ? "AM" : "PM";
+            var minLabel = String(m).padStart(2, "0");
+            return (
+              cron + " (" + displayHour + ":" + minLabel + " " + ampm + ")"
+            );
+          }
+        }
+        return cron;
+      }
+
       function renderScheduleListView(state) {
         var body = document.getElementById("schedule-modal-body");
         if (!body) return;
@@ -2910,7 +3016,7 @@
           state && Array.isArray(state.schedules) ? state.schedules : [];
         var tz = state && Array.isArray(state.timezones) ? state.timezones : [];
         var html =
-          '<div class="schedule-header-row"><div>Manage scheduled sync &amp; extraction jobs.</div><div style="display:flex;gap:0.51rem;flex-wrap:wrap;"><button type="button" id="schedule-history-btn" class="btn-secondary">History</button><button type="button" id="schedule-reports-btn" class="btn-secondary">Reports</button><button type="button" id="schedule-create-btn" class="download-report-btn download-report-schedule-btn">Create a Schedule</button></div></div><div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
+          '<div class="schedule-header-row"><div>Manage scheduled sync &amp; extraction jobs.</div><div style="display:flex;gap:0.51rem;flex-wrap:wrap;"><button type="button" id="schedule-history-btn" class="btn-secondary">Execution History</button><button type="button" id="schedule-create-btn" class="download-report-btn download-report-schedule-btn">Create a Schedule</button></div></div><div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
         if (!schedules.length) {
           html +=
             '<div class="schedule-empty">No schedules created. Please create a schedule.</div>';
@@ -2919,10 +3025,12 @@
             '<div style="flex:1;overflow-y:auto;"><table class="schedule-list"><thead><tr><th>Brand</th><th>Purchaser</th><th>Time (cron)</th><th>Timezone</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
           schedules.forEach(function (s) {
             var brands =
-              s.brands && s.brands.length ? s.brands.join(", ") : "All";
+              s.brands && s.brands.length
+                ? s.brands.map(formatBrandName).join(", ")
+                : "All";
             var purchasers =
               s.purchasers && s.purchasers.length
-                ? s.purchasers.join(", ")
+                ? s.purchasers.map(formatPurchaserName).join(", ")
                 : "All";
             html +=
               "<tr data-sched-id='" +
@@ -2932,11 +3040,11 @@
               "</td><td>" +
               escapeHtml(purchasers) +
               "</td><td>" +
-              escapeHtml(s.cron) +
+              escapeHtml(formatCronWithTime(s.cron)) +
               "</td><td>" +
               escapeHtml(s.timezone) +
               "</td><td>" +
-              escapeHtml(s.createdAt || "") +
+              escapeHtml(formatDateWithSuffix(s.createdAt || "")) +
               '</td><td><div style="display:flex;flex-wrap:wrap;gap:0.51rem;">' +
               '<button type="button" class="btn-secondary" data-sched-edit>Edit</button>' +
               '<button type="button" class="btn-secondary" data-sched-delete>Delete</button>' +
@@ -2958,12 +3066,7 @@
             renderScheduleRunHistoryView();
           };
         }
-        var reportsBtn = document.getElementById("schedule-reports-btn");
-        if (reportsBtn) {
-          reportsBtn.onclick = function () {
-            renderReportsHistoryView();
-          };
-        }
+
         body.querySelectorAll("[data-sched-edit]").forEach(function (btn) {
           btn.addEventListener("click", function () {
             var tr = btn.closest("tr");
@@ -3021,7 +3124,10 @@
           trigger.textContent =
             type === "brand" ? "Select brand" : "Select purchaser";
         } else if (selected.length === 1) {
-          trigger.textContent = selected[0];
+          trigger.textContent =
+            type === "brand"
+              ? formatBrandName(selected[0])
+              : formatPurchaserName(selected[0]);
         } else {
           trigger.textContent = selected.length + " selected";
         }
@@ -3079,7 +3185,7 @@
               '<label class="filter-dropdown-option"><input type="checkbox" value="' +
               escapeHtml(b) +
               '"> ' +
-              escapeHtml(b) +
+              escapeHtml(formatBrandName(b)) +
               "</label>"
             );
           })
@@ -3287,20 +3393,30 @@
               html +=
                 '<table class="schedule-list"><thead><tr><th>Time</th><th>Schedule ID</th><th>Outcome</th><th>Message</th></tr></thead><tbody>';
               entries.forEach(function (e) {
-                var time = e.timestamp ? new Date(e.timestamp).toLocaleString() : "";
-                var schedId = e.scheduleId != null ? String(e.scheduleId).slice(0, 20) : "";
+                var time = e.timestamp
+                  ? new Date(e.timestamp).toLocaleString()
+                  : "";
+                var schedId =
+                  e.scheduleId != null ? String(e.scheduleId).slice(0, 20) : "";
                 var outcome = (e.outcome || "executed").toLowerCase();
-                var outcomeLabel = outcome === "skipped" ? "Skipped" : "Executed";
-                var outcomeClass = outcome === "skipped" ? "schedule-outcome-skipped" : "schedule-outcome-executed";
-                var msg = (e.message || "") + (e.error ? " — " + e.error : "") + (e.exitCode != null ? " (exit " + e.exitCode + ")" : "");
+                var outcomeLabel =
+                  outcome === "skipped" ? "Skipped" : "Executed";
+                var outcomeClass =
+                  outcome === "skipped"
+                    ? "schedule-outcome-skipped"
+                    : "schedule-outcome-executed";
+                var msg =
+                  (e.message || "") +
+                  (e.error ? " — " + e.error : "") +
+                  (e.exitCode != null ? " (exit " + e.exitCode + ")" : "");
                 html +=
                   "<tr><td>" +
                   escapeHtml(time) +
                   "</td><td>" +
                   escapeHtml(schedId) +
-                  "</td><td><span class=\"" +
+                  '</td><td><span class="' +
                   outcomeClass +
-                  "\">" +
+                  '">' +
                   escapeHtml(outcomeLabel) +
                   "</span></td><td>" +
                   escapeHtml(msg) +
@@ -3321,128 +3437,6 @@
             body.innerHTML =
               '<div class="schedule-header-row"><div>Schedule run history</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load schedule log.</div>';
             backBtn = document.getElementById("schedule-log-back-btn");
-            if (backBtn) {
-              backBtn.onclick = function () {
-                loadSchedulesIntoModal();
-              };
-            }
-          });
-      }
-
-      function renderReportsHistoryView() {
-        var body = document.getElementById("schedule-modal-body");
-        if (!body) return;
-        fetch("/api/reports")
-          .then(function (r) {
-            if (!r.ok) throw new Error("Could not load reports");
-            return r.json();
-          })
-          .then(function (list) {
-            var html =
-              '<div class="schedule-header-row">' +
-              '<div style="display:flex;gap:0.51rem;flex-wrap:wrap;">' +
-              '<button type="button" id="history-latest-summary" class="download-report-btn download-report-html-btn">Latest summary (HTML)</button>' +
-              '<button type="button" id="history-extractions-zip" class="download-report-btn download-report-json-btn">Latest extractions ZIP</button>' +
-              "</div>" +
-              '<button type="button" id="history-back-btn" class="btn-secondary">Back to Schedules</button>' +
-              "</div>" +
-              '<div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
-            var runMap = {};
-            function extractRunId(filename) {
-              var match = filename.match(/^report_(.+?)_\d+\.(html|json)$/);
-              return match ? match[1] : null;
-            }
-            (list.html || []).forEach(function (r) {
-              var runId = extractRunId(r.name);
-              if (runId) {
-                if (
-                  !runMap[runId] ||
-                  (r.mtime || 0) < (runMap[runId].mtime || 0)
-                ) {
-                  runMap[runId] = {
-                    runId: runId,
-                    mtime: r.mtime || 0,
-                    htmlName: r.name,
-                    jsonName: null,
-                  };
-                } else if (runMap[runId]) {
-                  runMap[runId].htmlName = r.name;
-                  if ((r.mtime || 0) < (runMap[runId].mtime || 0)) {
-                    runMap[runId].mtime = r.mtime || 0;
-                  }
-                }
-              }
-            });
-            (list.json || []).forEach(function (r) {
-              var runId = extractRunId(r.name);
-              if (runId) {
-                if (!runMap[runId]) {
-                  runMap[runId] = {
-                    runId: runId,
-                    mtime: r.mtime || 0,
-                    htmlName: null,
-                    jsonName: r.name,
-                  };
-                } else {
-                  runMap[runId].jsonName = r.name;
-                  if ((r.mtime || 0) < (runMap[runId].mtime || 0)) {
-                    runMap[runId].mtime = r.mtime || 0;
-                  }
-                }
-              }
-            });
-            var items = Object.values(runMap);
-            items.sort(function (a, b) {
-              return (b.mtime || 0) - (a.mtime || 0);
-            });
-            if (!items.length) {
-              html +=
-                '<div class="schedule-empty">No reports available yet. Run or schedule an extraction to generate reports.</div>';
-            } else {
-              html +=
-                '<div style="flex:1;overflow-y:auto;"><table class="schedule-list"><thead><tr><th>Run ID</th><th>Executed At</th></tr></thead><tbody>';
-              items.forEach(function (it) {
-                var dateLabel = it.mtime
-                  ? new Date(it.mtime).toLocaleString()
-                  : "";
-                html +=
-                  "<tr><td>" +
-                  escapeHtml(it.runId) +
-                  "</td><td>" +
-                  escapeHtml(dateLabel) +
-                  "</td></tr>";
-              });
-              html += "</tbody></table></div>";
-            }
-            html += "</div>";
-            body.innerHTML = html;
-            var backBtn = document.getElementById("history-back-btn");
-            if (backBtn) {
-              backBtn.onclick = function () {
-                loadSchedulesIntoModal();
-              };
-            }
-            var latestSummaryBtn = document.getElementById(
-              "history-latest-summary",
-            );
-            if (latestSummaryBtn) {
-              latestSummaryBtn.onclick = function () {
-                downloadLatestReport(latestSummaryBtn, "html");
-              };
-            }
-            var extractionsZipBtn = document.getElementById(
-              "history-extractions-zip",
-            );
-            if (extractionsZipBtn) {
-              extractionsZipBtn.onclick = function () {
-                downloadExtractionsZip(extractionsZipBtn);
-              };
-            }
-          })
-          .catch(function () {
-            body.innerHTML =
-              '<div class="schedule-header-row"><div>Reports history</div><button type="button" id="history-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load reports.</div>';
-            var backBtn = document.getElementById("history-back-btn");
             if (backBtn) {
               backBtn.onclick = function () {
                 loadSchedulesIntoModal();
@@ -3585,11 +3579,11 @@
             which === "brand" ? "Select brand" : "Select purchaser";
           trigger.title = defaultTitle;
         } else if (selected.length === 1) {
-          trigger.textContent = selected[0];
-          trigger.title = selected[0];
+          trigger.textContent = formatBrandName(selected[0]);
+          trigger.title = formatBrandName(selected[0]);
         } else {
           trigger.textContent = selected.length + " selected";
-          trigger.title = selected.join(", ");
+          trigger.title = selected.map(formatBrandName).join(", ");
         }
         clearValidationAlertWhenFilterSelected();
         clearResumeStateFromAllRows();

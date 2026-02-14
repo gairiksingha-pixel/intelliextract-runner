@@ -133,10 +133,9 @@ function filterExtractionResultsForRun(
 ): ExtractionResultEntry[] {
   const db = openCheckpointDb(config.run.checkpointPath);
 
-  // Include ALL successful files from any run + all files from current run
-  // This ensures resumed runs show complete history, not just newly processed files
+  // FIXED: Only include files from the current run to ensure metrics match execution
   const relevantRecords = db._data.checkpoints.filter(
-    (r) => r.status === "done" || r.run_id === runId,
+    (r) => r.run_id === runId,
   );
 
   closeCheckpointDb(db);
@@ -271,7 +270,7 @@ function dayOrdinal(day: number): string {
 /** Human-readable date and time for a run (e.g. "Feb-2nd-2026 09:32-AM") for accordion labels. */
 function formatRunDateTime(iso: string): string {
   const d = new Date(iso);
-  const month = MONTH_NAMES[d.getMonth()];
+  const month = MONTH_NAMES[d.getMonth()].toUpperCase();
   const day = d.getDate();
   const year = d.getFullYear();
   const hours24 = d.getHours();
@@ -279,7 +278,26 @@ function formatRunDateTime(iso: string): string {
   const h = String(hours12).padStart(2, "0");
   const min = String(d.getMinutes()).padStart(2, "0");
   const ampm = hours24 < 12 ? "AM" : "PM";
-  return `${month}-${dayOrdinal(day)}-${year} ${h}:${min}-${ampm}`;
+  // Format: FEB-14-2026-12:19:PM
+  return `${month}-${day}-${year}-${h}:${min}:${ampm}`;
+}
+
+function formatBrandDisplayName(brandId?: string): string {
+  if (!brandId) return "";
+  if (brandId.includes("no-cow")) return "No Cow";
+  if (brandId.includes("sundia")) return "Sundia";
+  if (brandId.includes("tractor-beverage")) return "Tractor";
+  if (brandId.includes("tractor-beverage")) return "Tractor";
+  return brandId;
+}
+
+function formatPurchaserDisplayName(purchaserId?: string): string {
+  if (!purchaserId) return "";
+  if (purchaserId.includes("8c03bc63-a173-49d2-9ef4-d3f4c540fae8"))
+    return "Temp 1";
+  if (purchaserId.includes("a451e439-c9d1-41c5-b107-868b65b596b8"))
+    return "Temp 2";
+  return purchaserId;
 }
 
 export function buildSummary(metrics: RunMetrics): ExecutiveSummary {
@@ -414,7 +432,10 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       : "";
 
   const failuresByBrandRows = m.failureCountByBrand
-    .map((e) => `<tr><td>${escapeHtml(e.brand)}</td><td>${e.count}</td></tr>`)
+    .map(
+      (e) =>
+        `<tr><td>${escapeHtml(formatBrandDisplayName(e.brand))}</td><td>${e.count}</td></tr>`,
+    )
     .join("");
   const failuresByBrandSection =
     m.failureCountByBrand.length > 0
@@ -436,9 +457,9 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   if (m.failureCountByBrand.length > 0) {
     const topBrand = m.failureCountByBrand[0];
     agentSummaryPoints.push(
-      `Most failures are for brand "${topBrand.brand}" (${topBrand.count} failed file${
-        topBrand.count === 1 ? "" : "s"
-      }).`,
+      `Most failures are for brand "${formatBrandDisplayName(topBrand.brand)}" (${
+        topBrand.count
+      } failed file${topBrand.count === 1 ? "" : "s"}).`,
     );
   }
   const highLatency = m.anomalies.filter((a) => a.type === "high_latency");
@@ -464,11 +485,19 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   const runLabel = formatRunDateTime(m.startedAt);
   let prefix = "";
   if (entry.brand && entry.purchaser) {
-    prefix = `${entry.brand}-${entry.purchaser}-`;
+    const b = formatBrandDisplayName(entry.brand).toUpperCase();
+    const p = formatPurchaserDisplayName(entry.purchaser)
+      .toUpperCase()
+      .replace(/_/g, "-");
+    prefix = `[${b}]-${p}-`;
   } else if (entry.brand) {
-    prefix = `${entry.brand}-`;
+    const b = formatBrandDisplayName(entry.brand).toUpperCase();
+    prefix = `[${b}]-`;
   } else if (entry.purchaser) {
-    prefix = `${entry.purchaser}-`;
+    const p = formatPurchaserDisplayName(entry.purchaser)
+      .toUpperCase()
+      .replace(/_/g, "-");
+    prefix = `${p}-`;
   }
   const labelWithPrefix = `${prefix}${runLabel}`;
   return `
@@ -478,7 +507,8 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   <h3>Overview</h3>
   <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Total files</td><td>${m.totalFiles}</td></tr>
+    <tr><td>Total synced files</td><td>${m.totalFiles}</td></tr>
+    <tr><td>Total extracted files</td><td>${displaySuccess + displayApiFailed}</td></tr>
     <tr><td>Successful Response (Success: true)</td><td>${displaySuccess}</td></tr>
     <tr><td>Successful Response (Success: false)</td><td>${displayApiFailed}</td></tr>
     <tr><td>Failure</td><td>${displayInfraFailed}</td></tr>
@@ -534,8 +564,11 @@ function htmlReportFromHistory(
 <head>
   <meta charset="UTF-8">
   <title>${escapeHtml(REPORT_TITLE)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    body { font-family: 'Ubuntu', sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
     table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
     th { background: #f5f5f5; }
