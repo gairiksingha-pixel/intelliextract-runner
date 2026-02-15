@@ -49,6 +49,44 @@
       * {
         box-sizing: border-box;
       }
+      /* Universal Button Sliding & Hover Effects */
+      button:not(:disabled):not(.modal-close-icon):not(
+          .filter-dropdown-trigger
+        ) {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      button:not(:disabled):not(.modal-close-icon):not(
+          .filter-dropdown-trigger
+        )::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -150%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.4),
+          rgba(45, 157, 95, 0.15),
+          rgba(255, 255, 255, 0.4),
+          transparent
+        );
+        transform: skewX(-20deg);
+        z-index: 10;
+        pointer-events: none;
+      }
+      button:not(:disabled):not(.modal-close-icon):not(
+          .filter-dropdown-trigger
+        ):hover::after {
+        left: 150%;
+        transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      button:active:not(:disabled) {
+        transform: scale(0.97);
+      }
       html,
       body {
         height: 100%;
@@ -1015,6 +1053,39 @@
         animation: modalScaleDown 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)
           forwards;
       }
+      @keyframes slideInRight {
+        from {
+          opacity: 0;
+          transform: translateX(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      @keyframes slideInLeft {
+        from {
+          opacity: 0;
+          transform: translateX(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      .modal-screen-animate {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .modal-screen-animate.slide-right {
+        animation: slideInRight 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+      }
+      .modal-screen-animate.slide-left {
+        animation: slideInLeft 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+      }
       .modal-header {
         display: flex;
         align-items: center;
@@ -1042,7 +1113,7 @@
       }
       .modal-body {
         flex: 1;
-        overflow-y: auto;
+        overflow: hidden;
         font-size: 0.85rem;
         color: var(--text-secondary);
         display: flex;
@@ -3193,6 +3264,17 @@
         }
       }
 
+      function renderWithTransition(body, html, direction) {
+        if (!body) return;
+        var dirClass = direction === "left" ? "slide-left" : "slide-right";
+        body.innerHTML =
+          '<div class="modal-screen-animate ' +
+          dirClass +
+          '">' +
+          html +
+          "</div>";
+      }
+
       function formatDateWithSuffix(dateStr) {
         if (!dateStr) return "";
         var date = new Date(dateStr);
@@ -3239,7 +3321,7 @@
         return cron;
       }
 
-      function renderScheduleListView(state) {
+      function renderScheduleListView(state, direction) {
         var body = document.getElementById("schedule-modal-body");
         if (!body) return;
         var schedules =
@@ -3285,17 +3367,17 @@
         html += "</div>";
         html +=
           '<div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>';
-        body.innerHTML = html;
+        renderWithTransition(body, html, direction);
         var createBtn = document.getElementById("schedule-create-btn");
         if (createBtn) {
           createBtn.onclick = function () {
-            renderScheduleCreateForm(tz);
+            renderScheduleCreateForm(tz, null, "right");
           };
         }
         var historyBtn = document.getElementById("schedule-history-btn");
         if (historyBtn) {
           historyBtn.onclick = function () {
-            renderScheduleRunHistoryView();
+            renderScheduleRunHistoryView("right");
           };
         }
 
@@ -3308,7 +3390,7 @@
               return s.id === id;
             });
             if (!sched) return;
-            renderScheduleCreateForm(tz, sched);
+            renderScheduleCreateForm(tz, sched, "right");
           });
         });
         body.querySelectorAll("[data-sched-delete]").forEach(function (btn) {
@@ -3409,7 +3491,7 @@
         });
         updateScheduleDropdownTrigger("purchaser");
       }
-      function renderScheduleCreateForm(timezones, schedule) {
+      function renderScheduleCreateForm(timezones, schedule, direction) {
         var body = document.getElementById("schedule-modal-body");
         if (!body) return;
         var brands = Object.keys(BRAND_PURCHASERS || {}).sort(function (a, b) {
@@ -3457,31 +3539,34 @@
             );
           })
           .join("");
-        body.innerHTML =
+        renderWithTransition(
+          body,
           '<div class="schedule-header-row"><div>' +
-          (schedule ? "Edit schedule." : "Create a new schedule.") +
-          '</div><button type="button" id="schedule-form-back-btn" class="btn-secondary">Back to Schedules</button></div>' +
-          '<div style="flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;">' +
-          '<div class="schedule-form-grid">' +
-          '<div class="schedule-field"><label class="schedule-label" for="sched-brand-dropdown-trigger">Brand (optional)</label><div id="sched-brand-dropdown" class="filter-dropdown"><button type="button" id="sched-brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">Select brand</button><div id="sched-brand-dropdown-panel" class="filter-dropdown-panel" role="listbox">' +
-          brandOptions +
-          '</div></div><div class="schedule-hint">Leave empty to include all brands.</div></div>' +
-          '<div class="schedule-field"><label class="schedule-label" for="sched-purchaser-dropdown-trigger">Purchaser (optional)</label><div id="sched-purchaser-dropdown" class="filter-dropdown"><button type="button" id="sched-purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">Select purchaser</button><div id="sched-purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div></div><div class="schedule-hint">Leave empty to include all purchasers. Options update based on selected brands.</div></div>' +
-          '<div class="schedule-field"><label class="schedule-label" for="sched-cron-trigger">Run time (daily)</label><div id="sched-cron-dropdown" class="filter-dropdown"><input type="hidden" id="sched-cron"><button type="button" id="sched-cron-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">Select time</button><div id="sched-cron-panel" class="filter-dropdown-panel" role="listbox">' +
-          cronOptions +
-          '</div></div><div class="schedule-hint">Runs once per day at the selected time.</div></div>' +
-          '<div class="schedule-field"><label class="schedule-label" for="sched-tz-trigger">Timezone</label><div id="sched-tz-dropdown" class="filter-dropdown"><input type="hidden" id="sched-tz"><button type="button" id="sched-tz-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">Select timezone</button><div id="sched-tz-panel" class="filter-dropdown-panel" role="listbox">' +
-          tzOptions +
-          '</div></div><div class="schedule-hint">All runs use this timezone for the schedule.</div></div>' +
-          "</div>" +
-          '<div id="schedule-error" class="schedule-error"></div>' +
-          "</div>" +
-          '<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;padding:0.5rem 0.75rem;margin-top:0.5rem;font-size:0.8rem;color:#e65100;line-height:1.4;">' +
-          "<strong>⚠ Note:</strong> Make sure no Sync &amp; Extract or any other process is running at the scheduled time. If any manual process is active, or any process is in <strong>paused (Resume)</strong> mode, when the cron triggers, the scheduled run will be <strong>skipped</strong>." +
-          "</div>" +
-          '<div class="modal-footer" style="margin-top:0.85rem;"><button type="button" id="schedule-cancel-btn" class="btn-secondary">Cancel</button><button type="button" id="schedule-save-btn" class="download-report-btn download-report-schedule-btn">' +
-          (schedule ? "Update schedule" : "Save Schedule") +
-          "</button></div>";
+            (schedule ? "Edit schedule." : "Create a new schedule.") +
+            '</div><button type="button" id="schedule-form-back-btn" class="btn-secondary">Back to Schedules</button></div>' +
+            '<div style="flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;">' +
+            '<div class="schedule-form-grid">' +
+            '<div class="schedule-field"><label class="schedule-label" for="sched-brand-dropdown-trigger">Brand (optional)</label><div id="sched-brand-dropdown" class="filter-dropdown"><button type="button" id="sched-brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">Select brand</button><div id="sched-brand-dropdown-panel" class="filter-dropdown-panel" role="listbox">' +
+            brandOptions +
+            '</div></div><div class="schedule-hint">Leave empty to include all brands.</div></div>' +
+            '<div class="schedule-field"><label class="schedule-label" for="sched-purchaser-dropdown-trigger">Purchaser (optional)</label><div id="sched-purchaser-dropdown" class="filter-dropdown"><button type="button" id="sched-purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">Select purchaser</button><div id="sched-purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div></div><div class="schedule-hint">Leave empty to include all purchasers. Options update based on selected brands.</div></div>' +
+            '<div class="schedule-field"><label class="schedule-label" for="sched-cron-trigger">Run time (daily)</label><div id="sched-cron-dropdown" class="filter-dropdown"><input type="hidden" id="sched-cron"><button type="button" id="sched-cron-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">Select time</button><div id="sched-cron-panel" class="filter-dropdown-panel" role="listbox">' +
+            cronOptions +
+            '</div></div><div class="schedule-hint">Runs once per day at the selected time.</div></div>' +
+            '<div class="schedule-field"><label class="schedule-label" for="sched-tz-trigger">Timezone</label><div id="sched-tz-dropdown" class="filter-dropdown"><input type="hidden" id="sched-tz"><button type="button" id="sched-tz-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">Select timezone</button><div id="sched-tz-panel" class="filter-dropdown-panel" role="listbox">' +
+            tzOptions +
+            '</div></div><div class="schedule-hint">All runs use this timezone for the schedule.</div></div>' +
+            "</div>" +
+            '<div id="schedule-error" class="schedule-error"></div>' +
+            "</div>" +
+            '<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;padding:0.5rem 0.75rem;margin-top:0.5rem;font-size:0.8rem;color:#e65100;line-height:1.4;">' +
+            "<strong>⚠ Note:</strong> Make sure no Sync &amp; Extract or any other process is running at the scheduled time. If any manual process is active, or any process is in <strong>paused (Resume)</strong> mode, when the cron triggers, the scheduled run will be <strong>skipped</strong>." +
+            "</div>" +
+            '<div class="modal-footer" style="margin-top:0.85rem;"><button type="button" id="schedule-cancel-btn" class="btn-secondary">Cancel</button><button type="button" id="schedule-save-btn" class="download-report-btn download-report-schedule-btn">' +
+            (schedule ? "Update schedule" : "Save Schedule") +
+            "</button></div>",
+          direction || "right",
+        );
 
         function updateDisabledCronOptions() {
           var cronPanel = document.getElementById("sched-cron-panel");
@@ -3628,13 +3713,13 @@
         var backBtnHeader = document.getElementById("schedule-form-back-btn");
         if (backBtnHeader) {
           backBtnHeader.onclick = function () {
-            loadSchedulesIntoModal();
+            loadSchedulesIntoModal("left");
           };
         }
         var cancelBtn = document.getElementById("schedule-cancel-btn");
         if (cancelBtn) {
           cancelBtn.onclick = function () {
-            loadSchedulesIntoModal();
+            loadSchedulesIntoModal("left");
           };
         }
         var saveBtn = document.getElementById("schedule-save-btn");
@@ -3686,7 +3771,7 @@
         }
       }
 
-      function loadSchedulesIntoModal() {
+      function loadSchedulesIntoModal(direction) {
         fetch("/api/schedules")
           .then(function (r) {
             if (!r.ok) throw new Error("Could not load schedules");
@@ -3697,25 +3782,34 @@
             ALL_SCHEDULES.sort(function (a, b) {
               return new Date(b.createdAt) - new Date(a.createdAt);
             });
-            renderScheduleListView({
-              schedules: ALL_SCHEDULES,
-              timezones: data.timezones || [],
-            });
+            renderScheduleListView(
+              {
+                schedules: ALL_SCHEDULES,
+                timezones: data.timezones || [],
+              },
+              direction,
+            );
           })
           .catch(function () {
-            renderScheduleListView({ schedules: [], timezones: ["UTC"] });
+            renderScheduleListView(
+              { schedules: [], timezones: ["UTC"] },
+              direction,
+            );
           });
       }
 
-      function renderScheduleRunHistoryView() {
+      function renderScheduleRunHistoryView(direction) {
         var body = document.getElementById("schedule-modal-body");
         if (!body) return;
-        body.innerHTML =
-          '<div class="schedule-header-row"><div>Schedule run history</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Loading…</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>';
+        renderWithTransition(
+          body,
+          '<div class="schedule-header-row"><div>Schedule run history</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Loading…</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
+          direction || "right",
+        );
         var backBtn = document.getElementById("schedule-log-back-btn");
         if (backBtn) {
           backBtn.onclick = function () {
-            loadSchedulesIntoModal();
+            loadSchedulesIntoModal("left");
           };
         }
         fetch("/api/schedule-log")
@@ -3768,21 +3862,24 @@
             html += "</div>";
             html +=
               '<div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>';
-            body.innerHTML = html;
+            renderWithTransition(body, html, direction || "right");
             backBtn = document.getElementById("schedule-log-back-btn");
             if (backBtn) {
               backBtn.onclick = function () {
-                loadSchedulesIntoModal();
+                loadSchedulesIntoModal("left");
               };
             }
           })
           .catch(function () {
-            body.innerHTML =
-              '<div class="schedule-header-row"><div>Schedule run history</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load schedule log.</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>';
+            renderWithTransition(
+              body,
+              '<div class="schedule-header-row"><div>Schedule run history</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load schedule log.</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
+              direction || "right",
+            );
             backBtn = document.getElementById("schedule-log-back-btn");
             if (backBtn) {
               backBtn.onclick = function () {
-                loadSchedulesIntoModal();
+                loadSchedulesIntoModal("left");
               };
             }
           });
@@ -3796,7 +3893,7 @@
             if (!r.ok) {
               throw new Error("Failed to delete schedule");
             }
-            loadSchedulesIntoModal();
+            loadSchedulesIntoModal("left");
           })
           .catch(function () {
             // Best effort; keep current view if delete fails.
@@ -3866,7 +3963,7 @@
             return r.json();
           })
           .then(function () {
-            loadSchedulesIntoModal();
+            loadSchedulesIntoModal("left");
           })
           .catch(function (e) {
             errorEl.textContent =
