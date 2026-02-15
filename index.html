@@ -38,7 +38,9 @@
         --radius-xs: 3.4px;
         --shadow-sm: 0 0.85px 2.55px rgba(0, 0, 0, 0.08);
         --shadow-md: 0 1.7px 6.8px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 3.4px 10.2px rgba(0, 0, 0, 0.08);
+        --shadow-lg:
+          0 12px 30px -10px rgba(0, 0, 0, 0.15),
+          0 4px 15px -5px rgba(0, 0, 0, 0.1);
         --shadow-inset: inset 0 0.85px 1.7px rgba(0, 0, 0, 0.06);
         --shadow-btn: 0 0.85px 2.55px rgba(0, 0, 0, 0.12);
         --warning: #f59e0b;
@@ -69,7 +71,7 @@
         border: 0.85px solid var(--border);
         border-radius: var(--radius);
         box-shadow: var(--shadow-lg);
-        margin: 1.062rem 1.275rem;
+        margin: 1.062rem 1.275rem 0.425rem 1.275rem;
         box-sizing: border-box;
       }
       .header-inner {
@@ -273,6 +275,11 @@
       .filter-dropdown-option:hover {
         background: var(--row-alt);
       }
+      .filter-dropdown-option.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: var(--row-alt);
+      }
       .filter-dropdown-option input {
         margin: 0;
         cursor: pointer;
@@ -329,9 +336,7 @@
         background: var(--surface);
         border: 0.85px solid var(--border);
         border-radius: var(--radius);
-        box-shadow:
-          0 3.4px 17px rgba(0, 0, 0, 0.1),
-          0 1.7px 6.8px rgba(0, 0, 0, 0.06);
+        box-shadow: var(--shadow-lg);
       }
       .table-section table {
         height: 100%;
@@ -471,23 +476,25 @@
         min-width: 70.5px;
         max-width: 70.5px;
         height: 28.05px;
-        padding: 0.34rem 0.425rem;
-        border: 0.85px solid var(--border);
+        padding: 0.34rem 0.51rem;
+        border: 1px solid var(--border);
         border-radius: var(--radius-sm);
         font-size: 0.875rem;
         font-weight: 500;
+        font-family: inherit;
         color: var(--text);
-        background: var(--surface);
+        background: var(--bg);
         box-sizing: border-box;
-        box-shadow:
-          0 0.85px 1.7px rgba(0, 0, 0, 0.06),
-          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.8);
-        transition:
-          border-color 0.15s ease,
-          box-shadow 0.15s ease;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
       }
       .limits-cell input[type="number"]::-webkit-inner-spin-button,
       .limits-cell input[type="number"]::-webkit-outer-spin-button {
+        opacity: 0.5;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+      }
+      .limits-cell input:hover::-webkit-inner-spin-button {
         opacity: 1;
       }
       .limits-cell input[type="number"]:hover:not(:disabled) {
@@ -699,7 +706,7 @@
         display: flex;
         align-items: center;
         gap: 0.637rem;
-        padding: 0.51rem 1.275rem;
+        padding: 1.105rem 1.275rem 0.85rem;
         background: var(--surface);
         border: 0.85px solid var(--border-light);
         border-radius: 0;
@@ -965,9 +972,9 @@
         border-radius: var(--radius);
         box-shadow: var(--shadow-lg);
         border: 0.85px solid var(--border);
-        width: 800px;
+        width: 1152px;
         max-width: 90vw;
-        height: 650px;
+        height: 786px;
         max-height: 85vh;
         padding: 1.062rem 1.275rem 0.85rem;
         box-sizing: border-box;
@@ -1059,6 +1066,7 @@
         justify-content: space-between;
         margin-bottom: 0.85rem;
         gap: 0.85rem;
+        padding-top: 2px;
       }
       .schedule-empty {
         color: var(--muted);
@@ -3164,7 +3172,26 @@
         var day = date.getDate();
         var month = date.toLocaleString("default", { month: "short" });
         var year = date.getFullYear();
-        return day + getOrdinalSuffix(day) + " " + month + " " + year;
+        var h = date.getHours();
+        var m = date.getMinutes();
+        var ampm = h >= 12 ? "PM" : "AM";
+        var hh = h % 12;
+        hh = hh ? hh : 12; // the hour '0' should be '12'
+        var mm = m < 10 ? "0" + m : m;
+        return (
+          day +
+          getOrdinalSuffix(day) +
+          " " +
+          month +
+          " " +
+          year +
+          ", " +
+          hh +
+          ":" +
+          mm +
+          " " +
+          ampm
+        );
       }
 
       function formatCronWithTime(cron) {
@@ -3385,40 +3412,40 @@
             var label = displayHour + ":" + minLabel + " " + ampm;
             var cronVal = String(m) + " " + String(h) + " * * *";
             cronOptions +=
-              '<option value="' +
+              '<div class="filter-dropdown-option single-select" data-value="' +
               cronVal +
               '">' +
               escapeHtml(label) +
-              "</option>";
+              "</div>";
           }
         }
         var tzOptions = tz
           .map(function (z) {
             return (
-              '<option value="' +
+              '<div class="filter-dropdown-option single-select" data-value="' +
               escapeHtml(z) +
               '">' +
               escapeHtml(z) +
-              "</option>"
+              "</div>"
             );
           })
           .join("");
         body.innerHTML =
           '<div class="schedule-header-row"><div>' +
           (schedule ? "Edit schedule." : "Create a new schedule.") +
-          "</div></div>" +
+          '</div><button type="button" id="schedule-form-back-btn" class="btn-secondary">Back to Schedules</button></div>' +
           '<div style="flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;">' +
           '<div class="schedule-form-grid">' +
           '<div class="schedule-field"><label class="schedule-label" for="sched-brand-dropdown-trigger">Brand (optional)</label><div id="sched-brand-dropdown" class="filter-dropdown"><button type="button" id="sched-brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">Select brand</button><div id="sched-brand-dropdown-panel" class="filter-dropdown-panel" role="listbox">' +
           brandOptions +
           '</div></div><div class="schedule-hint">Leave empty to include all brands.</div></div>' +
           '<div class="schedule-field"><label class="schedule-label" for="sched-purchaser-dropdown-trigger">Purchaser (optional)</label><div id="sched-purchaser-dropdown" class="filter-dropdown"><button type="button" id="sched-purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">Select purchaser</button><div id="sched-purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div></div><div class="schedule-hint">Leave empty to include all purchasers. Options update based on selected brands.</div></div>' +
-          '<div class="schedule-field"><label class="schedule-label" for="sched-cron">Run time (daily)</label><select id="sched-cron" class="schedule-select">' +
+          '<div class="schedule-field"><label class="schedule-label" for="sched-cron-trigger">Run time (daily)</label><div id="sched-cron-dropdown" class="filter-dropdown"><input type="hidden" id="sched-cron"><button type="button" id="sched-cron-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">Select time</button><div id="sched-cron-panel" class="filter-dropdown-panel" role="listbox">' +
           cronOptions +
-          '</select><div class="schedule-hint">Runs once per day at the selected time (every minute interval options).</div></div>' +
-          '<div class="schedule-field"><label class="schedule-label" for="sched-tz">Timezone</label><select id="sched-tz" class="schedule-select">' +
+          '</div></div><div class="schedule-hint">Runs once per day at the selected time.</div></div>' +
+          '<div class="schedule-field"><label class="schedule-label" for="sched-tz-trigger">Timezone</label><div id="sched-tz-dropdown" class="filter-dropdown"><input type="hidden" id="sched-tz"><button type="button" id="sched-tz-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">Select timezone</button><div id="sched-tz-panel" class="filter-dropdown-panel" role="listbox">' +
           tzOptions +
-          '</select><div class="schedule-hint">All runs use this timezone for the cron schedule.</div></div>' +
+          '</div></div><div class="schedule-hint">All runs use this timezone for the schedule.</div></div>' +
           "</div>" +
           '<div id="schedule-error" class="schedule-error"></div>' +
           "</div>" +
@@ -3430,13 +3457,13 @@
           "</button></div>";
 
         function updateDisabledCronOptions() {
-          var cronEl = document.getElementById("sched-cron");
-          var tzEl = document.getElementById("sched-tz");
-          if (!cronEl || !tzEl) return;
-          var selectedTz = tzEl.value;
-          var options = cronEl.querySelectorAll("option");
+          var cronPanel = document.getElementById("sched-cron-panel");
+          var tzInput = document.getElementById("sched-tz");
+          if (!cronPanel || !tzInput) return;
+          var selectedTz = tzInput.value;
+          var options = cronPanel.querySelectorAll(".filter-dropdown-option");
           options.forEach(function (opt) {
-            var cronVal = opt.value;
+            var cronVal = opt.getAttribute("data-value");
             var inUse = ALL_SCHEDULES.some(function (s) {
               return (
                 s.cron === cronVal &&
@@ -3445,12 +3472,12 @@
               );
             });
             if (inUse) {
-              opt.disabled = true;
+              opt.classList.add("disabled");
               if (opt.textContent.indexOf(" (In Use)") === -1) {
                 opt.textContent += " (In Use)";
               }
             } else {
-              opt.disabled = false;
+              opt.classList.remove("disabled");
               opt.textContent = opt.textContent.replace(" (In Use)", "");
             }
           });
@@ -3477,12 +3504,21 @@
         var purchaserDropdown = document.getElementById(
           "sched-purchaser-dropdown",
         );
+        var cronTrigger = document.getElementById("sched-cron-trigger");
+        var cronPanel = document.getElementById("sched-cron-panel");
+        var tzTrigger = document.getElementById("sched-tz-trigger");
+        var tzPanel = document.getElementById("sched-tz-panel");
+
         function closeScheduleDropdowns() {
           if (brandPanel) brandPanel.classList.remove("open");
           if (purchaserPanel) purchaserPanel.classList.remove("open");
+          if (cronPanel) cronPanel.classList.remove("open");
+          if (tzPanel) tzPanel.classList.remove("open");
           if (brandTrigger) brandTrigger.setAttribute("aria-expanded", "false");
           if (purchaserTrigger)
             purchaserTrigger.setAttribute("aria-expanded", "false");
+          if (cronTrigger) cronTrigger.setAttribute("aria-expanded", "false");
+          if (tzTrigger) tzTrigger.setAttribute("aria-expanded", "false");
         }
         function toggleScheduleDropdown(panel, trigger) {
           var isOpen = panel && panel.classList.contains("open");
@@ -3498,6 +3534,43 @@
             toggleScheduleDropdown(brandPanel, brandTrigger);
           });
         }
+        if (cronTrigger && cronPanel) {
+          cronTrigger.addEventListener("click", function (e) {
+            e.stopPropagation();
+            toggleScheduleDropdown(cronPanel, cronTrigger);
+          });
+        }
+        if (tzTrigger && tzPanel) {
+          tzTrigger.addEventListener("click", function (e) {
+            e.stopPropagation();
+            toggleScheduleDropdown(tzPanel, tzTrigger);
+          });
+        }
+
+        function initSingleSelectDropdown(panel, trigger, inputId, onSelect) {
+          if (!panel || !trigger) return;
+          var input = document.getElementById(inputId);
+          panel
+            .querySelectorAll(".filter-dropdown-option")
+            .forEach(function (opt) {
+              opt.onclick = function (e) {
+                e.stopPropagation();
+                if (opt.classList.contains("disabled")) return;
+                var val = opt.getAttribute("data-value");
+                if (input) input.value = val;
+                trigger.textContent = opt.textContent.replace(" (In Use)", "");
+                panel.classList.remove("open");
+                trigger.setAttribute("aria-expanded", "false");
+                if (onSelect) onSelect(val);
+              };
+            });
+        }
+
+        initSingleSelectDropdown(cronPanel, cronTrigger, "sched-cron");
+        initSingleSelectDropdown(tzPanel, tzTrigger, "sched-tz", function () {
+          updateDisabledCronOptions();
+        });
+
         if (purchaserTrigger && purchaserPanel) {
           purchaserTrigger.addEventListener("click", function (e) {
             e.stopPropagation();
@@ -3525,6 +3598,12 @@
               refreshSchedulePurchaserOptions();
             });
           });
+        var backBtnHeader = document.getElementById("schedule-form-back-btn");
+        if (backBtnHeader) {
+          backBtnHeader.onclick = function () {
+            loadSchedulesIntoModal();
+          };
+        }
         var cancelBtn = document.getElementById("schedule-cancel-btn");
         if (cancelBtn) {
           cancelBtn.onclick = function () {
@@ -3538,8 +3617,8 @@
           };
         }
         if (schedule) {
-          var cronEl = document.getElementById("sched-cron");
-          var tzEl = document.getElementById("sched-tz");
+          var cronInput = document.getElementById("sched-cron");
+          var tzInput = document.getElementById("sched-tz");
           if (schedule.brands && schedule.brands.length) {
             schedule.brands.forEach(function (b) {
               var cb = brandPanel.querySelector(
@@ -3559,11 +3638,23 @@
             });
             updateScheduleDropdownTrigger("purchaser");
           }
-          if (cronEl && schedule.cron) {
-            cronEl.value = schedule.cron;
+          if (cronInput && schedule.cron) {
+            cronInput.value = schedule.cron;
+            var cronOpt = cronPanel.querySelector(
+              '.filter-dropdown-option[data-value="' + schedule.cron + '"]',
+            );
+            if (cronOpt && cronTrigger)
+              cronTrigger.textContent = cronOpt.textContent.replace(
+                " (In Use)",
+                "",
+              );
           }
-          if (tzEl && schedule.timezone) {
-            tzEl.value = schedule.timezone;
+          if (tzInput && schedule.timezone) {
+            tzInput.value = schedule.timezone;
+            var tzOpt = tzPanel.querySelector(
+              '.filter-dropdown-option[data-value="' + schedule.timezone + '"]',
+            );
+            if (tzOpt && tzTrigger) tzTrigger.textContent = tzOpt.textContent;
           }
         }
       }
@@ -3576,6 +3667,9 @@
           })
           .then(function (data) {
             ALL_SCHEDULES = data.schedules || [];
+            ALL_SCHEDULES.sort(function (a, b) {
+              return new Date(b.createdAt) - new Date(a.createdAt);
+            });
             renderScheduleListView({
               schedules: ALL_SCHEDULES,
               timezones: data.timezones || [],
