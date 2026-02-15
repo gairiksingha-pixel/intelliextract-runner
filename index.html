@@ -277,7 +277,7 @@
         left: 0;
         margin-top: 1.7px;
         min-width: 100%;
-        max-height: 187px;
+        max-height: 300px;
         overflow-y: auto;
         border: 0.85px solid var(--border);
         border-radius: var(--radius-sm);
@@ -2081,11 +2081,45 @@
         };
       }
 
+      function attachSelectAll(panelId, onToggle) {
+        var panel = document.getElementById(panelId);
+        if (!panel) return;
+        var allCb = panel.querySelector('input[value="ALL"]');
+        if (!allCb) return;
+        var otherCbs = Array.from(
+          panel.querySelectorAll('input[type=checkbox]:not([value="ALL"])'),
+        );
+        allCb.onchange = function () {
+          var checked = allCb.checked;
+          otherCbs.forEach(function (cb) {
+            cb.checked = checked;
+          });
+          if (onToggle) onToggle();
+        };
+        otherCbs.forEach(function (cb) {
+          cb.onchange = function () {
+            allCb.checked =
+              otherCbs.length > 0 &&
+              otherCbs.every(function (c) {
+                return c.checked;
+              });
+            if (onToggle) onToggle();
+          };
+        });
+        if (otherCbs.length > 0) {
+          allCb.checked = otherCbs.every(function (c) {
+            return c.checked;
+          });
+        }
+      }
+
       function getSelectedBrands() {
         var panel = document.getElementById("brand-dropdown-panel");
         if (!panel) return [];
         return Array.from(
-          panel.querySelectorAll("input[type=checkbox]:checked"),
+          panel.querySelectorAll(
+            "input[type=checkbox]:checked:not([value='ALL'])",
+          ),
         ).map(function (cb) {
           return cb.value;
         });
@@ -2094,7 +2128,9 @@
         var panel = document.getElementById("purchaser-dropdown-panel");
         if (!panel) return [];
         return Array.from(
-          panel.querySelectorAll("input[type=checkbox]:checked"),
+          panel.querySelectorAll(
+            "input[type=checkbox]:checked:not([value='ALL'])",
+          ),
         ).map(function (cb) {
           return cb.value;
         });
@@ -3133,23 +3169,25 @@
         var brands = Object.keys(BRAND_PURCHASERS).sort(function (a, b) {
           return formatBrandName(a).localeCompare(formatBrandName(b));
         });
-        panel.innerHTML = brands
-          .map(function (b) {
-            return (
-              '<label class="filter-dropdown-option"><input type="checkbox" value="' +
-              escapeHtml(b) +
-              '"> ' +
-              escapeHtml(formatBrandName(b)) +
-              "</label>"
-            );
-          })
-          .join("");
-        panel.querySelectorAll("input[type=checkbox]").forEach(function (cb) {
-          cb.addEventListener("change", function () {
-            updateFilterDropdownTrigger("brand");
-            clearBrandError();
-            refreshPurchaserOptions();
-          });
+        var allHtml =
+          '<label class="filter-dropdown-option"><input type="checkbox" value="ALL"> <strong>All</strong></label>';
+        panel.innerHTML =
+          allHtml +
+          brands
+            .map(function (b) {
+              return (
+                '<label class="filter-dropdown-option"><input type="checkbox" value="' +
+                escapeHtml(b) +
+                '"> ' +
+                escapeHtml(formatBrandName(b)) +
+                "</label>"
+              );
+            })
+            .join("");
+        attachSelectAll("brand-dropdown-panel", function () {
+          updateFilterDropdownTrigger("brand");
+          clearBrandError();
+          refreshPurchaserOptions();
         });
       }
       function fetchConfig() {
@@ -3196,24 +3234,33 @@
           return formatPurchaserName(a).localeCompare(formatPurchaserName(b));
         });
         var currentChecked = getSelectedPurchasers();
-        panel.innerHTML = opts
-          .map(function (p) {
-            var checked = currentChecked.indexOf(p) !== -1 ? " checked" : "";
-            return (
-              '<label class="filter-dropdown-option"><input type="checkbox" value="' +
-              p +
-              '"' +
-              checked +
-              "> " +
-              escapeHtml(formatPurchaserName(p)) +
-              "</label>"
-            );
-          })
-          .join("");
-        panel.querySelectorAll("input[type=checkbox]").forEach(function (cb) {
-          cb.addEventListener("change", function () {
-            updateFilterDropdownTrigger("purchaser");
+        var allChecked =
+          opts.length > 0 &&
+          opts.every(function (p) {
+            return currentChecked.indexOf(p) !== -1;
           });
+        var allHtml =
+          '<label class="filter-dropdown-option"><input type="checkbox" value="ALL"' +
+          (allChecked ? " checked" : "") +
+          "> <strong>All</strong></label>";
+        panel.innerHTML =
+          allHtml +
+          opts
+            .map(function (p) {
+              var checked = currentChecked.indexOf(p) !== -1 ? " checked" : "";
+              return (
+                '<label class="filter-dropdown-option"><input type="checkbox" value="' +
+                p +
+                '"' +
+                checked +
+                "> " +
+                escapeHtml(formatPurchaserName(p)) +
+                "</label>"
+              );
+            })
+            .join("");
+        attachSelectAll("purchaser-dropdown-panel", function () {
+          updateFilterDropdownTrigger("purchaser");
         });
         updateFilterDropdownTrigger("purchaser");
       }
@@ -3409,7 +3456,9 @@
         var panel = document.getElementById("sched-brand-dropdown-panel");
         if (!panel) return [];
         return Array.from(
-          panel.querySelectorAll("input[type=checkbox]:checked"),
+          panel.querySelectorAll(
+            "input[type=checkbox]:checked:not([value='ALL'])",
+          ),
         ).map(function (cb) {
           return cb.value;
         });
@@ -3418,7 +3467,9 @@
         var panel = document.getElementById("sched-purchaser-dropdown-panel");
         if (!panel) return [];
         return Array.from(
-          panel.querySelectorAll("input[type=checkbox]:checked"),
+          panel.querySelectorAll(
+            "input[type=checkbox]:checked:not([value='ALL'])",
+          ),
         ).map(function (cb) {
           return cb.value;
         });
@@ -3429,6 +3480,30 @@
             ? "sched-brand-dropdown-trigger"
             : "sched-purchaser-dropdown-trigger",
         );
+        var panel = document.getElementById(
+          type === "brand"
+            ? "sched-brand-dropdown-panel"
+            : "sched-purchaser-dropdown-panel",
+        );
+        var total = panel
+          ? panel.querySelectorAll("input[type=checkbox]:not([value='ALL'])")
+              .length
+          : 0;
+
+        if (panel) {
+          var allCb = panel.querySelector('input[value="ALL"]');
+          if (allCb) {
+            var otherCbs = Array.from(
+              panel.querySelectorAll('input[type=checkbox]:not([value="ALL"])'),
+            );
+            allCb.checked =
+              otherCbs.length > 0 &&
+              otherCbs.every(function (c) {
+                return c.checked;
+              });
+          }
+        }
+
         if (!trigger) return;
         var selected =
           type === "brand"
@@ -3443,7 +3518,11 @@
               ? formatBrandName(selected[0])
               : formatPurchaserName(selected[0]);
         } else {
-          trigger.textContent = selected.length + " selected";
+          if (total > 0 && selected.length === total) {
+            trigger.textContent = "All";
+          } else {
+            trigger.textContent = selected.length + " selected";
+          }
         }
       }
       function refreshSchedulePurchaserOptions() {
@@ -3470,24 +3549,33 @@
                 });
               })();
         var currentChecked = getSelectedSchedulePurchasers();
-        panel.innerHTML = opts
-          .map(function (p) {
-            var checked = currentChecked.indexOf(p) !== -1 ? " checked" : "";
-            return (
-              '<label class="filter-dropdown-option"><input type="checkbox" value="' +
-              escapeHtml(p) +
-              '"' +
-              checked +
-              "> " +
-              escapeHtml(formatPurchaserName(p)) +
-              "</label>"
-            );
-          })
-          .join("");
-        panel.querySelectorAll("input[type=checkbox]").forEach(function (cb) {
-          cb.addEventListener("change", function () {
-            updateScheduleDropdownTrigger("purchaser");
+        var allChecked =
+          opts.length > 0 &&
+          opts.every(function (p) {
+            return currentChecked.indexOf(p) !== -1;
           });
+        var allHtml =
+          '<label class="filter-dropdown-option"><input type="checkbox" value="ALL"' +
+          (allChecked ? " checked" : "") +
+          "> <strong>All</strong></label>";
+        panel.innerHTML =
+          allHtml +
+          opts
+            .map(function (p) {
+              var checked = currentChecked.indexOf(p) !== -1 ? " checked" : "";
+              return (
+                '<label class="filter-dropdown-option"><input type="checkbox" value="' +
+                escapeHtml(p) +
+                '"' +
+                checked +
+                "> " +
+                escapeHtml(formatPurchaserName(p)) +
+                "</label>"
+              );
+            })
+            .join("");
+        attachSelectAll("sched-purchaser-dropdown-panel", function () {
+          updateScheduleDropdownTrigger("purchaser");
         });
         updateScheduleDropdownTrigger("purchaser");
       }
@@ -3501,17 +3589,19 @@
         });
         var tz =
           Array.isArray(timezones) && timezones.length ? timezones : ["UTC"];
-        var brandOptions = brands
-          .map(function (b) {
-            return (
-              '<label class="filter-dropdown-option"><input type="checkbox" value="' +
-              escapeHtml(b) +
-              '"> ' +
-              escapeHtml(formatBrandName(b)) +
-              "</label>"
-            );
-          })
-          .join("");
+        var brandOptions =
+          '<label class="filter-dropdown-option"><input type="checkbox" value="ALL"> <strong>All</strong></label>' +
+          brands
+            .map(function (b) {
+              return (
+                '<label class="filter-dropdown-option"><input type="checkbox" value="' +
+                escapeHtml(b) +
+                '"> ' +
+                escapeHtml(formatBrandName(b)) +
+                "</label>"
+              );
+            })
+            .join("");
         var cronOptions = "";
         for (var h = 0; h < 24; h++) {
           for (var m = 0; m < 60; m += 5) {
@@ -3702,14 +3792,10 @@
         document.addEventListener("click", function () {
           closeScheduleDropdowns();
         });
-        brandPanel
-          .querySelectorAll("input[type=checkbox]")
-          .forEach(function (cb) {
-            cb.addEventListener("change", function () {
-              updateScheduleDropdownTrigger("brand");
-              refreshSchedulePurchaserOptions();
-            });
-          });
+        attachSelectAll("sched-brand-dropdown-panel", function () {
+          updateScheduleDropdownTrigger("brand");
+          refreshSchedulePurchaserOptions();
+        });
         var backBtnHeader = document.getElementById("schedule-form-back-btn");
         if (backBtnHeader) {
           backBtnHeader.onclick = function () {
@@ -4022,6 +4108,30 @@
         );
         var selected =
           which === "brand" ? getSelectedBrands() : getSelectedPurchasers();
+        var panel = document.getElementById(
+          which === "brand"
+            ? "brand-dropdown-panel"
+            : "purchaser-dropdown-panel",
+        );
+        var total = panel
+          ? panel.querySelectorAll("input[type=checkbox]:not([value='ALL'])")
+              .length
+          : 0;
+
+        if (panel) {
+          var allCb = panel.querySelector('input[value="ALL"]');
+          if (allCb) {
+            var otherCbs = Array.from(
+              panel.querySelectorAll('input[type=checkbox]:not([value="ALL"])'),
+            );
+            allCb.checked =
+              otherCbs.length > 0 &&
+              otherCbs.every(function (c) {
+                return c.checked;
+              });
+          }
+        }
+
         if (!trigger) return;
         var defaultTitle =
           which === "brand"
@@ -4039,7 +4149,11 @@
           trigger.textContent = label;
           trigger.title = label;
         } else {
-          trigger.textContent = selected.length + " selected";
+          if (total > 0 && selected.length === total) {
+            trigger.textContent = "All";
+          } else {
+            trigger.textContent = selected.length + " selected";
+          }
           var formatter =
             which === "brand" ? formatBrandName : formatPurchaserName;
           trigger.title = selected.map(formatter).join(", ");
