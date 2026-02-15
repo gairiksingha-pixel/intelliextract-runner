@@ -965,6 +965,14 @@
           opacity: 1;
         }
       }
+      @keyframes fadeOut {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
       .modal {
         background: var(--surface);
         border-radius: var(--radius);
@@ -989,6 +997,23 @@
           opacity: 1;
           transform: scale(1) translateY(0);
         }
+      }
+      @keyframes modalScaleDown {
+        from {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+        to {
+          opacity: 0;
+          transform: scale(0.9) translateY(20px);
+        }
+      }
+      .modal-overlay.closing {
+        animation: fadeOut 0.25s ease-in forwards;
+      }
+      .modal-overlay.closing .modal {
+        animation: modalScaleDown 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)
+          forwards;
       }
       .modal-header {
         display: flex;
@@ -3128,8 +3153,14 @@
         var closeIcon = document.getElementById("schedule-modal-close-icon");
         if (!overlay || !body) return;
         function close() {
-          overlay.classList.remove("open");
+          if (overlay.classList.contains("closing")) return;
+          overlay.classList.add("closing");
           overlay.setAttribute("aria-hidden", "true");
+          // Wait for animation to finish (duration is 0.25s)
+          setTimeout(function () {
+            overlay.classList.remove("open");
+            overlay.classList.remove("closing");
+          }, 250);
         }
         window.closeScheduleModal = close;
         if (closeIcon) closeIcon.onclick = close;
@@ -3142,6 +3173,7 @@
         var overlay = document.getElementById("schedule-modal-overlay");
         var body = document.getElementById("schedule-modal-body");
         if (!overlay || !body) return;
+        overlay.classList.remove("closing");
         overlay.classList.add("open");
         overlay.setAttribute("aria-hidden", "false");
         loadSchedulesIntoModal();
