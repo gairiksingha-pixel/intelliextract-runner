@@ -456,13 +456,25 @@
         margin: 0 auto;
       }
       .op-icon-wrap {
-        width: 2.2rem;
-        height: 2.2rem;
+        width: 1.8rem;
+        height: 1.8rem;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
         color: var(--primary);
+      }
+      .op-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-top: 0.2rem;
+        display: block;
+      }
+      .op-description {
+        font-size: 0.85rem;
+        font-weight: 400;
+        opacity: 0.9;
+        display: block;
       }
       .op-icon-wrap svg {
         width: 100%;
@@ -1425,20 +1437,22 @@
       const ROWS = [
         {
           id: "P1",
-          scenario: "Cloud Sync — Download files to staging.",
+          title: "Cloud Sync",
+          description: "Download files to staging",
           limits: { sync: true, extract: false },
           iconHtml: ICON_SYNC,
         },
         {
           id: "P2",
-          scenario:
-            "Extract — Run extraction with staging files (No Cloud sync).",
+          title: "Extract",
+          description: "Run extraction with staging files and no Cloud sync",
           limits: { sync: false, extract: true },
           iconHtml: ICON_EXTRACT,
         },
         {
           id: "PIPE",
-          scenario: "Sync & Extract — Sync from Cloud then extract in one run.",
+          title: "Sync & Extract",
+          description: "Sync from Cloud then extract in one run",
           limits: { pipeline: true },
           iconHtml: ICON_PIPELINE,
         },
@@ -1525,8 +1539,11 @@
           '<div class="op-icon-wrap">' +
           c.iconHtml +
           "</div>" +
-          "<span>" +
-          escapeHtml(c.scenario) +
+          '<span class="op-title">' +
+          escapeHtml(c.title) +
+          "</span>" +
+          '<span class="op-description">' +
+          escapeHtml(c.description) +
           "</span>" +
           "</div>" +
           "</td>" +
