@@ -714,11 +714,18 @@
         flex-wrap: wrap;
       }
       .download-bar-label {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: var(--text-secondary);
+        font-size: 0.725rem;
+        font-weight: 700;
+        color: var(--header-bg);
+        background: rgba(33, 108, 109, 0.08);
+        padding: 0.35rem 0.85rem;
+        border-radius: var(--radius-sm);
         text-transform: uppercase;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.04em;
+        border: 0.85px solid rgba(33, 108, 109, 0.2);
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
       }
       .download-bar-btns {
         display: flex;
@@ -1084,13 +1091,13 @@
         font-size: 0.8rem;
         border-radius: var(--radius-sm);
         overflow: hidden;
-        border: 0.85px solid var(--border-light);
+        border: 0.1px solid var(--border-light);
       }
       .schedule-list th,
       .schedule-list td {
         padding: 0.34rem 0.51rem;
-        border-bottom: 0.85px solid var(--border-light);
-        border-right: 0.85px solid var(--border-light);
+        border-bottom: 0.1px solid var(--border-light);
+        border-right: 0.1px solid var(--border-light);
         text-align: left;
         vertical-align: top;
       }
@@ -1274,7 +1281,7 @@
     <main class="main">
       <div class="table-section">
         <div class="download-bar" id="download-bar">
-          <span class="download-bar-label">Reports & downloads</span>
+          <span class="download-bar-label">Reports & downloads:</span>
           <div class="download-bar-btns" id="download-bar-btns"></div>
         </div>
         <table>
@@ -1335,19 +1342,20 @@
       const ROWS = [
         {
           id: "P1",
-          scenario: "S3 Sync — Download files to staging.",
+          scenario: "Cloud Sync — Download files to staging.",
           limits: { sync: true, extract: false },
           iconHtml: ICON_SYNC,
         },
         {
           id: "P2",
-          scenario: "Extract — Run extraction with staging files (No S3 sync).",
+          scenario:
+            "Extract — Run extraction with staging files (No Cloud sync).",
           limits: { sync: false, extract: true },
           iconHtml: ICON_EXTRACT,
         },
         {
           id: "PIPE",
-          scenario: "Sync & Extract — Sync from S3 then extract in one run.",
+          scenario: "Sync & Extract — Sync from Cloud then extract in one run.",
           limits: { pipeline: true },
           iconHtml: ICON_PIPELINE,
         },
