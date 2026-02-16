@@ -368,8 +368,13 @@ export function loadHistoricalRunSummaries(
         clusterEnd,
       );
 
-      // Fix for the title: the user wants the latest activity (completion) time as the accordion header.
-      metrics.startedAt = clusterEnd.toISOString();
+      // Fix for the title: the user wants the latest activity time as the accordion header (e.g. FEB-16-2026-09:30:PM).
+      // Use the completion time of the latest file in the cluster, but fallback to the newest run's start time if no files were processed.
+      const clusterLatestActivity = Math.max(
+        clusterEnd.getTime(),
+        latestRun.start.getTime(),
+      );
+      metrics.startedAt = new Date(clusterLatestActivity).toISOString();
 
       const runDurationSeconds = cluster.reduce(
         (sum, c) => sum + (c.end.getTime() - c.start.getTime()) / 1000,
