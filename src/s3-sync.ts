@@ -16,6 +16,7 @@ import {
   existsSync,
   readFileSync,
   writeFileSync,
+  statSync,
 } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -31,8 +32,8 @@ async function listAllKeys(
   client: S3Client,
   bucket: string,
   prefix: string,
-): Promise<{ key: string }[]> {
-  const keys: { key: string }[] = [];
+): Promise<{ key: string; etag: string; size: number }[]> {
+  const keys: { key: string; etag: string; size: number }[] = [];
   let continuationToken: string | undefined;
   do {
     const cmd = new ListObjectsV2Command({
@@ -43,7 +44,13 @@ async function listAllKeys(
     const out = await client.send(cmd);
     const contents = out.Contents ?? [];
     for (const obj of contents) {
-      if (obj.Key) keys.push({ key: obj.Key });
+      if (obj.Key) {
+        keys.push({
+          key: obj.Key,
+          etag: obj.ETag?.replace(/"/g, "") || "",
+          size: obj.Size ?? 0,
+        });
+      }
     }
     continuationToken = out.NextContinuationToken;
   } while (continuationToken);
@@ -62,11 +69,19 @@ export function getStagingSubdir(bucket: S3BucketConfig): string {
   return bucket.name;
 }
 
-function loadSyncManifest(manifestPath: string): Record<string, string> {
+interface ManifestEntry {
+  sha256: string;
+  etag: string;
+  size: number;
+}
+
+function loadSyncManifest(
+  manifestPath: string,
+): Record<string, ManifestEntry | string> {
   if (!existsSync(manifestPath)) return {};
   try {
     const raw = readFileSync(manifestPath, "utf-8");
-    const data = JSON.parse(raw) as Record<string, string>;
+    const data = JSON.parse(raw) as Record<string, ManifestEntry | string>;
     return typeof data === "object" && data !== null ? data : {};
   } catch {
     return {};
@@ -75,7 +90,7 @@ function loadSyncManifest(manifestPath: string): Record<string, string> {
 
 function saveSyncManifest(
   manifestPath: string,
-  data: Record<string, string>,
+  data: Record<string, ManifestEntry | string>,
 ): void {
   const dir = dirname(manifestPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -92,21 +107,52 @@ async function computeFileSha256(filePath: string): Promise<string> {
   });
 }
 
-/** Returns true if file exists and its SHA-256 matches the manifest (skip re-download). */
+/** Returns true if file exists and headers/manifest match (skip re-download). */
 async function skipIfUnchanged(
   destPath: string,
   keyInManifest: string,
-  manifest: Record<string, string>,
+  manifest: Record<string, ManifestEntry | string>,
+  s3Metadata: { etag: string; size: number },
 ): Promise<boolean> {
   if (!existsSync(destPath)) return false;
-  const expectedSha = manifest[keyInManifest];
-  if (!expectedSha) return false;
-  try {
-    const actualSha = await computeFileSha256(destPath);
-    return actualSha === expectedSha;
-  } catch {
-    return false;
+
+  const entry = manifest[keyInManifest];
+  if (entry) {
+    // Modern entry: compare ETag and Size (instant skip)
+    if (typeof entry === "object") {
+      if (entry.etag === s3Metadata.etag && entry.size === s3Metadata.size) {
+        return true;
+      }
+      return false;
+    }
+
+    // Legacy entry (string SHA-256): falls back to disk I/O
+    try {
+      const actualSha = await computeFileSha256(destPath);
+      return actualSha === entry;
+    } catch {
+      return false;
+    }
   }
+
+  // Recovery: file exists on disk but not in manifest.
+  // We compute the hash once and assume it belongs to this S3 version if size matches.
+  try {
+    const stats = statSync(destPath);
+    if (stats.size === s3Metadata.size) {
+      const sha = await computeFileSha256(destPath);
+      manifest[keyInManifest] = {
+        sha256: sha,
+        etag: s3Metadata.etag,
+        size: s3Metadata.size,
+      };
+      return true;
+    }
+  } catch {
+    // ignore errors, let it re-download
+  }
+
+  return false;
 }
 
 async function downloadToFile(
@@ -133,7 +179,7 @@ export async function syncBucket(
   bucketConfig: S3BucketConfig,
   stagingDir: string,
   options: {
-    manifest: Record<string, string>;
+    manifest: Record<string, ManifestEntry | string>;
     manifestPath: string;
     limitRemaining: { value: number };
     /** When set, called after each file. done = new downloads so far; total = limit or 0 (unknown). */
@@ -184,7 +230,7 @@ export async function syncBucket(
   };
   reportProgress(); // Initial reporting of 0/Total (or 0/0)
 
-  for (const { key } of keys) {
+  for (const { key, etag, size } of keys) {
     if (options.limitRemaining.value <= 0) break;
 
     const keyAfterPrefix =
@@ -205,10 +251,21 @@ export async function syncBucket(
       continue;
     }
 
-    const shouldSkip = await skipIfUnchanged(destPath, mk, options.manifest);
+    const shouldSkip = await skipIfUnchanged(destPath, mk, options.manifest, {
+      etag,
+      size,
+    });
     if (shouldSkip) {
       skipped++;
       options.onSyncSkipProgress?.(skipped, skipped + synced);
+      // Ensure manifest has the latest info (may have been legacy or recovery)
+      if (typeof options.manifest[mk] === "string" || !options.manifest[mk]) {
+        // computeFileSha256 was already called in skipIfUnchanged in these cases
+        // or we just reuse the old string if it was legacy.
+        // skipIfUnchanged already updated its entry if it was recovery.
+        // We only save if it's been updated.
+        saveSyncManifest(options.manifestPath, options.manifest);
+      }
       if (options.onFileSynced) {
         const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
         options.onFileSynced({ filePath: destPath, relativePath, brand });
@@ -221,11 +278,14 @@ export async function syncBucket(
       options.onStartDownload?.(destPath, mk);
       await downloadToFile(client, bucketConfig.bucket, key, destPath);
       const sha = await computeFileSha256(destPath);
-      options.manifest[mk] = sha;
-      saveSyncManifest(options.manifestPath, options.manifest);
+      options.manifest[mk] = { sha256: sha, etag, size };
       synced++;
       options.onSyncSkipProgress?.(skipped, skipped + synced);
       options.limitRemaining.value--;
+      // Throttle manifest writes: save every 20 downloads to reduce I/O pressure
+      if (synced % 20 === 0) {
+        saveSyncManifest(options.manifestPath, options.manifest);
+      }
       if (options.onFileSynced) {
         const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
         options.onFileSynced({ filePath: destPath, relativePath, brand });

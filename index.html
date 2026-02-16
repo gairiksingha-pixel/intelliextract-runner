@@ -140,13 +140,24 @@
         margin-top: 0.75rem;
       }
       .header-field-wrap {
-        display: grid;
-        grid-template-columns: auto minmax(9.35rem, 1fr);
-        grid-template-rows: auto minmax(1.062em, auto);
+        display: flex;
+        flex-direction: column;
+        gap: 0.17rem;
+        align-items: flex-start;
+      }
+      .filter-chip .header-label {
+        font-size: 0.725rem;
+        color: var(--primary);
+        white-space: nowrap;
+        font-weight: 800;
+        background: var(--pass-bg);
+        padding: 0 0.85rem;
+        height: 100%;
+        display: flex;
         align-items: center;
-        column-gap: 0.425rem;
-        row-gap: 0.17rem;
-        justify-content: start;
+        border-right: 1.2px solid rgba(45, 157, 95, 0.2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
       }
       .header-field-wrap > .header-label {
         grid-column: 1;
@@ -188,6 +199,24 @@
         white-space: nowrap;
         font-weight: 600;
       }
+      .filter-chip {
+        display: flex;
+        align-items: center;
+        height: 34px;
+        background: var(--surface);
+        border: 0.85px solid var(--border);
+        border-radius: var(--radius-sm);
+        transition: all 0.2s ease;
+        box-shadow: 0 0.85px 1.7px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+      }
+      .filter-chip:hover {
+        border-color: var(--border-light);
+      }
+      .filter-chip:focus-within {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 1.7px rgba(45, 157, 95, 0.2);
+      }
       .header-select {
         width: 180px;
         min-width: 180px;
@@ -205,56 +234,58 @@
         background-repeat: no-repeat;
         background-position: right 0.425rem center;
         box-sizing: border-box;
-        box-shadow:
-          0 0.85px 1.7px rgba(0, 0, 0, 0.06),
-          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.8);
-        transition:
-          border-color 0.15s ease,
-          box-shadow 0.15s ease;
+      }
+      .filter-chip .header-select {
+        width: 140px;
+        height: 100%;
+        border: none;
+        background-color: transparent;
+        box-shadow: none;
       }
       .header-select:focus {
         outline: none;
-        border-color: var(--primary);
-        box-shadow:
-          0 0 0 1.7px rgba(45, 157, 95, 0.2),
-          0 1.7px 3.4px rgba(0, 0, 0, 0.08),
-          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
       }
       .header-select:disabled {
         opacity: 0.7;
         cursor: not-allowed;
-        background: var(--row-alt);
       }
       .filter-dropdown {
         position: relative;
         width: 180px;
         min-width: 180px;
       }
+      .header-filter-row .filter-dropdown {
+        width: auto;
+        min-width: 0;
+      }
       .filter-dropdown-trigger {
         width: 100%;
         height: 34px;
         padding: 0.297rem 1.7rem 0.297rem 0.51rem;
-        border: 0.85px solid var(--border);
+        border: 1px solid rgba(45, 157, 95, 0.2);
         border-radius: var(--radius-sm);
-        background: var(--surface);
-        color: var(--text);
+        background: var(--accent-light);
+        color: var(--text-secondary);
         font-size: 0.875rem;
         font-family: inherit;
         text-align: left;
         cursor: pointer;
         box-sizing: border-box;
-        box-shadow:
-          0 0.85px 1.7px rgba(0, 0, 0, 0.06),
-          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.8);
-        transition:
-          border-color 0.15s ease,
-          box-shadow 0.15s ease;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 0.425rem center;
+        transition: all 0.2s ease;
+        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        white-space: nowrap;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%232d9d5f' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.425rem center;
+      }
+      .filter-chip .filter-dropdown-trigger {
+        height: 100%;
+        border: none;
+        background-color: transparent;
+        box-shadow: none;
+        padding: 0 1.7rem 0 0.51rem;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
       }
       .filter-dropdown-trigger:hover {
         border-color: var(--border-light);
@@ -323,7 +354,7 @@
         cursor: pointer;
       }
       .header-filter-reset-wrap {
-        align-self: flex-end;
+        margin-top: -15px;
       }
       .header-btn-reset {
         height: 34px;
@@ -1135,15 +1166,38 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 0.85rem;
-        padding-bottom: 0.51rem;
-        border-bottom: 0.85px solid var(--border-light);
-        background: var(--row-alt);
+        margin: -1.062rem -1.275rem 1rem;
+        padding: 1rem 1.25rem;
+        background: var(--bg);
+        border-bottom: 0.85px solid var(--border);
+        border-radius: var(--radius) var(--radius) 0 0;
       }
       .modal-title {
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--header-bg);
+      }
+      .title-badge {
+        background: var(--header-bg);
+        color: white;
+        font-size: 0.625rem;
+        font-weight: 800;
+        padding: 0.25rem 1.15rem 0.25rem 0.65rem;
+        clip-path: polygon(
+          0% 0%,
+          calc(100% - 10px) 0%,
+          100% 50%,
+          calc(100% - 10px) 100%,
+          0% 100%
+        );
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        line-height: 1.2;
+        display: inline-flex;
+        align-items: center;
       }
       .modal-close-icon {
         border: none;
@@ -1173,35 +1227,55 @@
         border-top: 0.85px solid var(--border-light);
         background: var(--row-alt);
       }
+      .schedule-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        gap: 0.85rem;
+        padding-top: 2px;
+      }
+      .subtitle-chip {
+        display: inline-flex;
+        align-items: center;
+        background: var(--surface);
+        color: var(--header-bg);
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 0.35rem 1.35rem 0.35rem 0.75rem;
+        clip-path: polygon(
+          0% 0%,
+          calc(100% - 12px) 0%,
+          100% 50%,
+          calc(100% - 12px) 100%,
+          0% 100%
+        );
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        filter: drop-shadow(0 0 0.85px var(--border));
+      }
       .btn-secondary {
         height: 34px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: var(--surface);
-        color: var(--text-secondary);
-        border: 0.85px solid var(--border);
+        background: var(--accent-light);
+        color: var(--primary);
+        border: 1px solid rgba(45, 157, 95, 0.2);
         border-radius: var(--radius-sm);
         padding: 0 1.25rem;
         font-size: 0.875rem;
-        font-weight: 600;
+        font-weight: 700;
         cursor: pointer;
         font-family: inherit;
         box-shadow: var(--shadow-sm);
         transition: all 0.2s ease;
       }
       .btn-secondary:hover {
-        background: var(--row-alt);
-        color: var(--text);
+        background: #dcf2e6;
+        color: var(--primary-hover);
+        border-color: var(--primary);
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-      .schedule-header-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 0.85rem;
-        gap: 0.85rem;
-        padding-top: 2px;
       }
       .schedule-empty {
         color: var(--muted);
@@ -1221,7 +1295,12 @@
         overflow: hidden;
         border: 0.05px solid var(--border-light);
       }
-      .schedule-list th,
+      .schedule-list th {
+        padding: 0.34rem 0.51rem;
+        border-right: 0.01px solid rgba(197, 205, 209, 0.3);
+        text-align: left;
+        vertical-align: top;
+      }
       .schedule-list td {
         padding: 0.34rem 0.51rem;
         border-bottom: 0.05px solid var(--border-light);
@@ -1266,13 +1345,50 @@
         gap: 0.21rem;
       }
       .schedule-label {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: var(--text-secondary);
+        font-size: 0.65rem;
+        font-weight: 800;
+        color: white;
+        background: var(--header-bg);
+        padding: 0.25rem 1.1rem 0.25rem 0.65rem;
+        clip-path: polygon(
+          0% 0%,
+          calc(100% - 10px) 0%,
+          100% 50%,
+          calc(100% - 10px) 100%,
+          0% 100%
+        );
+        width: fit-content;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.2rem;
+        filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.4));
       }
       .schedule-hint {
-        font-size: 0.78rem;
+        font-size: 0.75rem;
         color: var(--muted);
+        line-height: 1.3;
+      }
+      .schedule-note-card {
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.85rem 1rem;
+        margin-top: 1rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        box-shadow: var(--shadow-sm);
+        position: relative;
+        overflow: hidden;
+      }
+      .schedule-note-card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--header-bg);
       }
       .schedule-select,
       .schedule-input {
@@ -1331,20 +1447,22 @@
         <div class="header-right">
           <div class="header-filter-row">
             <div class="header-field-wrap">
-              <label class="header-label" for="brand-dropdown-trigger"
-                >Brand</label
-              >
               <div id="brand-dropdown" class="filter-dropdown">
-                <button
-                  type="button"
-                  id="brand-dropdown-trigger"
-                  class="filter-dropdown-trigger"
-                  aria-haspopup="listbox"
-                  aria-expanded="false"
-                  title="Select one or more brands"
-                >
-                  Select brand
-                </button>
+                <div class="filter-chip">
+                  <label class="header-label" for="brand-dropdown-trigger"
+                    >Brand</label
+                  >
+                  <button
+                    type="button"
+                    id="brand-dropdown-trigger"
+                    class="filter-dropdown-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    title="Select one or more brands"
+                  >
+                    Select brand
+                  </button>
+                </div>
                 <div
                   id="brand-dropdown-panel"
                   class="filter-dropdown-panel"
@@ -1360,20 +1478,22 @@
               ></div>
             </div>
             <div class="header-field-wrap">
-              <label class="header-label" for="purchaser-dropdown-trigger"
-                >Purchaser</label
-              >
               <div id="purchaser-dropdown" class="filter-dropdown">
-                <button
-                  type="button"
-                  id="purchaser-dropdown-trigger"
-                  class="filter-dropdown-trigger"
-                  aria-haspopup="listbox"
-                  aria-expanded="false"
-                  title="Select one or more purchasers"
-                >
-                  Select purchaser
-                </button>
+                <div class="filter-chip">
+                  <label class="header-label" for="purchaser-dropdown-trigger"
+                    >Purchaser</label
+                  >
+                  <button
+                    type="button"
+                    id="purchaser-dropdown-trigger"
+                    class="filter-dropdown-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    title="Select one or more purchasers"
+                  >
+                    Select purchaser
+                  </button>
+                </div>
                 <div
                   id="purchaser-dropdown-panel"
                   class="filter-dropdown-panel"
@@ -1389,9 +1509,6 @@
               ></div>
             </div>
             <div class="header-field-wrap header-filter-reset-wrap">
-              <label class="header-label" style="visibility: hidden"
-                >Reset</label
-              >
               <button
                 type="button"
                 id="filter-reset-btn"
@@ -1435,6 +1552,7 @@
       >
         <div class="modal-header">
           <div class="modal-title" id="schedule-modal-title">
+            <span class="title-badge">SCHEDULE</span>
             Schedule automatic sync &amp; extraction
           </div>
           <button
@@ -3425,7 +3543,7 @@
           state && Array.isArray(state.schedules) ? state.schedules : [];
         var tz = state && Array.isArray(state.timezones) ? state.timezones : [];
         var html =
-          '<div class="schedule-header-row"><div>Manage scheduled sync &amp; extraction jobs.</div><div style="display:flex;gap:0.51rem;flex-wrap:wrap;"><button type="button" id="schedule-history-btn" class="btn-secondary">Execution History</button><button type="button" id="schedule-create-btn" class="download-report-btn download-report-schedule-btn">Create a Schedule</button></div></div><div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
+          '<div class="schedule-header-row"><div class="subtitle-chip">Manage scheduled sync &amp; extraction jobs</div><div style="display:flex;gap:0.51rem;flex-wrap:wrap;"><button type="button" id="schedule-history-btn" class="btn-secondary">Execution History</button><button type="button" id="schedule-create-btn" class="download-report-btn download-report-schedule-btn">Create a Schedule</button></div></div><div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
         if (!schedules.length) {
           html +=
             '<div class="schedule-empty">No schedules created. Please create a schedule.</div>';
@@ -3681,8 +3799,10 @@
           .join("");
         renderWithTransition(
           body,
-          '<div class="schedule-header-row"><div>' +
-            (schedule ? "Edit schedule." : "Create a new schedule.") +
+          '<div class="schedule-header-row"><div class="subtitle-chip">' +
+            (schedule
+              ? "Edit schedule configuration"
+              : "Create a new schedule mission") +
             '</div><button type="button" id="schedule-form-back-btn" class="btn-secondary">Back to Schedules</button></div>' +
             '<div style="flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;">' +
             '<div class="schedule-form-grid">' +
@@ -3699,8 +3819,8 @@
             "</div>" +
             '<div id="schedule-error" class="schedule-error"></div>' +
             "</div>" +
-            '<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;padding:0.5rem 0.75rem;margin-top:0.5rem;font-size:0.8rem;color:#e65100;line-height:1.4;">' +
-            "<strong>⚠ Note:</strong> Make sure no Sync &amp; Extract or any other process is running at the scheduled time. If any manual process is active, or any process is in <strong>paused (Resume)</strong> mode, when the cron triggers, the scheduled run will be <strong>skipped</strong>." +
+            '<div class="schedule-note-card">' +
+            "<strong>⚠ Important Information:</strong> Ensure no other extraction missions are scheduled or active at this time. Manual processes or <strong>paused (Resume)</strong> states will cause this mission to be skipped to prevent data conflicts." +
             "</div>" +
             '<div class="modal-footer" style="margin-top:0.85rem;"><button type="button" id="schedule-cancel-btn" class="btn-secondary">Cancel</button><button type="button" id="schedule-save-btn" class="download-report-btn download-report-schedule-btn">' +
             (schedule ? "Update schedule" : "Save Schedule") +
@@ -3939,7 +4059,7 @@
         if (!body) return;
         renderWithTransition(
           body,
-          '<div class="schedule-header-row"><div>Schedule run history</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Loading…</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
+          '<div class="schedule-header-row"><div class="subtitle-chip">Schedule execution logs</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Loading history logs…</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
           direction || "right",
         );
         var backBtn = document.getElementById("schedule-log-back-btn");
@@ -3956,10 +4076,10 @@
           .then(function (data) {
             var entries = data.entries || [];
             var html =
-              '<div class="schedule-header-row"><div>Schedule run history</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div style="flex:1;display:flex;flex-direction:column;overflow-y:auto;">';
+              '<div class="schedule-header-row"><div class="subtitle-chip">Schedule execution logs</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div style="flex:1;display:flex;flex-direction:column;overflow-y:auto;">';
             if (!entries.length) {
               html +=
-                '<div class="schedule-empty">No schedule run log yet. Skipped and executed runs will appear here.</div>';
+                '<div class="schedule-empty">No execution history found yet. Logs for missions will appear here.</div>';
             } else {
               html +=
                 '<table class="schedule-list"><thead><tr><th>Time</th><th>Schedule ID</th><th>Outcome</th><th>Message</th></tr></thead><tbody>';
@@ -4009,7 +4129,7 @@
           .catch(function () {
             renderWithTransition(
               body,
-              '<div class="schedule-header-row"><div>Schedule run history</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load schedule log.</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
+              '<div class="schedule-header-row"><div class="subtitle-chip">Execution Log Error</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load mission execution history logs.</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
               direction || "right",
             );
             backBtn = document.getElementById("schedule-log-back-btn");
