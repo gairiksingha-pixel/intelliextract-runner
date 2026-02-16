@@ -449,7 +449,6 @@ function formatBrandDisplayName(brandId?: string): string {
   if (brandId.includes("no-cow")) return "No Cow";
   if (brandId.includes("sundia")) return "Sundia";
   if (brandId.includes("tractor-beverage")) return "Tractor";
-  if (brandId.includes("tractor-beverage")) return "Tractor";
   return brandId;
 }
 
@@ -497,6 +496,10 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     entry.runDurationSeconds > 0 ? processed / entry.runDurationSeconds : 0;
   const throughputPerMinute = throughputPerSecond * 60;
   const totalApiTime = formatDuration(m.totalProcessingTimeMs);
+  const avgConcurrency =
+    wallClockMs > 0
+      ? (m.totalProcessingTimeMs / wallClockMs).toFixed(1)
+      : "0.0";
   // Error rate = Infrastructure failures / Total processed.
   // Logical failures (API success: false) are NOT counted as system errors.
   const displayErrorRate = processed > 0 ? displayInfraFailed / processed : 0;
@@ -632,8 +635,9 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     );
   }
   if (agentSummaryPoints.length === 0 && processed > 0) {
+    const skipSuffix = m.skipped > 0 ? ` (+${m.skipped} skipped)` : "";
     agentSummaryPoints.push(
-      `Run completed without notable anomalies: ${processed} files in ${runDuration} at ${throughputPerMinute.toFixed(1)} files/min.`,
+      `Run completed without notable anomalies: ${processed} files${skipSuffix} in ${runDuration} at ${throughputPerMinute.toFixed(1)} files/min.`,
     );
   }
   const agentSummaryHtml =
@@ -669,13 +673,16 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   <table>
     <tr><th>Metric</th><th>Value</th></tr>
     <tr><td>Total synced files</td><td>${m.totalFiles}</td></tr>
-    <tr><td>Total extracted files</td><td>${displaySuccess + displayApiFailed}</td></tr>
+    <tr><td>Total extraction results available</td><td>${displaySuccess + displayApiFailed}</td></tr>
+    <tr><td>Files processed in this run</td><td>${processed}</td></tr>
+    <tr><td>Files skipped (already handled)</td><td>${m.skipped}</td></tr>
     <tr><td>Successful Response (Success: true)</td><td>${displaySuccess}</td></tr>
     <tr><td>Successful Response (Success: false)</td><td>${displayApiFailed}</td></tr>
-    <tr><td>Failure</td><td>${displayInfraFailed}</td></tr>
+    <tr><td>Failure (Infrastructure)</td><td>${displayInfraFailed}</td></tr>
     <tr><td>Run duration (wall clock)</td><td>${runDuration}</td></tr>
-    <tr><td>Throughput</td><td>${throughputPerSecond.toFixed(2)} files/sec, ${throughputPerMinute.toFixed(2)} files/min</td></tr>
-    <tr><td>Total API time (sum of request latencies)</td><td>${totalApiTime}</td></tr>
+    <tr><td>Average API concurrency</td><td>${avgConcurrency}x</td></tr>
+    <tr><td>Total API processing time</td><td>${totalApiTime} <span class="muted">(sum of latencies)</span></td></tr>
+    <tr><td>Throughput (observed)</td><td>${throughputPerSecond.toFixed(2)} files/sec, ${throughputPerMinute.toFixed(2)} files/min</td></tr>
     <tr><td>Error rate (Infrastructure failures)</td><td>${(displayErrorRate * 100).toFixed(2)}%</td></tr>
     <tr><td>False Response Rate (API success: false)</td><td>${(falseResponseRate * 100).toFixed(2)}%</td></tr>
   </table>
@@ -691,7 +698,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     <tr><td>Ideal extract count (≈10 min run)</td><td>~${Math.round(throughputPerMinute * 10)} files</td></tr>
     <tr><td>Ideal extract count (≈15 min run)</td><td>~${Math.round(throughputPerMinute * 15)} files</td></tr>
   </table>
-  <p><strong>Summary:</strong> At this run&rsquo;s load, the API handled <strong>${processed} files</strong> in <strong>${runDuration}</strong> with <strong>${(displayErrorRate * 100).toFixed(2)}%</strong> infrastructure errors and <strong>${(falseResponseRate * 100).toFixed(2)}%</strong> false responses. For a target run of about 5 minutes, aim for batches of <strong>~${Math.round(throughputPerMinute * 5)} files</strong>; for 10 minutes, <strong>~${Math.round(throughputPerMinute * 10)} files</strong>.</p>
+  <p><strong>Summary:</strong> At this run&rsquo;s load, the API handled <strong>${processed} files</strong> (${m.skipped} skipped) in <strong>${runDuration}</strong> with <strong>${(displayErrorRate * 100).toFixed(2)}%</strong> infrastructure errors and <strong>${(falseResponseRate * 100).toFixed(2)}%</strong> false responses. For a target run of about 5 minutes, aim for batches of <strong>~${Math.round(throughputPerMinute * 5)} files</strong>; for 10 minutes, <strong>~${Math.round(throughputPerMinute * 10)} files</strong>.</p>
   <h3>Latency (ms)</h3>
   <table>
     <tr><th>Percentile</th><th>Value</th></tr>
