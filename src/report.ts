@@ -368,8 +368,8 @@ export function loadHistoricalRunSummaries(
         clusterEnd,
       );
 
-      // Fix for the title: the user wants the latest timestamp for the accordion title.
-      metrics.startedAt = latestRun.start.toISOString();
+      // Fix for the title: the user wants the latest activity (completion) time as the accordion header.
+      metrics.startedAt = clusterEnd.toISOString();
 
       const runDurationSeconds = cluster.reduce(
         (sum, c) => sum + (c.end.getTime() - c.start.getTime()) / 1000,
