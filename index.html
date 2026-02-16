@@ -479,6 +479,7 @@
         text-transform: none;
         letter-spacing: 0.02em;
         border-color: var(--header-border);
+        border-bottom: none;
         text-align: center;
       }
       tbody tr {
@@ -801,35 +802,20 @@
         align-items: center;
         justify-content: center;
       }
-      button.download-sync-report-btn:hover:not(:disabled),
-      button.download-report-btn:hover:not(:disabled) {
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      .download-bar-btns button.download-sync-report-btn,
+      .download-bar-btns button.download-report-btn {
+        background: transparent;
+        color: var(--text-secondary);
+        box-shadow: none;
       }
-      button.download-sync-report-btn {
-        background: var(--header-bg);
+      /* Specifically restore 'Add a Schedule' button colors */
+      button.download-report-schedule-btn {
+        background: var(--primary) !important;
+        color: #fff !important;
+        box-shadow: var(--shadow-btn) !important;
       }
-      button.download-sync-report-btn:hover:not(:disabled) {
-        background: var(--primary-hover);
-      }
-      button.download-report-btn.download-report-html-btn {
-        background: var(--header-bg);
-      }
-      button.download-report-btn.download-report-html-btn:hover:not(:disabled) {
-        background: var(--primary-hover);
-      }
-      button.download-report-btn.download-report-json-btn {
-        background: var(--header-bg);
-      }
-      button.download-report-btn.download-report-json-btn:hover:not(:disabled) {
-        background: var(--primary-hover);
-      }
-      button.download-report-btn.download-report-schedule-btn {
-        background: var(--header-bg);
-      }
-      button.download-report-btn.download-report-schedule-btn:hover:not(
-          :disabled
-        ) {
-        background: var(--primary-hover);
+      button.download-report-schedule-btn:hover:not(:disabled) {
+        background: var(--primary-hover) !important;
       }
       button.download-sync-report-btn:disabled,
       button.download-report-btn:disabled {
@@ -847,29 +833,62 @@
         margin-bottom: 0;
         flex-wrap: wrap;
       }
+      .download-chip {
+        display: flex;
+        align-items: center;
+        height: 38px;
+        background: var(--surface);
+        border: 0.85px solid var(--border);
+        border-radius: var(--radius-sm);
+        box-shadow: 0 0.85px 1.7px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+      }
       .download-bar-label {
         font-size: 0.725rem;
-        font-weight: 700;
-        color: var(--header-bg);
-        background: rgba(33, 108, 109, 0.08);
-        padding: 0.35rem 0.85rem;
-        border-radius: var(--radius-sm);
+        font-weight: 800;
+        color: var(--primary);
+        background: var(--pass-bg);
+        padding: 0 1rem;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        border-right: 1.2px solid rgba(45, 157, 95, 0.2);
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        border: 0.85px solid rgba(33, 108, 109, 0.2);
-        display: inline-flex;
-        align-items: center;
         white-space: nowrap;
+        margin: 0;
       }
       .download-bar-btns {
         display: flex;
         align-items: center;
-        gap: 0.425rem;
-        flex-wrap: wrap;
+        height: 100%;
+        gap: 0;
       }
       .download-bar-btns .download-sync-report-btn,
       .download-bar-btns .download-report-btn {
+        height: 100%;
+        width: auto;
+        min-width: 150px;
+        border: none;
+        border-radius: 0;
+        background: transparent !important;
+        color: var(--text-secondary) !important;
+        padding: 0 1.25rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        box-shadow: none;
+        border-right: 1px solid var(--border-light);
         margin: 0;
+        transition: all 0.2s ease;
+      }
+      .download-bar-btns .download-sync-report-btn:hover,
+      .download-bar-btns .download-report-btn:hover:not(:disabled) {
+        background: var(--bg) !important;
+        color: var(--primary) !important;
+        box-shadow: none;
+      }
+      .download-bar-btns button:last-child {
+        border-right: none;
       }
       .result-header {
         width: 402.9px;
@@ -1026,18 +1045,23 @@
         text-align: left;
         vertical-align: top;
         border: 0.85px solid var(--border-light);
-        background: rgba(255, 255, 255, 0.5);
       }
       .result-table-wrap th {
+        background: var(--header-bg) !important;
+        color: #ffffff !important;
         font-weight: 600;
-        color: var(--text);
         width: 195.5px;
         min-width: 195.5px;
+        border-bottom: none;
       }
       .result-table-wrap td {
+        background: var(--surface);
         color: var(--text-secondary);
         word-break: break-word;
         white-space: pre-wrap;
+      }
+      .result-table-wrap tr:nth-child(even) td {
+        background: var(--row-alt);
       }
       .result-table-wrap tr:first-child th:first-child,
       .result-table-wrap tr:first-child td:first-child {
@@ -1328,9 +1352,12 @@
       .schedule-list th {
         padding: 0.34rem 0.51rem;
         border-right: 1px solid var(--border-light);
+        border-bottom: none;
         text-align: left;
         vertical-align: top;
-        background: var(--surface);
+        background: var(--header-bg) !important;
+        color: #ffffff !important;
+        font-weight: 600;
       }
       .schedule-list td {
         padding: 0.34rem 0.51rem;
@@ -1338,6 +1365,11 @@
         border-right: 1px solid var(--border-light);
         text-align: left;
         vertical-align: top;
+        background: var(--surface);
+        color: var(--text-secondary);
+      }
+      .schedule-list tr:nth-child(even) td {
+        background: var(--row-alt);
       }
       .schedule-list tr:last-child td {
         border-bottom: none;
@@ -1557,8 +1589,10 @@
     <main class="main">
       <div class="table-section">
         <div class="download-bar" id="download-bar">
-          <span class="download-bar-label">Reports & downloads:</span>
-          <div class="download-bar-btns" id="download-bar-btns"></div>
+          <div class="download-chip">
+            <span class="download-bar-label">Reports & downloads</span>
+            <div class="download-bar-btns" id="download-bar-btns"></div>
+          </div>
         </div>
         <table>
           <thead>
@@ -3209,7 +3243,7 @@
         var btns = document.getElementById("download-bar-btns");
         var scheduleBtn = document.createElement("button");
         scheduleBtn.type = "button";
-        scheduleBtn.textContent = "Add a Schedule";
+        scheduleBtn.textContent = "Manage Schedules";
         scheduleBtn.className =
           "download-report-btn download-report-schedule-btn";
         scheduleBtn.style.marginLeft = "auto";
