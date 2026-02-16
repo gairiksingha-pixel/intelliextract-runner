@@ -129,21 +129,24 @@
         align-items: flex-end;
         justify-content: center;
         gap: 0;
-        flex-shrink: 0;
+        flex: 1;
         padding-top: 0;
       }
       .header-filter-row {
         display: flex;
         align-items: center;
-        gap: 0.85rem;
+        justify-content: flex-end;
+        gap: 1rem;
         flex-wrap: wrap;
         margin-top: 0.75rem;
+        width: 100%;
       }
       .header-field-wrap {
         display: flex;
         flex-direction: column;
         gap: 0.17rem;
         align-items: flex-start;
+        margin-right: 0.5rem;
       }
       .filter-chip .header-label {
         font-size: 0.725rem;
@@ -354,8 +357,33 @@
         margin: 0;
         cursor: pointer;
       }
+      /* Brand & Purchaser Dropdown Width Customization */
+      .brand-field-wrap {
+        flex: 0 0 15%;
+        min-width: 160px;
+      }
+      .purchaser-field-wrap {
+        flex: 0 0 20%;
+        min-width: 240px;
+      }
+      #brand-dropdown,
+      #purchaser-dropdown {
+        width: 100%;
+        max-width: none;
+      }
+      #brand-dropdown .filter-chip,
+      #purchaser-dropdown .filter-chip {
+        width: 100% !important;
+      }
+      #brand-dropdown .filter-dropdown-trigger,
+      #purchaser-dropdown .filter-dropdown-trigger {
+        flex: 1 !important;
+        width: auto !important;
+        min-width: 0;
+      }
       .header-filter-reset-wrap {
         margin-top: -15px;
+        margin-right: 0 !important;
       }
       .header-btn-reset {
         height: 34px;
@@ -1449,7 +1477,7 @@
         >
         <div class="header-right">
           <div class="header-filter-row">
-            <div class="header-field-wrap">
+            <div class="header-field-wrap brand-field-wrap">
               <div id="brand-dropdown" class="filter-dropdown">
                 <div class="filter-chip">
                   <label class="header-label" for="brand-dropdown-trigger"
@@ -1480,7 +1508,7 @@
                 role="alert"
               ></div>
             </div>
-            <div class="header-field-wrap">
+            <div class="header-field-wrap purchaser-field-wrap">
               <div id="purchaser-dropdown" class="filter-dropdown">
                 <div class="filter-chip">
                   <label class="header-label" for="purchaser-dropdown-trigger"
