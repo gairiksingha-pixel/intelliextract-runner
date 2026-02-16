@@ -17,8 +17,8 @@
         --surface: #ffffff;
         --text: #2c2c2c;
         --text-secondary: #5a5a5a;
-        --border: #c5cdd1;
-        --border-light: #dfe4e8;
+        --border: #b0bfc9;
+        --border-light: #cbd5e1;
         --header-bg: #216c6d;
         --header-text: #ffffff;
         --header-border: #1a5758;
@@ -255,8 +255,8 @@
         min-width: 180px;
       }
       .header-filter-row .filter-dropdown {
-        width: auto;
-        min-width: 0;
+        width: 180px;
+        min-width: 180px;
       }
       .filter-dropdown-trigger {
         width: 100%;
@@ -280,6 +280,7 @@
         background-position: right 0.425rem center;
       }
       .filter-chip .filter-dropdown-trigger {
+        width: 180px;
         height: 100%;
         border: none;
         background-color: transparent;
@@ -1169,7 +1170,7 @@
         margin: -1.062rem -1.275rem 1rem;
         padding: 1rem 1.25rem;
         background: var(--bg);
-        border-bottom: 0.85px solid var(--border);
+        border-bottom: 1.2px solid var(--border);
         border-radius: var(--radius) var(--radius) 0 0;
       }
       .modal-title {
@@ -1198,6 +1199,7 @@
         line-height: 1.2;
         display: inline-flex;
         align-items: center;
+        filter: drop-shadow(0 0 1.2px rgba(0, 0, 0, 0.5));
       }
       .modal-close-icon {
         border: none;
@@ -1252,7 +1254,7 @@
         );
         text-transform: uppercase;
         letter-spacing: 0.03em;
-        filter: drop-shadow(0 0 0.85px var(--border));
+        filter: drop-shadow(0 0 1.2px var(--header-bg));
       }
       .btn-secondary {
         height: 34px;
@@ -1293,18 +1295,19 @@
         font-size: 0.8rem;
         border-radius: var(--radius-sm);
         overflow: hidden;
-        border: 0.05px solid var(--border-light);
+        border: 1px solid var(--border-light);
       }
       .schedule-list th {
         padding: 0.34rem 0.51rem;
-        border-right: 0.01px solid rgba(197, 205, 209, 0.3);
+        border-right: 1px solid var(--border-light);
         text-align: left;
         vertical-align: top;
+        background: var(--surface);
       }
       .schedule-list td {
         padding: 0.34rem 0.51rem;
-        border-bottom: 0.05px solid var(--border-light);
-        border-right: 0.01px solid rgba(197, 205, 209, 0.3);
+        border-bottom: 1px solid var(--border-light);
+        border-right: 1px solid var(--border-light);
         text-align: left;
         vertical-align: top;
       }
@@ -1361,7 +1364,7 @@
         text-transform: uppercase;
         letter-spacing: 0.06em;
         margin-bottom: 0.2rem;
-        filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.4));
+        filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
       }
       .schedule-hint {
         font-size: 0.75rem;

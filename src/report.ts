@@ -670,26 +670,36 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     prefix = `${p}-`;
   }
   const labelWithPrefix = `${prefix}${runLabel}`;
+  const successBadge = `<span class="badge-status success">${displaySuccess} SUCCESS</span>`;
+  const apiFailBadge = `<span class="badge-status secondary">${displayApiFailed} API FAIL</span>`;
+  const infraFailBadge = `<span class="badge-status fail">${displayInfraFailed} INFRA FAIL</span>`;
+
   return `
   <details class="run-section">
-  <summary class="run-section-summary"><strong>${escapeHtml(labelWithPrefix)}</strong> — Successful Response (Success: true): ${displaySuccess}, Successful Response (Success: false): ${displayApiFailed}, Failure: ${displayInfraFailed}</summary>
+  <summary class="run-section-summary">
+    <div class="summary-content">
+      <div class="mission-pointer">${escapeHtml(labelWithPrefix)}</div>
+      <div class="summary-badges">
+        ${successBadge} ${apiFailBadge} ${infraFailBadge}
+      </div>
+    </div>
+  </summary>
   <div class="run-section-body">
   <h3>Overview</h3>
   <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Total synced files</td><td>${m.totalFiles}</td></tr>
-    <tr><td>Total extraction results available</td><td>${displaySuccess + displayApiFailed}</td></tr>
-    <tr><td>Files processed in this run</td><td>${processed}</td></tr>
-    <tr><td>Files skipped (already handled)</td><td>${m.skipped}</td></tr>
-    <tr><td>Successful Response (Success: true)</td><td>${displaySuccess}</td></tr>
-    <tr><td>Successful Response (Success: false)</td><td>${displayApiFailed}</td></tr>
-    <tr><td>Failure (Infrastructure)</td><td>${displayInfraFailed}</td></tr>
-    <tr><td>Run duration (wall clock)</td><td>${runDuration}</td></tr>
-    <tr><td>Average API concurrency</td><td>${avgConcurrency}x</td></tr>
-    <tr><td>Total API processing time</td><td>${totalApiTime} <span class="muted">(sum of latencies)</span></td></tr>
-    <tr><td>Throughput (observed)</td><td>${throughputPerSecond.toFixed(2)} files/sec, ${throughputPerMinute.toFixed(2)} files/min</td></tr>
-    <tr><td>Error rate (Infrastructure failures)</td><td>${(displayErrorRate * 100).toFixed(2)}%</td></tr>
-    <tr><td>False Response Rate (API success: false)</td><td>${(falseResponseRate * 100).toFixed(2)}%</td></tr>
+    <tr><td>Total synced files</td><td><span class="chip secondary">${m.totalFiles}</span></td></tr>
+    <tr><td>Total extraction results available</td><td><span class="chip secondary">${displaySuccess + displayApiFailed}</span></td></tr>
+    <tr><td>Files processed in this run</td><td><span class="chip secondary">${processed}</span></td></tr>
+    <tr><td>Files skipped (already handled)</td><td><span class="chip secondary">${m.skipped}</span></td></tr>
+    <tr><td>Successful Response (Success: true)</td><td><span class="chip success">${displaySuccess}</span></td></tr>
+    <tr><td>Successful Response (Success: false)</td><td><span class="chip secondary">${displayApiFailed}</span></td></tr>
+    <tr><td>Failure (Infrastructure)</td><td><span class="chip fail">${displayInfraFailed}</span></td></tr>
+    <tr><td>Run duration (wall clock)</td><td><span class="chip">${runDuration}</span></td></tr>
+    <tr><td>Average API concurrency</td><td><span class="chip">${avgConcurrency}x</span></td></tr>
+    <tr><td>Total API processing time</td><td><span class="chip">${totalApiTime}</span> <span class="muted small">(sum of latencies)</span></td></tr>
+    <tr><td>Throughput (observed)</td><td><span class="chip">${throughputPerMinute.toFixed(2)} files/min</span></td></tr>
+    <tr><td>Error rate (Infrastructure failures)</td><td><span class="chip fail">${(displayErrorRate * 100).toFixed(2)}%</span></td></tr>
   </table>
   <h3>Load testing / API capability</h3>
   <p>Use these as a guide for batch sizes and expected capacity at similar concurrency and file mix.</p>
@@ -707,19 +717,23 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   <h3>Latency (ms)</h3>
   <table>
     <tr><th>Percentile</th><th>Value</th></tr>
-    <tr><td>Average</td><td>${m.avgLatencyMs.toFixed(2)}</td></tr>
-    <tr><td>P50</td><td>${m.p50LatencyMs.toFixed(2)}</td></tr>
-    <tr><td>P95</td><td>${m.p95LatencyMs.toFixed(2)}</td></tr>
-    <tr><td>P99</td><td>${m.p99LatencyMs.toFixed(2)}</td></tr>
+    <tr><td>Average</td><td><span class="chip">${m.avgLatencyMs.toFixed(2)}</span></td></tr>
+    <tr><td>P50</td><td><span class="chip">${m.p50LatencyMs.toFixed(2)}</span></td></tr>
+    <tr><td>P95</td><td><span class="chip">${m.p95LatencyMs.toFixed(2)}</span></td></tr>
+    <tr><td>P99</td><td><span class="chip">${m.p99LatencyMs.toFixed(2)}</span></td></tr>
   </table>
   <h3>Automated summary</h3>
-  ${agentSummaryHtml}
+  <div class="agent-style-summary">
+    ${agentSummaryHtml}
+  </div>
   ${failureBreakdownSection}
   ${failureDetailsSection}
   ${topSlowestSection}
   ${failuresByBrandSection}
   <h3>Anomalies</h3>
-  ${anomaliesList}
+  <div class="anomalies-container">
+    ${anomaliesList}
+  </div>
   ${extractionSection}
   </div>
   </details>`;
@@ -743,24 +757,76 @@ function htmlReportFromHistory(
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Ubuntu', sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
-    th { background: #f5f5f5; }
-    h1, h2 { color: #333; }
-    h3 { color: #444; font-size: 1rem; margin-top: 1rem; }
-    .meta { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
-    .run-section { margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
-    .run-section[open] { border-color: #216c6d; }
-    .run-section-summary { cursor: pointer; padding: 0.6rem 0.75rem; background: #f5f5f5; list-style: none; font-size: 1rem; }
+    :root {
+      --primary: #2d9d5f;
+      --header-bg: #216c6d;
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --border: #abb9c8;
+      --text: #1e293b;
+      --text-secondary: #475569;
+      --pass-bg: #dcf2e6;
+      --fail-bg: #fee2e2;
+      --fail-text: #b91c1c;
+    }
+    body { font-family: 'Ubuntu', sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; color: var(--text); background: #f1f5f9; }
+    h1 { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
+    h2 { color: var(--text-secondary); font-size: 1.1rem; font-weight: 500; margin-bottom: 1.5rem; text-align: center; }
+    h3 { color: var(--header-bg); font-size: 0.95rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 1.5rem 0 0.75rem; border-bottom: 1.5px solid var(--border); padding-bottom: 0.25rem; }
+    
+    .meta { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 2rem; text-align: center; }
+    
+    table { border-collapse: separate; border-spacing: 0; width: 100%; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem; border: 1px solid var(--border); }
+    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+    th { background: var(--surface); color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+    th:last-child, td:last-child { border-right: none; }
+    tr:last-child td { border-bottom: none; }
+    
+    .run-section { margin-bottom: 1.25rem; background: white; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid var(--border); overflow: hidden; }
+    .run-section[open] { border-color: var(--header-bg); }
+    
+    .run-section-summary { cursor: pointer; padding: 1rem 1.25rem; background: var(--surface); list-style: none; transition: background 0.2s; }
     .run-section-summary::-webkit-details-marker { display: none; }
-    .run-section-summary::before { content: "▶"; display: inline-block; margin-right: 0.5rem; font-size: 0.65rem; color: #666; transition: transform 0.2s; }
-    .run-section[open] .run-section-summary::before { transform: rotate(90deg); }
-    .run-section-summary:hover { background: #eee; }
-    .run-section-body { padding: 0 0.75rem 0.75rem; }
-    .extraction-note { color: #555; font-size: 0.9rem; margin: 0.5rem 0; }
-    td.file-path { word-break: break-all; max-width: 700px; }
-    .muted { color: #888; font-style: italic; }
+    .run-section-summary:hover { background: #f1f5f9; }
+    
+    .summary-content { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    
+    .mission-pointer {
+      background: var(--header-bg);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.4rem 1.75rem 0.4rem 1rem;
+      clip-path: polygon(0% 0%, calc(100% - 15px) 0%, 100% 50%, calc(100% - 15px) 100%, 0% 100%);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      filter: drop-shadow(0 0 1.5px rgba(0,0,0,0.4));
+    }
+    
+    .summary-badges { display: flex; gap: 0.5rem; align-items: center; }
+    .badge-status { font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.6rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .badge-status.success { background: var(--pass-bg); color: var(--primary); }
+    .badge-status.fail { background: var(--fail-bg); color: var(--fail-text); }
+    .badge-status.secondary { background: #e2e8f0; color: #475569; }
+    
+    .run-section-body { padding: 0.5rem 1.5rem 1.5rem; }
+    
+    .chip { display: inline-flex; align-items: center; background: #f1f5f9; color: var(--text); padding: 0.2rem 0.6rem; border-radius: 100px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border); }
+    .chip.success { background: var(--pass-bg); color: var(--primary); border-color: rgba(45, 157, 95, 0.2); }
+    .chip.fail { background: var(--fail-bg); color: var(--fail-text); border-color: rgba(185, 28, 28, 0.2); }
+    .chip.secondary { background: #f8fafc; color: var(--header-bg); font-weight: 700; }
+    
+    .agent-style-summary, .anomalies-container {
+      background: #f8fafc;
+      border-left: 4px solid var(--header-bg);
+      padding: 1rem;
+      border-radius: 0 6px 6px 0;
+      margin: 0.5rem 0 1rem;
+    }
+    
+    .muted { color: var(--text-secondary); font-style: italic; }
+    .small { font-size: 0.75rem; }
+    td.file-path { font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); word-break: break-all; }
   </style>
 </head>
 <body>
