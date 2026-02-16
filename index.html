@@ -497,9 +497,9 @@
         background: var(--header-bg);
       }
       .limits-col {
-        width: 156.35px;
-        min-width: 156.35px;
-        max-width: 156.35px;
+        width: 143px;
+        min-width: 143px;
+        max-width: 143px;
       }
       .limits-cell {
         font-size: 0.85rem;
@@ -508,31 +508,56 @@
         vertical-align: top;
       }
       .limits-cell .limit-row {
-        display: grid;
-        grid-template-columns: auto 70.5px;
-        gap: 0.425rem 0.637rem;
-        align-items: center;
+        display: flex;
+        flex-direction: column;
+        gap: 0.425rem;
         min-height: 1.87rem;
       }
-      .limits-cell .limit-label {
-        white-space: nowrap;
-        font-weight: 500;
-      }
-      .limits-cell input[type="number"] {
-        width: 70.5px;
-        min-width: 70.5px;
-        max-width: 70.5px;
-        height: 28.05px;
-        padding: 0.34rem 0.51rem;
+      .limit-chip {
+        display: flex;
+        align-items: center;
+        height: 38px;
+        background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius-sm);
-        font-size: 0.875rem;
-        font-weight: 500;
+        overflow: hidden;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
+      }
+      .limit-chip:hover:not(:has(input:disabled)) {
+        border-color: var(--border-light);
+      }
+      .limit-chip:has(input:focus) {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 1.7px rgba(45, 157, 95, 0.2);
+      }
+      .limits-cell .limit-label {
+        background: var(--bg);
+        padding: 0 0.637rem;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        border-right: 1px solid var(--border);
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        min-width: 60px;
+        white-space: nowrap;
+      }
+      .limits-cell input[type="number"] {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: transparent;
+        padding: 0 0.51rem;
+        font-size: 0.9rem;
+        font-weight: 600;
         font-family: inherit;
         color: var(--text);
-        background: var(--bg);
-        box-sizing: border-box;
-        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        box-shadow: none;
+        text-align: center;
         transition: all 0.2s ease;
       }
       .limits-cell input[type="number"]::-webkit-inner-spin-button,
@@ -544,43 +569,41 @@
       .limits-cell input:hover::-webkit-inner-spin-button {
         opacity: 1;
       }
-      .limits-cell input[type="number"]:hover:not(:disabled) {
-        border-color: var(--border-light);
-        box-shadow:
-          0 1.7px 3.4px rgba(0, 0, 0, 0.08),
-          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
-      }
       .limits-cell input[type="number"]:focus {
         outline: none;
-        border-color: var(--primary);
-        box-shadow:
-          0 0 0 1.7px rgba(45, 157, 95, 0.2),
-          0 1.7px 3.4px rgba(0, 0, 0, 0.08),
-          inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
       }
       .limits-cell input[type="number"]:disabled {
+        opacity: 0.6;
+      }
+      .limit-chip:has(input:disabled) {
         background: var(--row-alt);
-        box-shadow: inset 0 0.85px 1.7px rgba(0, 0, 0, 0.05);
+        box-shadow: none;
       }
       .limits-cell .limit-hint {
         margin-top: 0.425rem;
-        padding: 0.297rem 0.425rem;
-        font-size: 0.8rem;
+        padding: 0.552rem 1.062rem;
+        font-size: 0.9rem;
         font-weight: 600;
         color: var(--primary);
         background: var(--accent-light);
-        border-radius: var(--radius-xs);
+        border-radius: var(--radius-sm);
         border: 0.85px solid rgba(45, 157, 95, 0.25);
-        display: inline-block;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 38px;
+        box-sizing: border-box;
+        width: 100%;
+        text-align: center;
       }
       .limits-cell .n/a {
         color: var(--muted);
         font-style: italic;
       }
       .run-cell {
-        width: 136.85px;
-        min-width: 136.85px;
-        max-width: 136.85px;
+        width: 143px;
+        min-width: 143px;
+        max-width: 143px;
         text-align: center;
         vertical-align: top;
       }
@@ -604,7 +627,8 @@
         color: #fff;
         border: 0.85px solid var(--header-border);
         border-radius: var(--radius-sm);
-        padding: 0.552rem 1.062rem;
+        height: 38px;
+        padding: 0 1.062rem;
         font-size: 0.9rem;
         font-weight: 600;
         cursor: pointer;
@@ -616,6 +640,9 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       button.run:hover:not(:disabled) {
         background: var(--primary-hover);
@@ -630,7 +657,8 @@
         color: var(--text-secondary);
         border: 0.85px solid var(--border);
         border-radius: var(--radius-sm);
-        padding: 0.468rem 0.85rem;
+        height: 38px;
+        padding: 0 0.85rem;
         font-size: 0.85rem;
         font-weight: 600;
         cursor: pointer;
@@ -642,6 +670,9 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       button.reset-case:hover {
         background: var(--row-alt);
@@ -1471,15 +1502,15 @@
         var html = '<td class="limits-cell"><div class="limit-row">';
         if (lim.pipeline) {
           html +=
-            '<span class="limit-label">Limit:</span><input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to sync; each is extracted in background as it is synced. 0 = no limit">';
+            '<div class="limit-chip"><span class="limit-label">Limit:</span><input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to sync; each is extracted in background as it is synced. 0 = no limit"></div>';
         } else {
           if (lim.sync) {
             html +=
-              '<span class="limit-label">Sync:</span><input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to download. 0 = no limit">';
+              '<div class="limit-chip"><span class="limit-label">Sync:</span><input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to download. 0 = no limit"></div>';
           }
           if (lim.extract) {
             html +=
-              '<span class="limit-label">Extract:</span><input type="number" class="limit-extract" min="0" step="1" value="0" title="Max files to extract. 0 = no limit">';
+              '<div class="limit-chip"><span class="limit-label">Extract:</span><input type="number" class="limit-extract" min="0" step="1" value="0" title="Max files to extract. 0 = no limit"></div>';
           }
         }
         html += '</div><div class="limit-hint">0 = no limit</div></td>';
