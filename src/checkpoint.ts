@@ -317,6 +317,38 @@ export function getRecordsForRun(
   return rows.map(rowToRecord);
 }
 
+/**
+ * Returns overall statistics across ALL runs for unique files,
+ * taking the latest status for each file.
+ */
+export function getCumulativeStats(
+  db: CheckpointDb,
+  filter?: { tenant?: string; purchaser?: string },
+): { success: number; failed: number; total: number } {
+  const latestByFile = new Map<string, { status: string; time: number }>();
+
+  for (const c of db._data.checkpoints) {
+    if (filter?.tenant && c.brand !== filter.tenant) continue;
+    if (filter?.purchaser && c.purchaser !== filter.purchaser) continue;
+
+    const time = c.started_at ? new Date(c.started_at).getTime() : 0;
+    const existing = latestByFile.get(c.file_path);
+
+    if (!existing || time > existing.time) {
+      latestByFile.set(c.file_path, { status: c.status, time });
+    }
+  }
+
+  let success = 0;
+  let failed = 0;
+  for (const info of latestByFile.values()) {
+    if (info.status === "done") success++;
+    else if (info.status === "error") failed++;
+  }
+
+  return { success, failed, total: latestByFile.size };
+}
+
 /** All unique run IDs from checkpoints, ordered by latest first (by earliest started_at in that run). */
 export function getAllRunIdsOrdered(db: CheckpointDb): string[] {
   const byRun = new Map<string, number>();

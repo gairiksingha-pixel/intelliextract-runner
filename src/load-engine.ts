@@ -28,6 +28,7 @@ import {
   upsertCheckpoints,
   getRecordsForRun,
   closeCheckpointDb,
+  getCumulativeStats,
 } from "./checkpoint.js";
 import {
   initRequestResponseLogger,
@@ -339,26 +340,42 @@ export async function extractOneFile(
     success: result.success,
   });
 
-  const status = result.success ? "done" : "error";
-  if (result.body) {
-    writeExtractionResult(config, runId, job, result.body);
-  }
-  const baseErrorSnippet = result.success
-    ? undefined
-    : result.body.slice(0, 500);
-  const errorMessage =
-    result.success || !baseErrorSnippet
-      ? undefined
-      : attempts > 1
-        ? `${baseErrorSnippet} (after ${attempts} attempt${attempts === 1 ? "" : "s"})`
-        : baseErrorSnippet;
+  const isHttpSuccess = result.success;
+  let isAppSuccess = isHttpSuccess;
+  let appErrorMessage: string | undefined;
   let patternKey: string | undefined;
+
   if (result.body) {
     try {
       const parsed = JSON.parse(result.body);
-      patternKey = parsed.pattern?.pattern_key;
-    } catch (_) {}
+      if (typeof parsed === "object" && parsed !== null) {
+        if (parsed.success === false) {
+          isAppSuccess = false;
+          appErrorMessage = parsed.error || parsed.message;
+        }
+        patternKey = parsed.pattern?.pattern_key;
+      }
+    } catch (_) {
+      // If we can't parse JSON but HTTP was 2xx, we'll still call it success
+      // unless we want to be strict. For now, keep as is.
+    }
   }
+
+  const finalSuccess = isAppSuccess;
+  const status = finalSuccess ? "done" : "error";
+
+  if (result.body) {
+    writeExtractionResult(config, runId, job, result.body);
+  }
+
+  const baseErrorSnippet = finalSuccess ? undefined : result.body.slice(0, 500);
+  const errorMessage =
+    finalSuccess || (!baseErrorSnippet && !appErrorMessage)
+      ? undefined
+      : appErrorMessage ||
+        (attempts > 1
+          ? `${baseErrorSnippet} (after ${attempts} attempt${attempts === 1 ? "" : "s"})`
+          : baseErrorSnippet);
 
   upsertCheckpoint(db, {
     filePath: job.filePath,
@@ -394,6 +411,8 @@ export async function runExtraction(
     runId?: string;
     /** Called after each file completes (done or error) so the report can be updated. */
     onFileComplete?: (runId: string) => void;
+    /** When true, only retry files that previously failed. */
+    retryFailed?: boolean;
   },
 ): Promise<LoadEngineResult> {
   const db = openCheckpointDb(config.run.checkpointPath);
@@ -401,6 +420,16 @@ export async function runExtraction(
   const completed = config.run.skipCompleted
     ? getCompletedPaths(db)
     : new Set<string>();
+
+  // If retryFailed is on, we ALSO want to know which files have "error" status
+  const errorPaths = options?.retryFailed
+    ? new Set(
+        db._data.checkpoints
+          .filter((c) => c.status === "error")
+          .map((c) => c.file_path),
+      )
+    : null;
+
   initRequestResponseLogger(config, runId);
 
   let buckets = config.s3.buckets;
@@ -442,6 +471,10 @@ export async function runExtraction(
   }
 
   let toProcess = jobs.filter((j) => !completed.has(j.filePath));
+
+  if (errorPaths) {
+    toProcess = toProcess.filter((j) => errorPaths.has(j.filePath));
+  }
   const extractLimit = options?.extractLimit;
   if (extractLimit !== undefined && extractLimit > 0) {
     toProcess = toProcess.slice(0, extractLimit);
@@ -563,26 +596,39 @@ export async function runExtraction(
             success: result.success,
           });
 
-          const status = result.success ? "done" : "error";
+          const isHttpSuccess = result.success;
+          let isAppSuccess = isHttpSuccess;
+          let appErrorMessage: string | undefined;
+          let patternKey: string | undefined;
+
+          if (result.body) {
+            try {
+              const parsed = JSON.parse(result.body);
+              if (typeof parsed === "object" && parsed !== null) {
+                if (parsed.success === false) {
+                  isAppSuccess = false;
+                  appErrorMessage = parsed.error || parsed.message;
+                }
+                patternKey = parsed.pattern?.pattern_key;
+              }
+            } catch (_) {}
+          }
+
+          const finalSuccess = isAppSuccess;
+          const status = finalSuccess ? "done" : "error";
           if (result.body) {
             writeExtractionResult(config, runIdToUse, job, result.body);
           }
-          const baseErrorSnippet = result.success
+          const baseErrorSnippet = finalSuccess
             ? undefined
             : result.body.slice(0, 500);
           const errorMessage =
-            result.success || !baseErrorSnippet
+            finalSuccess || (!baseErrorSnippet && !appErrorMessage)
               ? undefined
-              : attempts > 1
-                ? `${baseErrorSnippet} (after ${attempts} attempt${attempts === 1 ? "" : "s"})`
-                : baseErrorSnippet;
-          let patternKey: string | undefined;
-          if (result.success && result.body) {
-            try {
-              const parsed = JSON.parse(result.body);
-              patternKey = parsed.pattern?.pattern_key;
-            } catch (_) {}
-          }
+              : appErrorMessage ||
+                (attempts > 1
+                  ? `${baseErrorSnippet} (after ${attempts} attempt${attempts === 1 ? "" : "s"})`
+                  : baseErrorSnippet);
 
           upsertCheckpoint(db, {
             filePath: job.filePath,
@@ -644,6 +690,19 @@ export async function runExtraction(
   }
   const finishedAt = new Date();
   const records = getRecordsForRun(db, runIdToUse);
+
+  const cumStats = getCumulativeStats(db, {
+    tenant: options?.tenant,
+    purchaser: options?.purchaser,
+  });
+  const isPiped =
+    typeof process !== "undefined" && process.stdout?.isTTY !== true;
+  if (isPiped) {
+    process.stdout.write(
+      `CUMULATIVE_METRICS\tsuccess=${cumStats.success},failed=${cumStats.failed},total=${cumStats.total}\n`,
+    );
+  }
+
   closeRequestResponseLogger();
   closeCheckpointDb(db);
   return { runId: runIdToUse, records, startedAt, finishedAt };

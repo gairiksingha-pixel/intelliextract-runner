@@ -20,6 +20,7 @@ import {
   upsertCheckpoints,
   getRecordsForRun,
   closeCheckpointDb,
+  getCumulativeStats,
 } from "./checkpoint.js";
 import { saveResumeState, clearResumeState } from "./resume-state.js";
 import {
@@ -51,6 +52,8 @@ export interface RunOptions {
   onFileComplete?: (runId: string) => void;
   /** Resume with existing run ID if provided. */
   runId?: string;
+  /** When true, only retry files that previously failed. */
+  retryFailed?: boolean;
 }
 
 /** Single limit for pipeline mode: sync up to N files and extract each as it is synced (in background). */
@@ -136,6 +139,7 @@ export async function runFull(
     pairs: options.pairs,
     runId: options.runId,
     onFileComplete: options.onFileComplete,
+    retryFailed: options.retryFailed,
   });
   const metrics = computeMetrics(
     runResult.runId,
@@ -215,6 +219,15 @@ export async function runSyncExtractPipeline(
   const concurrency = config.run.concurrency;
   const extractionQueue = new PQueue({ concurrency });
 
+  // If retryFailed is on, we ONLY want to extract files that previously failed
+  const errorPaths = options.retryFailed
+    ? new Set(
+        db._data.checkpoints
+          .filter((c) => c.status === "error")
+          .map((c) => c.file_path),
+      )
+    : null;
+
   const startedAt = new Date();
   let syncResults: SyncResult[] = [];
   let extractionQueued = 0;
@@ -233,6 +246,12 @@ export async function runSyncExtractPipeline(
     if (aborted) return;
     clearResumeState(config);
     extractionQueued++;
+
+    if (errorPaths && !errorPaths.has(job.filePath)) {
+      extractionDone++;
+      options.onExtractionProgress?.(extractionDone, extractionQueued);
+      return;
+    }
 
     if (completed.has(job.filePath)) {
       extractionDone++;
@@ -297,10 +316,24 @@ export async function runSyncExtractPipeline(
   await extractionQueue.onIdle();
   const finishedAt = new Date();
   const records = getRecordsForRun(db, runId);
-  closeRequestResponseLogger();
-  closeCheckpointDb(db);
 
   const metrics = computeMetrics(runId, records, startedAt, finishedAt);
+
+  if (stdoutPiped) {
+    process.stdout.write(
+      `Extraction metrics: success=${metrics.success}, skipped=${metrics.skipped}, failed=${metrics.failed}\n`,
+    );
+    const cumStats = getCumulativeStats(db, {
+      tenant: options.tenant,
+      purchaser: options.purchaser,
+    });
+    process.stdout.write(
+      `CUMULATIVE_METRICS\tsuccess=${cumStats.success},failed=${cumStats.failed},total=${cumStats.total}\n`,
+    );
+  }
+
+  closeRequestResponseLogger();
+  closeCheckpointDb(db);
   const runResult: LoadEngineResult = {
     runId,
     records,

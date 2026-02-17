@@ -1493,6 +1493,23 @@
         width: 100%;
         min-width: 100%;
       }
+      .btn-group .retry-failed-btn {
+        background: var(--header-bg);
+        color: #ffffff;
+        border: 1px solid var(--header-border);
+      }
+      .btn-group .retry-failed-btn:hover {
+        background: #1a5758;
+        color: #ffffff;
+        border-color: #1a5758;
+        box-shadow: 0 2px 5px rgba(33, 108, 109, 0.2);
+      }
+      .btn-group .retry-failed-btn:disabled {
+        background: var(--surface);
+        color: var(--muted);
+        border-color: var(--border-light);
+        box-shadow: none;
+      }
     </style>
   </head>
   <body>
@@ -1733,6 +1750,19 @@
         resetBtn.onclick = function () {
           resetCase(resultDiv);
         };
+        // Add Retry Failed button for extraction-related cases
+        let retryBtn = null;
+        if (c.id === "P2") {
+          retryBtn = document.createElement("button");
+          retryBtn.type = "button";
+          retryBtn.className = "run retry-failed-btn";
+          retryBtn.textContent = "Retry Failed";
+          retryBtn.title =
+            "Only retry extractions that previously failed (ignored successful ones and new files)";
+          retryBtn.onclick = function () {
+            runCase(c.id, retryBtn, resultDiv, { retryFailed: true });
+          };
+        }
         const resetDuringResumeBtn = document.createElement("button");
         resetDuringResumeBtn.type = "button";
         resetDuringResumeBtn.className = "reset-case reset-during-resume";
@@ -1766,6 +1796,7 @@
           renderLimitsCell(c) +
           '<td class="run-cell"><div class="btn-group"><div class="btn-row"></div></div></td>';
         tr.querySelector(".btn-row").appendChild(btn);
+        if (retryBtn) tr.querySelector(".btn-row").appendChild(retryBtn);
         tr.querySelector(".btn-row").appendChild(resetBtn);
         tr.querySelector(".btn-row").appendChild(resetDuringResumeBtn);
         tr.appendChild(resultCell);
@@ -2042,6 +2073,16 @@
             parsed.extractionResultsPath = m[1].trim();
           else if ((m = /^Reports path:\s*(.+)$/.exec(line)))
             parsed.reportsPath = m[1].trim();
+          else if (
+            (m =
+              /^CUMULATIVE_METRICS\tsuccess=(\d+),failed=(\d+),total=(\d+)\s*$/.exec(
+                line,
+              ))
+          ) {
+            parsed.cumSuccess = m[1];
+            parsed.cumFailed = m[2];
+            parsed.cumTotal = m[3];
+          }
         }
         var syncCases = ["P1", "PIPE", "P5"];
         var extractCases = ["P2", "PIPE", "P5", "P3"];
@@ -2065,23 +2106,20 @@
           parsed.extractSuccess != null ||
           parsed.extractFailed != null ||
           parsed.extractSkipped != null;
-        var syncOnlyNoFiles =
-          hasSync && noSyncDownloaded && !hasExtractionMetrics;
-        var extractOrPipelineNoFiles =
-          hasExtractionMetrics &&
-          allExtractZero &&
-          (noSyncDownloaded || !hasSync);
-        var pipelineNoFiles =
-          caseId === "PIPE" &&
-          pass &&
-          (allExtractZero || (hasSync && noSyncDownloaded));
         var noFilesFound =
-          pass &&
-          (syncOnlyNoFiles || extractOrPipelineNoFiles || pipelineNoFiles);
+          pass && allExtractZero && (noSyncDownloaded || !hasSync);
+        // Special case: if we have cumulative data, it's not "no files" even if this run did nothing
+        if (parsed.cumTotal != null && Number(parsed.cumTotal) > 0) {
+          noFilesFound = false;
+        }
         var rows = [];
         rows.push(["Status", statusLabel]);
         if (noFilesFound) {
-          rows.push(["Message", "No files found to sync or extract."]);
+          var msg = "No files found to sync or extract.";
+          if (row && row._isRetryFailed) {
+            msg = "No failed files found to retry.";
+          }
+          rows.push(["Message", msg]);
         } else {
           if (hasSync) {
             var brandPurchaser =
@@ -2130,16 +2168,29 @@
                 escapeHtml(failedVal);
               rows.push(["Extraction overview", detail]);
             }
-            if (parsed.extractionResultsPath)
-              rows.push(["Extraction path", parsed.extractionResultsPath]);
-            if (parsed.reportsPath)
-              rows.push(["Reports path", parsed.reportsPath]);
+            if (parsed.cumTotal != null) {
+              var cumDetail =
+                "Success: " +
+                escapeHtml(parsed.cumSuccess) +
+                ", Failed: " +
+                escapeHtml(parsed.cumFailed) +
+                ' <span class="info-icon" title="Aggregated status of all unique files found for this filter across all historical runs.">i</span> (Total: ' +
+                escapeHtml(parsed.cumTotal) +
+                ")";
+              rows.push(["Overall status", cumDetail]);
+            }
+            if (parsed.extractionResultsPath || parsed.reportsPath) {
+              rows.push([
+                "Mission Report",
+                "Reports and extraction data are ready. Please use the <b>Reports & downloads</b> buttons in the toolbar above to save your results.",
+              ]);
+            }
           }
           if (!hasSync && !hasExtract && stdoutFiltered) {
             rows.push([
               "Output",
-              escapeHtml(stdoutFiltered.slice(0, 1500)) +
-                (stdoutFiltered.length > 1500 ? "…" : ""),
+              escapeHtml(stdoutFiltered.slice(0, 5000)) +
+                (stdoutFiltered.length > 5000 ? "…" : ""),
             ]);
           } else if (rows.length === 1) {
             var noOutput = !stdoutFiltered && !stderrFiltered;
@@ -2156,8 +2207,8 @@
         if (stderrFiltered)
           rows.push([
             "Standard error",
-            escapeHtml(stderrFiltered.slice(0, 2000)) +
-              (stderrFiltered.length > 2000 ? "…" : ""),
+            escapeHtml(stderrFiltered.slice(0, 5000)) +
+              (stderrFiltered.length > 5000 ? "…" : ""),
           ]);
         var tableRows = rows.map(function (r) {
           return (
@@ -2169,7 +2220,9 @@
             (r[0] === "Standard error" ||
             r[0] === "Output" ||
             r[0] === "Download overview" ||
-            r[0] === "Extraction overview"
+            r[0] === "Extraction overview" ||
+            r[0] === "Overall status" ||
+            r[0] === "Mission Report"
               ? r[1]
               : escapeHtml(r[1]).replace(/\n/g, "<br>")) +
             "</td></tr>"
@@ -2224,6 +2277,7 @@
             delete row._resumeExtractLimit;
           if (row._resumeSync !== undefined) delete row._resumeSync;
           if (row._resumeExtract !== undefined) delete row._resumeExtract;
+          if (row._isRetryFailed !== undefined) delete row._isRetryFailed;
           var runBtn = row.querySelector("button.run");
           if (runBtn) {
             runBtn.disabled = false;
@@ -2261,11 +2315,10 @@
           if (tr === currentRow) return;
           tr.classList.add("row-inactive");
           tr.setAttribute("title", ROW_INACTIVE_HOVER_TITLE);
-          var runBtn = tr.querySelector("button.run");
-          if (runBtn) {
-            runBtn.disabled = true;
-            runBtn.title = msg;
-          }
+          tr.querySelectorAll("button.run").forEach(function (btn) {
+            btn.disabled = true;
+            btn.title = msg;
+          });
           tr.querySelectorAll("button.reset-case").forEach(function (b) {
             b.disabled = true;
           });
@@ -2283,11 +2336,10 @@
         rows.forEach(function (tr) {
           tr.classList.remove("row-inactive");
           tr.removeAttribute("title");
-          var runBtn = tr.querySelector("button.run");
-          if (runBtn) {
-            runBtn.disabled = false;
-            runBtn.title = runBtn.textContent || "";
-          }
+          tr.querySelectorAll("button.run").forEach(function (btn) {
+            btn.disabled = false;
+            btn.title = btn.textContent || "";
+          });
           tr.querySelectorAll("button.reset-case").forEach(function (b) {
             b.disabled = false;
           });
@@ -2514,8 +2566,17 @@
             controller.abort();
           };
         }
-        btn.disabled = true;
+        if (row) {
+          row.querySelectorAll("button.run").forEach(function (b) {
+            b.disabled = true;
+          });
+        } else {
+          btn.disabled = true;
+        }
         setOtherRowsInactive(row, OTHER_RUN_DISABLED_TITLE);
+        if (row) {
+          row._isRetryFailed = !!(runOptions && runOptions.retryFailed);
+        }
         showResult(
           resultDiv,
           null,
@@ -2576,6 +2637,7 @@
             caseId: caseId,
             syncLimit: params.syncLimit,
             extractLimit: params.extractLimit,
+            retryFailed: !!(runOptions && runOptions.retryFailed),
           };
           if (isResume) {
             body.resume = true;
@@ -2859,9 +2921,11 @@
           if (row) row._activeController = null;
           if (row && row._aborted) {
             row._aborted = false;
-            btn.disabled = true;
-            btn.title =
-              "Please reset the download/extraction to start a new download/extraction";
+            row.querySelectorAll("button.run").forEach(function (b) {
+              b.disabled = true;
+              b.title =
+                "Please reset the download/extraction to start a new download/extraction";
+            });
             setOtherRowsInactive(row, RESUME_OTHER_DISABLED_TITLE);
           } else {
             setOtherRowsActive();
@@ -2924,7 +2988,11 @@
                       resetCase(resultDiv);
                     };
                   }
-                  if (runBtn) runBtn.disabled = false;
+                  if (row) {
+                    row.querySelectorAll("button.run").forEach(function (btn) {
+                      btn.disabled = false;
+                    });
+                  }
                   setOtherRowsActive();
                   if (resultDiv) {
                     resultDiv.className = "result result-placeholder";
@@ -2972,7 +3040,9 @@
                     window.stopBackgroundJob(run.caseId);
                   };
                 }
-                if (runBtn) runBtn.disabled = true;
+                caseRow.querySelectorAll("button.run").forEach(function (btn) {
+                  btn.disabled = true;
+                });
                 setOtherRowsInactive(
                   caseRow,
                   "Background auto extraction is running. Pause/stop it to run another case.",
@@ -3010,7 +3080,9 @@
               }
 
               // Handle Manual Runs (Blocking - Existing Logic)
-              if (runBtn) runBtn.disabled = true;
+              caseRow.querySelectorAll("button.run").forEach(function (btn) {
+                btn.disabled = true;
+              });
               if (resetBtn) {
                 resetBtn.textContent = "Pause";
                 resetBtn.classList.remove("resume-btn");
@@ -3146,11 +3218,11 @@
               input.disabled = true;
             });
 
-            if (runBtn) {
-              runBtn.disabled = true;
-              runBtn.title =
+            caseRow.querySelectorAll("button.run").forEach(function (btn) {
+              btn.disabled = true;
+              btn.title =
                 "Please reset the download/extraction to start a new download/extraction";
-            }
+            });
 
             if (resetBtn) {
               resetBtn.textContent = "Resume";

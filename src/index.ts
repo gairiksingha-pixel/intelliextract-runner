@@ -210,6 +210,10 @@ program
     'JSON array of {tenant, purchaser} to scope (e.g. \'[{"tenant":"a","purchaser":"p"}]\')',
   )
   .option("-r, --run-id <id>", "Resume with existing run ID")
+  .option(
+    "--retry-failed",
+    "Only retry files that previously failed (status 'error')",
+  )
   .action(
     async (opts: {
       sync: boolean;
@@ -220,6 +224,7 @@ program
       purchaser?: string;
       pairs?: string;
       runId?: string;
+      retryFailed?: boolean;
     }) => {
       try {
         const globalOpts = program.opts() as { config?: string };
@@ -260,6 +265,7 @@ program
               purchaser,
               pairs,
               runId: opts.runId,
+              retryFailed: opts.retryFailed,
               onFileComplete: doReport
                 ? (runId) => writeReportsForRunId(config, runId)
                 : undefined,
@@ -271,6 +277,7 @@ program
               purchaser,
               pairs,
               runId: opts.runId,
+              retryFailed: opts.retryFailed,
               onFileComplete: doReport
                 ? (runId) => writeReportsForRunId(config, runId)
                 : undefined,
@@ -333,6 +340,10 @@ program
   .option("--pairs <json>", "JSON array of {tenant, purchaser} to scope")
   .option("--no-report", "Do not write report after run")
   .option("-r, --run-id <id>", "Resume with existing run ID")
+  .option(
+    "--retry-failed",
+    "Only retry files that previously failed (status 'error')",
+  )
   .action(
     async (cmdOpts: {
       limit?: number;
@@ -342,6 +353,7 @@ program
       pairs?: string;
       report?: boolean;
       runId?: string;
+      retryFailed?: boolean;
     }) => {
       try {
         const globalOpts = program.opts() as { config?: string };
@@ -395,6 +407,7 @@ program
           purchaser,
           pairs,
           runId: cmdOpts.runId,
+          retryFailed: cmdOpts.retryFailed,
           onProgress: stdoutPiped
             ? (done, total) => {
                 process.stdout.write(`SYNC_PROGRESS\t${done}\t${total}\n`);

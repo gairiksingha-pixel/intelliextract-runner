@@ -468,6 +468,7 @@ function runArgs(p, extra = [], runOpts = null) {
   if (runOpts && runOpts.runId) base.push("--run-id", runOpts.runId);
   if (p?.syncLimit > 0) base.push("--sync-limit", String(p.syncLimit));
   if (p?.extractLimit > 0) base.push("--extract-limit", String(p.extractLimit));
+  if (p?.retryFailed) base.push("--retry-failed");
   addPairArgs(base, p);
   return ["node", base, { cwd: ROOT }];
 }
@@ -480,6 +481,7 @@ function pipelineArgs(p, opts = {}) {
       ? Number(p.syncLimit)
       : 0;
   base.push("--limit", String(limit));
+  if (p?.retryFailed) base.push("--retry-failed");
   addPairArgs(base, p);
   return ["node", base, { cwd: ROOT }];
 }
@@ -962,6 +964,9 @@ createServer(async (req, res) => {
         if (tenant && typeof tenant === "string") params.tenant = tenant.trim();
         if (purchaser && typeof purchaser === "string")
           params.purchaser = purchaser.trim();
+      }
+      if (body.retryFailed === true) {
+        params.retryFailed = true;
       }
       const runOpts =
         resume === true

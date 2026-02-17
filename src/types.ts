@@ -36,6 +36,8 @@ export interface RunConfig {
   maxRetries?: number;
   /** Base delay in milliseconds between retries (simple linear backoff). Default: 500ms. */
   retryBackoffMs?: number;
+  /** When true, only retry files that previously failed (status 'error'). Default: false. */
+  retryFailed?: boolean;
 }
 
 export interface LoggingConfig {
