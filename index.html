@@ -2020,7 +2020,7 @@
         var stderrFiltered = stderrStr
           ? stderrStr.split("\n").filter(filterResultLine).join("\n").trim()
           : "";
-        var statusLabel = pass ? "Pass" : "Fail";
+        var statusLabel = pass ? "Success" : "Failed";
         var parsed = {};
         var lines = stdoutFiltered ? stdoutFiltered.split("\n") : [];
         for (var i = 0; i < lines.length; i++) {
