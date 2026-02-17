@@ -106,46 +106,72 @@
       .header {
         flex-shrink: 0;
         background: var(--surface);
-        border: 0.85px solid var(--border);
+        border: 1px solid var(--border);
         border-radius: var(--radius);
-        box-shadow: var(--shadow-lg);
-        margin: 1.062rem 1.275rem 0.425rem 1.275rem;
+        box-shadow: var(--shadow-md);
+        margin: 0.75rem 1.25rem 0.5rem 1.25rem;
         box-sizing: border-box;
       }
       .header-inner {
         max-width: 100%;
         margin: 0;
-        padding: 0.75rem 1.275rem;
+        padding: 0.6rem 1.25rem;
         box-sizing: border-box;
         display: flex;
+        align-items: flex-start;
+        gap: 1.5rem;
+      }
+      .header-status-panel {
+        display: flex;
         align-items: center;
-        gap: 1.275rem;
-        flex-wrap: wrap;
+        gap: 0.5rem;
+        background: #f1f5f9;
+        padding: 0.4rem 0.85rem;
+        border-radius: 100px;
+        border: 1px solid var(--border-light);
+        margin-left: 1rem;
+        margin-top: 17px;
+        flex: 0 1 auto;
+        min-width: 0;
+      }
+      .header-status-label {
+        font-size: 0.65rem;
+        font-weight: 800;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+      }
+      .header-status-value {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .header-right {
         margin-left: auto;
         display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        justify-content: center;
-        gap: 0;
+        align-items: center;
+        gap: 1rem;
         flex: 1;
-        padding-top: 0;
+        justify-content: flex-end;
       }
       .header-filter-row {
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: 1rem;
+        gap: 0.75rem;
         flex-wrap: wrap;
-        margin-top: 0.75rem;
         width: 100%;
+        margin-top: 14px;
       }
       .header-field-wrap {
         display: flex;
         flex-direction: column;
         gap: 0.17rem;
-        align-items: flex-start;
+        align-items: center;
         margin-right: 0.5rem;
       }
       .filter-chip .header-label {
@@ -181,20 +207,20 @@
         line-height: 1.2;
       }
       .header .logo {
-        height: 30.6px;
+        height: 32px;
         width: auto;
         display: block;
         object-fit: contain;
-        margin-top: -6.8px;
+        margin-top: 14px;
       }
       .header .logo-placeholder {
-        height: 30.6px;
+        height: 32px;
         display: flex;
         align-items: center;
         font-weight: 600;
         color: var(--accent);
         font-size: 1.1rem;
-        margin-top: -6.8px;
+        margin-top: 14px;
       }
       .header-label {
         font-size: 0.8rem;
@@ -271,10 +297,13 @@
         color: var(--text-secondary);
         font-size: 0.875rem;
         font-family: inherit;
-        text-align: left;
+        text-align: center;
         cursor: pointer;
         box-sizing: border-box;
         transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -288,7 +317,8 @@
         border: none;
         background-color: transparent;
         box-shadow: none;
-        padding: 0 1.7rem 0 0.51rem;
+        padding: 0 1.5rem;
+        justify-content: center;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
       }
       .filter-dropdown-trigger:hover {
@@ -359,31 +389,31 @@
       }
       /* Brand & Purchaser Dropdown Width Customization */
       .brand-field-wrap {
-        flex: 0 0 15%;
-        min-width: 160px;
+        flex: 0 0 auto;
       }
       .purchaser-field-wrap {
-        flex: 0 0 20%;
-        min-width: 240px;
+        flex: 0 0 auto;
       }
       #brand-dropdown,
       #purchaser-dropdown {
-        width: 100%;
+        width: auto;
         max-width: none;
       }
       #brand-dropdown .filter-chip,
       #purchaser-dropdown .filter-chip {
-        width: 100% !important;
-      }
-      #brand-dropdown .filter-dropdown-trigger,
-      #purchaser-dropdown .filter-dropdown-trigger {
-        flex: 1 !important;
         width: auto !important;
-        min-width: 0;
+      }
+      #brand-dropdown .filter-dropdown-trigger {
+        width: 180px !important;
+      }
+      #purchaser-dropdown .filter-dropdown-trigger {
+        width: 207px !important; /* 180 * 1.15 = 207.3, rounding to 207 */
       }
       .header-filter-reset-wrap {
-        margin-top: -15px;
         margin-right: 0 !important;
+      }
+      .header-filter-reset-wrap .header-btn-reset {
+        margin-top: 0;
       }
       .header-btn-reset {
         height: 34px;
@@ -444,9 +474,12 @@
       th,
       td {
         padding: var(--cell-pad);
-        text-align: left;
+        text-align: center;
         border: 0.85px solid var(--border);
         vertical-align: middle;
+      }
+      .op-name {
+        text-align: left;
       }
       thead th:first-child {
         border-top-left-radius: 0;
@@ -825,10 +858,11 @@
       .download-bar {
         display: flex;
         align-items: center;
-        gap: 0.637rem;
-        padding: 1.105rem 1.275rem 0.85rem;
-        background: var(--surface);
-        border: 0.85px solid var(--border-light);
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.75rem 1.25rem;
+        background: #f8fafc;
+        border-bottom: 1px solid var(--border);
         border-radius: 0;
         margin-bottom: 0;
         flex-wrap: wrap;
@@ -836,18 +870,18 @@
       .download-chip {
         display: flex;
         align-items: center;
-        height: 38px;
-        background: var(--surface);
-        border: 0.85px solid var(--border);
-        border-radius: var(--radius-sm);
-        box-shadow: 0 0.85px 1.7px rgba(0, 0, 0, 0.06);
+        height: 36px;
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        box-shadow: var(--shadow-sm);
         overflow: hidden;
       }
       .download-bar-label {
-        font-size: 0.725rem;
+        font-size: 0.65rem;
         font-weight: 800;
         color: var(--primary);
-        background: var(--pass-bg);
+        background: #f0fdf4;
         padding: 0 1rem;
         height: 100%;
         display: flex;
@@ -875,20 +909,166 @@
         color: var(--text-secondary) !important;
         padding: 0 1.25rem;
         font-size: 0.8rem;
-        font-weight: 600;
+        font-weight: 700;
         box-shadow: none;
         border-right: 1px solid var(--border-light);
         margin: 0;
-        transition: all 0.2s ease;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       .download-bar-btns .download-sync-report-btn:hover,
       .download-bar-btns .download-report-btn:hover:not(:disabled) {
-        background: var(--bg) !important;
+        background: #f1f5f9 !important;
         color: var(--primary) !important;
-        box-shadow: none;
+      }
+      .download-bar-btns .download-sync-report-btn:hover svg,
+      .download-bar-btns .download-report-btn:hover:not(:disabled) svg {
+        transform: translateY(-1px);
+        color: var(--primary);
       }
       .download-bar-btns button:last-child {
         border-right: none;
+      }
+      .system-status-pill {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: white;
+        padding: 0.4rem 0.85rem;
+        border-radius: 100px;
+        border: 1px solid var(--border-light);
+        margin-left: auto;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        box-shadow: var(--shadow-sm);
+        transition: all 0.3s ease;
+      }
+      .system-status-pill.busy {
+        background: #fffbeb;
+        border-color: #fcd34d;
+        color: #92400e;
+      }
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--primary);
+        border-radius: 50%;
+        box-shadow: 0 0 0 0 rgba(45, 157, 95, 0.4);
+        animation: pulse 2s infinite;
+      }
+      .busy .pulse-dot {
+        background: #f59e0b;
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+        animation: pulse-busy 1.5s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 0 rgba(45, 157, 95, 0.7);
+        }
+        70% {
+          transform: scale(1);
+          box-shadow: 0 0 0 6px rgba(45, 157, 95, 0);
+        }
+        100% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 0 rgba(45, 157, 95, 0);
+        }
+      }
+      @keyframes pulse-busy {
+        0% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+        }
+        70% {
+          transform: scale(1);
+          box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+        }
+        100% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+        }
+      }
+      .sync-progress-bar {
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+        position: relative;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+      .sync-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), #4ade80);
+        border-radius: 10px;
+        transition: width 0.3s ease;
+        position: relative;
+      }
+      .sync-progress-fill::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(rgba(255, 255, 255, 0.2), transparent);
+      }
+      .sync-progress-indeterminate {
+        width: 40%;
+        animation: flow 1.5s infinite ease-in-out;
+      }
+      @keyframes flow {
+        0% {
+          left: -40%;
+        }
+        100% {
+          left: 100%;
+        }
+      }
+      .btn-icon-inline {
+        width: 14px;
+        height: 14px;
+        margin-right: 6px;
+        vertical-align: text-bottom;
+      }
+      .result.result-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        border: 1px dashed var(--border);
+        color: var(--muted);
+        text-align: center;
+        padding: 1rem;
+        padding-bottom: calc(1rem + 5%);
+        height: calc(100% - 1.444rem);
+        box-sizing: border-box;
+      }
+      .result.result-validation-alert {
+        background: #fffbeb !important;
+        border-color: #fcd34d !important;
+        color: #92400e !important;
+        border-style: solid;
+      }
+      .result-placeholder-text {
+        font-size: 0.825rem;
+        font-weight: 500;
+        line-height: 1.4;
+        opacity: 0.9;
+        display: block;
+        width: 100%;
+      }
+      .result-placeholder::before {
+        content: "📡";
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        filter: grayscale(1);
+        opacity: 0.3;
       }
       .result-header {
         width: 402.9px;
@@ -920,6 +1100,7 @@
         overflow: auto;
         box-sizing: border-box;
         box-shadow: var(--shadow-sm);
+        text-align: center;
       }
       .result.pass {
         background: var(--pass-bg);
@@ -1115,6 +1296,8 @@
         position: fixed;
         inset: 0;
         background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         display: none;
         align-items: center;
         justify-content: center;
@@ -1142,18 +1325,21 @@
       }
       .modal {
         background: var(--surface);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow-lg);
-        border: 0.85px solid var(--border);
+        border-radius: calc(var(--radius) * 1.5);
+        box-shadow:
+          var(--shadow-2xl),
+          0 0 0 1px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
         width: 1152px;
         max-width: 90vw;
         height: 786px;
         max-height: 85vh;
-        padding: 1.062rem 1.275rem 0.85rem;
+        padding: 0;
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
         animation: modalScaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        overflow: hidden;
       }
       @keyframes modalScaleUp {
         from {
@@ -1219,39 +1405,109 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin: -1.062rem -1.275rem 1rem;
-        padding: 1rem 1.25rem;
-        background: var(--bg);
-        border-bottom: 1.2px solid var(--border);
-        border-radius: var(--radius) var(--radius) 0 0;
+        padding: 1.25rem 1.75rem;
+        background: white;
+        border-bottom: 1px solid var(--border-light);
       }
       .modal-title {
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        font-size: 1rem;
+        font-size: 1.15rem;
         font-weight: 700;
         color: var(--header-bg);
       }
       .title-badge {
-        background: var(--header-bg);
+        background: var(--primary);
         color: white;
         font-size: 0.625rem;
         font-weight: 800;
-        padding: 0.25rem 1.15rem 0.25rem 0.65rem;
+        padding: 0.35rem 1.25rem 0.35rem 0.75rem;
         clip-path: polygon(
           0% 0%,
-          calc(100% - 10px) 0%,
+          calc(100% - 12px) 0%,
           100% 50%,
-          calc(100% - 10px) 100%,
+          calc(100% - 12px) 100%,
           0% 100%
         );
         text-transform: uppercase;
-        letter-spacing: 0.08em;
-        line-height: 1.2;
-        display: inline-flex;
+        letter-spacing: 0.1em;
+      }
+      .modal-body {
+        padding: 1.75rem;
+        flex: 1;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+        display: flex;
+        flex-direction: column;
+      }
+      .modal-body::-webkit-scrollbar {
+        width: 6px;
+      }
+      .modal-body::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .modal-body::-webkit-scrollbar-thumb {
+        background-color: var(--border);
+        border-radius: 20px;
+      }
+      .modal-footer {
+        padding: 1.25rem 1.75rem;
+        background: #f8fafc;
+        border-top: 1px solid var(--border-light);
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+      }
+      .schedule-list {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .schedule-list th {
+        background: #f1f5f9;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .schedule-list td {
+        padding: 1rem;
+        font-size: 0.85rem;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--text);
+        transition: background 0.2s;
+      }
+      .schedule-list tr:hover td {
+        background: #f8fafc;
+      }
+      .schedule-list tr:last-child td {
+        border-bottom: none;
+      }
+      .schedule-empty {
+        display: flex;
+        flex-direction: column;
         align-items: center;
-        filter: drop-shadow(0 0 1.2px rgba(0, 0, 0, 0.5));
+        justify-content: center;
+        padding: 4rem 2rem;
+        color: var(--muted);
+        text-align: center;
+        background: #f8fafc;
+        border: 2px dashed var(--border-light);
+        border-radius: var(--radius);
+      }
+      .schedule-empty::before {
+        content: "📅";
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.3;
       }
       .modal-close-icon {
         border: none;
@@ -1263,23 +1519,6 @@
       }
       .modal-close-icon:hover {
         color: var(--fail);
-      }
-      .modal-body {
-        flex: 1;
-        overflow: hidden;
-        font-size: 0.85rem;
-        color: var(--text-secondary);
-        display: flex;
-        flex-direction: column;
-      }
-      .modal-footer {
-        margin-top: 0.85rem;
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.51rem;
-        padding-top: 0.51rem;
-        border-top: 0.85px solid var(--border-light);
-        background: var(--row-alt);
       }
       .schedule-header-row {
         display: flex;
@@ -1524,6 +1763,14 @@
         <span class="logo-placeholder" style="display: none"
           >intellirevenue</span
         >
+        <div class="header-status-panel">
+          <span class="header-status-label" title="Current mission filter"
+            >Current Scope:</span
+          >
+          <span class="header-status-value" id="header-status-scope"
+            >All Assets</span
+          >
+        </div>
         <div class="header-right">
           <div class="header-filter-row">
             <div class="header-field-wrap brand-field-wrap">
@@ -1597,6 +1844,7 @@
               >
                 Reset Filter
               </button>
+              <div class="header-field-error"></div>
             </div>
           </div>
         </div>
@@ -1609,6 +1857,10 @@
           <div class="download-chip">
             <span class="download-bar-label">Reports & downloads</span>
             <div class="download-bar-btns" id="download-bar-btns"></div>
+          </div>
+          <div class="system-status-pill">
+            <span class="pulse-dot"></span>
+            <span id="system-status-text">System Active</span>
           </div>
         </div>
         <table>
@@ -1666,6 +1918,30 @@
       const ICON_SYNC = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>`;
       const ICON_EXTRACT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>`;
       const ICON_PIPELINE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4"/><path d="M14 12h4"/><circle cx="12" cy="12" r="2"/></svg>`;
+
+      const ICON_PLAY = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px"><path d="M8 5v14l11-7z"/></svg>`;
+      const ICON_RETRY = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px;height:12px"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+      const ICON_RESET = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px;height:12px"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
+      const ICON_STOP = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;vertical-align:middle"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+      const ICON_PLUS = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+      const ICON_HISTORY = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+      const ICON_EDIT = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+      const ICON_DELETE = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+      const ICON_BACK = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
+      const ICON_CHECK = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+      function setSystemStatus(isBusy, text) {
+        var pill = document.querySelector(".system-status-pill");
+        var statusText = document.getElementById("system-status-text");
+        if (!pill || !statusText) return;
+        if (isBusy) {
+          pill.classList.add("busy");
+          statusText.textContent = text || "System Busy";
+        } else {
+          pill.classList.remove("busy");
+          statusText.textContent = text || "System Active";
+        }
+      }
 
       const ROWS = [
         {
@@ -1733,20 +2009,21 @@
         resultDiv.className = "result result-placeholder";
         resultDiv.id = "result-" + c.id;
         resultDiv.innerHTML =
-          '<span class="result-placeholder-text">Select at least one brand or purchaser in the filter above, then click Run.</span>';
+          '<span class="result-placeholder-text">Ready to extract. Configure filters and click Run.</span>';
         resultCell.appendChild(resultDiv);
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "run";
-        btn.textContent = getRunButtonLabel(c.id);
-        btn.title = btn.textContent;
+        btn.innerHTML =
+          ICON_PLAY + "<span>" + getRunButtonLabel(c.id) + "</span>";
+        btn.title = getRunButtonLabel(c.id);
         btn.onclick = function () {
           runCase(c.id, btn, resultDiv, null);
         };
         const resetBtn = document.createElement("button");
         resetBtn.type = "button";
         resetBtn.className = "reset-case";
-        resetBtn.textContent = "Reset";
+        resetBtn.innerHTML = ICON_RESET + "<span>Reset</span>";
         resetBtn.onclick = function () {
           resetCase(resultDiv);
         };
@@ -1756,9 +2033,8 @@
           retryBtn = document.createElement("button");
           retryBtn.type = "button";
           retryBtn.className = "run retry-failed-btn";
-          retryBtn.textContent = "Retry Failed";
-          retryBtn.title =
-            "Only retry extractions that previously failed (ignored successful ones and new files)";
+          retryBtn.innerHTML = ICON_RETRY + "<span>Retry Failed</span>";
+          retryBtn.title = "Only retry extractions that previously failed";
           retryBtn.onclick = function () {
             runCase(c.id, retryBtn, resultDiv, { retryFailed: true });
           };
@@ -1766,12 +2042,12 @@
         const resetDuringResumeBtn = document.createElement("button");
         resetDuringResumeBtn.type = "button";
         resetDuringResumeBtn.className = "reset-case reset-during-resume";
-        resetDuringResumeBtn.textContent = "Reset";
+        resetDuringResumeBtn.innerHTML = ICON_RESET + "<span>Reset</span>";
         resetDuringResumeBtn.title = "Clear result and exit resume mode";
         resetDuringResumeBtn.onclick = function () {
           resetCase(resultDiv);
           resetDuringResumeBtn.classList.remove("show-during-resume");
-          resetBtn.textContent = "Reset";
+          resetBtn.innerHTML = ICON_RESET + "<span>Reset</span>";
           resetBtn.classList.remove("resume-btn");
           resetBtn.onclick = function () {
             resetCase(resultDiv);
@@ -2260,7 +2536,7 @@
         }
         var clearLimits = !options || options.clearLimits !== false;
         resultDiv.innerHTML =
-          '<span class="result-placeholder-text">Select at least one brand or purchaser in the filter above, then click Run.</span>';
+          '<span class="result-placeholder-text">Ready to extract. Configure filters and click Run.</span>';
         resultDiv.className = "result result-placeholder";
         if (row) {
           var inputs = row.querySelectorAll(".limit-sync, .limit-extract");
@@ -2287,7 +2563,7 @@
             "button.reset-case:not(.reset-during-resume)",
           );
           if (resetBtn) {
-            resetBtn.textContent = "Reset";
+            resetBtn.innerHTML = ICON_RESET + "<span>Reset</span>";
             resetBtn.classList.remove("stop-btn", "resume-btn", "pause-btn");
             resetBtn.onclick = function () {
               resetCase(resultDiv);
@@ -2434,7 +2710,7 @@
           .forEach(function (div) {
             div.className = "result result-placeholder";
             div.innerHTML =
-              '<span class="result-placeholder-text">Select at least one brand or purchaser in the filter above, then click Run.</span>';
+              '<span class="result-placeholder-text">Ready to extract. Configure filters and click Run.</span>';
           });
       }
       function getTenantPurchaserPairs() {
@@ -2510,7 +2786,7 @@
         }
         function restoreResetBtn() {
           if (resetBtn) {
-            resetBtn.textContent = "Reset";
+            resetBtn.innerHTML = ICON_RESET + "<span>Reset</span>";
             resetBtn.classList.remove("stop-btn", "resume-btn", "pause-btn");
             resetBtn.onclick = function () {
               resetCase(resultDiv);
@@ -2524,6 +2800,7 @@
               input.disabled = false;
             });
           }
+          setSystemStatus(false);
         }
         if (isResume) row._aborted = false;
         if (row && !isResume && row._activeController) {
@@ -2558,7 +2835,7 @@
         } catch (_) {}
 
         if (resetBtn) {
-          resetBtn.textContent = "Pause";
+          resetBtn.innerHTML = ICON_STOP + "<span>Stop</span>";
           resetBtn.title = "Pause/Stop the execution";
           resetBtn.classList.remove("resume-btn");
           resetBtn.classList.add("pause-btn");
@@ -2566,6 +2843,7 @@
             controller.abort();
           };
         }
+        setSystemStatus(true, "Running Extraction...");
         if (row) {
           row.querySelectorAll("button.run").forEach(function (b) {
             b.disabled = true;
@@ -2869,7 +3147,7 @@
                 });
               }
               if (resetBtn) {
-                resetBtn.textContent = "Resume";
+                resetBtn.innerHTML = ICON_PLAY + "<span>Resume</span>";
                 resetBtn.classList.remove("stop-btn", "pause-btn");
                 resetBtn.classList.add("resume-btn");
                 resetBtn.onclick = function () {
@@ -2918,6 +3196,7 @@
             } catch (_) {}
           }
         } finally {
+          setSystemStatus(false);
           if (row) row._activeController = null;
           if (row && row._aborted) {
             row._aborted = false;
@@ -2981,7 +3260,7 @@
                 } else {
                   // Run finished
                   if (resetBtn) {
-                    resetBtn.textContent = "Reset";
+                    resetBtn.innerHTML = ICON_RESET + "<span>Reset</span>";
                     resetBtn.classList.remove("stop-btn", "pause-btn");
                     resetBtn.disabled = false;
                     resetBtn.onclick = function () {
@@ -2994,6 +3273,7 @@
                     });
                   }
                   setOtherRowsActive();
+                  setSystemStatus(false);
                   if (resultDiv) {
                     resultDiv.className = "result result-placeholder";
                     resultDiv.innerHTML =
@@ -3016,7 +3296,7 @@
             if (!data || !data.activeRuns || data.activeRuns.length === 0)
               return;
 
-            // Restore running state for active processes
+            setSystemStatus(true, "Extraction in Progress...");
             data.activeRuns.forEach(function (run) {
               var caseRow = tbody
                 ? tbody.querySelector('tr[data-case-id="' + run.caseId + '"]')
@@ -3272,30 +3552,50 @@
       (function initDownloadBar() {
         var container = document.getElementById("download-bar-btns");
         if (!container) return;
-        var syncBtn = document.createElement("button");
-        syncBtn.className = "download-sync-report-btn";
-        syncBtn.textContent = "Staging Inventory";
-        syncBtn.type = "button";
-        syncBtn.title = "Download staging report (files in staging)";
-        syncBtn.onclick = function () {
-          downloadSyncReport(syncBtn);
-        };
-        container.appendChild(syncBtn);
-        function addReportBtn(label, format) {
+
+        const ICON_INVENTORY = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>`;
+        const ICON_SUMMARY = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>`;
+        const ICON_DATA = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+
+        function createBtn(label, className, title, onClick, iconHtml) {
           var b = document.createElement("button");
-          b.className =
-            "download-report-btn download-report-" + format + "-btn";
-          b.textContent = label;
+          b.className = className;
+          b.innerHTML = iconHtml + "<span>" + label + "</span>";
           b.type = "button";
-          b.setAttribute("data-format", format);
+          b.title = title;
           b.onclick = function () {
-            if (format === "json") downloadExtractionsZip(b);
-            else downloadLatestReport(b, format);
+            onClick(b);
           };
           container.appendChild(b);
         }
-        addReportBtn("Run Summary", "html");
-        addReportBtn("Download Data", "json");
+
+        createBtn(
+          "Staging Inventory",
+          "download-sync-report-btn",
+          "Download staging report",
+          function (b) {
+            downloadSyncReport(b);
+          },
+          ICON_INVENTORY,
+        );
+        createBtn(
+          "Run Summary",
+          "download-report-btn download-report-html-btn",
+          "Download latest summary report",
+          function (b) {
+            downloadLatestReport(b, "html");
+          },
+          ICON_SUMMARY,
+        );
+        createBtn(
+          "Download Data",
+          "download-report-btn download-report-json-btn",
+          "Download extractions ZIP",
+          function (b) {
+            downloadExtractionsZip(b);
+          },
+          ICON_DATA,
+        );
       })();
 
       function getTimestampForFilename() {
@@ -3312,17 +3612,17 @@
       (function initScheduleButton() {
         var bar = document.getElementById("download-bar");
         if (!bar) return;
-        var btns = document.getElementById("download-bar-btns");
         var scheduleBtn = document.createElement("button");
         scheduleBtn.type = "button";
-        scheduleBtn.textContent = "Manage Schedules";
+        scheduleBtn.innerHTML = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Manage Schedules</span>`;
         scheduleBtn.className =
           "download-report-btn download-report-schedule-btn";
-        scheduleBtn.style.marginLeft = "auto";
+        scheduleBtn.style.marginLeft = "0.5rem";
         scheduleBtn.onclick = function () {
           openScheduleModal();
         };
         bar.appendChild(scheduleBtn);
+        updateHeaderStatus();
         initScheduleModal();
       })();
       document
@@ -3680,45 +3980,53 @@
           state && Array.isArray(state.schedules) ? state.schedules : [];
         var tz = state && Array.isArray(state.timezones) ? state.timezones : [];
         var html =
-          '<div class="schedule-header-row"><div class="subtitle-chip">Manage scheduled sync &amp; extraction jobs</div><div style="display:flex;gap:0.51rem;flex-wrap:wrap;"><button type="button" id="schedule-history-btn" class="btn-secondary">Execution History</button><button type="button" id="schedule-create-btn" class="download-report-btn download-report-schedule-btn">Create a Schedule</button></div></div><div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
+          '<div class="schedule-header-row"><div class="subtitle-chip">Configure automated periodic missions</div><div style="display:flex;gap:0.51rem;flex-wrap:wrap;"><button type="button" id="schedule-history-btn" class="btn-secondary">' +
+          ICON_HISTORY +
+          '<span>History</span></button><button type="button" id="schedule-create-btn" class="download-report-btn download-report-schedule-btn">' +
+          ICON_PLUS +
+          '<span>Create Mission</span></button></div></div><div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
         if (!schedules.length) {
           html +=
-            '<div class="schedule-empty">No schedules created. Please create a schedule.</div>';
+            '<div class="schedule-empty">No active schedules. Start by creating a mission.</div>';
         } else {
           html +=
-            '<div style="flex:1;overflow-y:auto;"><table class="schedule-list"><thead><tr><th>Brand</th><th>Purchaser</th><th>Time (cron)</th><th>Timezone</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+            '<div style="flex:1;overflow-y:auto;padding-right:4px;"><table class="schedule-list"><thead><tr><th>Brand Scope</th><th>Purchaser Scope</th><th>Mission Time</th><th>Timezone</th><th>Created</th><th style="text-align:right">Actions</th></tr></thead><tbody>';
           schedules.forEach(function (s) {
             var brands =
               s.brands && s.brands.length
                 ? s.brands.map(formatBrandName).join(", ")
-                : "All";
+                : "All Brands";
             var purchasers =
               s.purchasers && s.purchasers.length
                 ? s.purchasers.map(formatPurchaserName).join(", ")
-                : "All";
+                : "All Purchasers";
             html +=
               "<tr data-sched-id='" +
               escapeHtml(s.id || "") +
-              "'><td>" +
+              "'><td><strong>" +
               escapeHtml(brands) +
-              "</td><td>" +
+              "</strong></td><td>" +
               escapeHtml(purchasers) +
-              "</td><td>" +
+              "</td><td><span class='cron-tag'>" +
               escapeHtml(formatCronWithTime(s.cron)) +
-              "</td><td>" +
+              "</span></td><td>" +
               escapeHtml(s.timezone) +
               "</td><td>" +
               escapeHtml(formatDateWithSuffix(s.createdAt || "")) +
-              '</td><td><div style="display:flex;flex-wrap:wrap;gap:0.51rem;">' +
-              '<button type="button" class="btn-secondary" data-sched-edit>Edit</button>' +
-              '<button type="button" class="btn-secondary" data-sched-delete>Delete</button>' +
+              '</td><td style="text-align:right"><div style="display:flex;justify-content:flex-end;gap:0.4rem;">' +
+              '<button type="button" class="btn-secondary" data-sched-edit style="padding:0.4rem 0.6rem">' +
+              ICON_EDIT +
+              "</button>" +
+              '<button type="button" class="btn-secondary" data-sched-delete style="padding:0.4rem 0.6rem;color:var(--fail)">' +
+              ICON_DELETE +
+              "</button>" +
               "</div></td></tr>";
           });
           html += "</tbody></table></div>";
         }
         html += "</div>";
         html +=
-          '<div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>';
+          '<div class="modal-footer"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Close window</button></div>';
         renderWithTransition(body, html, direction);
         var createBtn = document.getElementById("schedule-create-btn");
         if (createBtn) {
@@ -3938,9 +4246,11 @@
           body,
           '<div class="schedule-header-row"><div class="subtitle-chip">' +
             (schedule
-              ? "Edit schedule configuration"
-              : "Create a new schedule mission") +
-            '</div><button type="button" id="schedule-form-back-btn" class="btn-secondary">Back to Schedules</button></div>' +
+              ? "Edit mission parameters"
+              : "Launch a new mission schedule") +
+            '</div><button type="button" id="schedule-form-back-btn" class="btn-secondary">' +
+            ICON_BACK +
+            "<span>Back</span></button></div>" +
             '<div style="flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;">' +
             '<div class="schedule-form-grid">' +
             '<div class="schedule-field"><label class="schedule-label" for="sched-brand-dropdown-trigger">Brand (optional)</label><div id="sched-brand-dropdown" class="filter-dropdown"><button type="button" id="sched-brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">Select brand</button><div id="sched-brand-dropdown-panel" class="filter-dropdown-panel" role="listbox">' +
@@ -3959,8 +4269,11 @@
             '<div class="schedule-note-card">' +
             "<strong>⚠ Important Information:</strong> Ensure no other extraction missions are scheduled or active at this time. Manual processes or <strong>paused (Resume)</strong> states will cause this mission to be skipped to prevent data conflicts." +
             "</div>" +
-            '<div class="modal-footer" style="margin-top:0.85rem;"><button type="button" id="schedule-cancel-btn" class="btn-secondary">Cancel</button><button type="button" id="schedule-save-btn" class="download-report-btn download-report-schedule-btn">' +
-            (schedule ? "Update schedule" : "Save Schedule") +
+            '<div class="modal-footer"><button type="button" id="schedule-cancel-btn" class="btn-secondary">Discard</button><button type="button" id="schedule-save-btn" class="download-report-btn download-report-schedule-btn">' +
+            ICON_CHECK +
+            "<span>" +
+            (schedule ? "Update Changes" : "Launch Mission") +
+            "</span>" +
             "</button></div>",
           direction || "right",
         );
@@ -4467,6 +4780,51 @@
         }
         clearValidationAlertWhenFilterSelected();
         clearResumeStateFromAllRows();
+        updateHeaderStatus();
+      }
+      function updateHeaderStatus() {
+        var scopeEl = document.getElementById("header-status-scope");
+        if (!scopeEl) return;
+        var selectedBrands = getSelectedBrands();
+        var selectedPurchasers = getSelectedPurchasers();
+
+        var brandText = "All Assets";
+        var totalBrands = document.querySelectorAll(
+          '#brand-dropdown-panel input[type=checkbox]:not([value="ALL"])',
+        ).length;
+        if (selectedBrands.length > 0) {
+          if (totalBrands > 0 && selectedBrands.length === totalBrands) {
+            brandText = "All Brands";
+          } else if (selectedBrands.length === 1) {
+            brandText = formatBrandName(selectedBrands[0]);
+          } else {
+            brandText = selectedBrands.length + " Brands";
+          }
+        }
+
+        var purchaserText = "";
+        var totalPurchasers = document.querySelectorAll(
+          '#purchaser-dropdown-panel input[type=checkbox]:not([value="ALL"])',
+        ).length;
+        if (selectedPurchasers.length > 0) {
+          if (
+            totalPurchasers > 0 &&
+            selectedPurchasers.length === totalPurchasers
+          ) {
+            purchaserText = "All Purchasers";
+          } else if (selectedPurchasers.length === 1) {
+            purchaserText = formatPurchaserName(selectedPurchasers[0]);
+          } else {
+            purchaserText = selectedPurchasers.length + " Purchasers";
+          }
+        }
+
+        if (purchaserText) {
+          scopeEl.textContent = brandText + " / " + purchaserText;
+        } else {
+          scopeEl.textContent = brandText;
+        }
+        scopeEl.title = "Current Scope: " + scopeEl.textContent;
       }
       function resetFilter() {
         var brandPanel = document.getElementById("brand-dropdown-panel");
@@ -4486,9 +4844,11 @@
               cb.checked = false;
             });
         updateFilterDropdownTrigger("brand");
+        updateFilterDropdownTrigger("purchaser");
         clearBrandError();
         clearPurchaserError();
         refreshPurchaserOptions();
+        updateHeaderStatus();
       }
       function showBrandError(msg) {
         var el = document.getElementById("brand-error");
@@ -4562,7 +4922,9 @@
           resetBtn.addEventListener("click", function () {
             resetFilter();
           });
-        fetchConfig();
+        fetchConfig().then(function () {
+          updateHeaderStatus();
+        });
       })();
       window.stopBackgroundJob = function (caseId) {
         if (confirm("Are you sure you want to stop auto extraction?")) {
@@ -4579,7 +4941,7 @@
 
           if (resetBtn) {
             resetBtn.disabled = true;
-            resetBtn.textContent = "Stopping...";
+            resetBtn.innerHTML = "<span>Stopping...</span>";
           }
 
           fetch("/api/stop-run", {
@@ -4595,18 +4957,19 @@
                 alert("Error stopping auto extraction: " + data.error);
                 if (resetBtn) {
                   resetBtn.disabled = false;
-                  resetBtn.textContent = "Stop Auto Extraction";
+                  resetBtn.innerHTML =
+                    ICON_STOP + "<span>Stop Auto Extraction</span>";
                 }
               } else {
                 // Success — reset UI back to default state
                 if (resultDiv) {
                   resultDiv.className = "result result-placeholder";
                   resultDiv.innerHTML =
-                    '<span class="result-placeholder-text">Select at least one brand or purchaser in the filter above, then click Run.</span>';
+                    '<span class="result-placeholder-text">Ready to extract. Configure filters and click Run.</span>';
                 }
                 if (resetBtn) {
                   resetBtn.disabled = false;
-                  resetBtn.textContent = "Reset";
+                  resetBtn.innerHTML = ICON_RESET + "<span>Reset</span>";
                   resetBtn.classList.remove("stop-btn");
                   resetBtn.onclick = function () {
                     resetCase(resultDiv);
@@ -4623,7 +4986,8 @@
               alert("Network error: " + e.message);
               if (resetBtn) {
                 resetBtn.disabled = false;
-                resetBtn.textContent = "Stop Auto Extraction";
+                resetBtn.innerHTML =
+                  ICON_STOP + "<span>Stop Auto Extraction</span>";
               }
             });
         }
