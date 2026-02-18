@@ -2461,8 +2461,8 @@
             }
             if (parsed.extractionResultsPath || parsed.reportsPath) {
               rows.push([
-                "Mission Report",
-                "Reports and extraction data are ready. Please use the <b>Reports & downloads</b> buttons in the toolbar above to save your results.",
+                "Mission report",
+                "Reports and extraction data are ready. Please download the results from <b>Reports & Downloads</b>. ",
               ]);
             }
           }
@@ -2502,7 +2502,7 @@
             r[0] === "Download overview" ||
             r[0] === "Extraction overview" ||
             r[0] === "Overall status" ||
-            r[0] === "Mission Report"
+            r[0] === "Mission report"
               ? r[1]
               : escapeHtml(r[1]).replace(/\n/g, "<br>")) +
             "</td></tr>"
@@ -3600,7 +3600,7 @@
           ICON_INVENTORY,
         );
         createBtn(
-          "Run Summary",
+          "Extraction Summary",
           "download-report-btn download-report-html-btn",
           "Download latest summary report",
           function (b) {
@@ -3609,7 +3609,7 @@
           ICON_SUMMARY,
         );
         createBtn(
-          "Download Data",
+          "Download Response",
           "download-report-btn download-report-json-btn",
           "Download extractions ZIP",
           function (b) {
