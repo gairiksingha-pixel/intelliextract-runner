@@ -1934,12 +1934,14 @@
         var pill = document.querySelector(".system-status-pill");
         var statusText = document.getElementById("system-status-text");
         if (!pill || !statusText) return;
+        var newText = text || (isBusy ? "System Busy" : "System Active");
+        if (statusText.textContent !== newText) {
+          statusText.textContent = newText;
+        }
         if (isBusy) {
-          pill.classList.add("busy");
-          statusText.textContent = text || "System Busy";
+          if (!pill.classList.contains("busy")) pill.classList.add("busy");
         } else {
-          pill.classList.remove("busy");
-          statusText.textContent = text || "System Active";
+          if (pill.classList.contains("busy")) pill.classList.remove("busy");
         }
       }
 
@@ -2843,7 +2845,20 @@
             controller.abort();
           };
         }
-        setSystemStatus(true, "Running Extraction...");
+        var initStatus =
+          caseId === "P1" || caseId === "P4" || caseId === "E3"
+            ? "Syncing Files..."
+            : caseId === "P2" ||
+                caseId === "P5" ||
+                caseId === "P6" ||
+                caseId === "E1" ||
+                caseId === "E2" ||
+                caseId === "E5"
+              ? "Extracting Files..."
+              : caseId === "PIPE"
+                ? "Syncing Files..." // Starts with sync
+                : "Running Operation...";
+        setSystemStatus(true, initStatus);
         if (row) {
           row.querySelectorAll("button.run").forEach(function (b) {
             b.disabled = true;
@@ -3018,6 +3033,7 @@
                     lastLogMessage,
                   );
                 } else if (msg.type === "resume_skip_sync") {
+                  setSystemStatus(true, "Skipping Synced Files...");
                   lastResumeSkipSync = {
                     skipped: msg.skipped,
                     total: msg.total,
@@ -3035,6 +3051,7 @@
                     lastLogMessage,
                   );
                 } else if (msg.type === "resume_skip") {
+                  setSystemStatus(true, "Skipping Extracted Files...");
                   lastResumeSkipExtract = {
                     skipped: msg.skipped,
                     total: msg.total,
@@ -3051,6 +3068,7 @@
                     lastResumeSkipExtract,
                   );
                 } else if (msg.type === "sync_progress") {
+                  setSystemStatus(true, "Syncing Files...");
                   lastSyncProgress = { done: msg.done, total: msg.total };
                   showResult(
                     resultDiv,
@@ -3064,6 +3082,7 @@
                     lastResumeSkipExtract,
                   );
                 } else if (msg.type === "extraction_progress") {
+                  setSystemStatus(true, "Extracting Files...");
                   lastExtractionProgress = { done: msg.done, total: msg.total };
                   showResult(
                     resultDiv,

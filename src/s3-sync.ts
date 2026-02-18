@@ -361,6 +361,26 @@ export async function syncAllBuckets(
   }
 
   saveSyncManifest(manifestPath, manifest);
+
+  // Record history
+  try {
+    const totalSynced = results.reduce((s, r) => s + r.synced, 0);
+    const totalSkipped = results.reduce((s, r) => s + r.skipped, 0);
+    const totalErrors = results.reduce((s, r) => s + r.errors, 0);
+    if (totalSynced > 0 || totalSkipped > 0 || totalErrors > 0) {
+      const { appendSyncHistory } = await import("./sync-history.js");
+      appendSyncHistory(dirname(config.run.checkpointPath), {
+        timestamp: new Date().toISOString(),
+        synced: totalSynced,
+        skipped: totalSkipped,
+        errors: totalErrors,
+        brands: results.map((r) => r.brand),
+      });
+    }
+  } catch (e) {
+    // ignore history write errors
+  }
+
   return results;
 }
 

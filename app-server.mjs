@@ -379,6 +379,13 @@ function listStagingFiles(dir, baseDir, list) {
   return list;
 }
 
+const SYNC_HISTORY_PATH = join(
+  ROOT,
+  "output",
+  "checkpoints",
+  "sync-history.json",
+);
+
 function buildSyncReportHtml() {
   const files = listStagingFiles(STAGING_DIR, STAGING_DIR, []);
   files.sort((a, b) => b.mtime - a.mtime);
@@ -393,6 +400,16 @@ function buildSyncReportHtml() {
           : 0;
     } catch (_) {}
   }
+
+  let history = [];
+  if (existsSync(SYNC_HISTORY_PATH)) {
+    try {
+      history = JSON.parse(readFileSync(SYNC_HISTORY_PATH, "utf-8"));
+      // Limit to last 30 entries
+      if (history.length > 30) history = history.slice(-30);
+    } catch (_) {}
+  }
+
   const formatDate = (ms) => {
     if (!ms) return "—";
     const d = new Date(ms);
@@ -404,20 +421,127 @@ function buildSyncReportHtml() {
         `<tr><td>${escapeHtml(f.path)}</td><td>${f.size}</td><td>${formatDate(f.mtime)}</td></tr>`,
     )
     .join("");
+
+  const historyData = JSON.stringify(history);
+
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>Sync Report</title>
-<style>body{font-family:system-ui,sans-serif;margin:1rem 2rem;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:0.5rem;text-align:left;} th{background:#f5f5f5;} .meta{margin-bottom:1rem;}</style>
+<head>
+  <meta charset="UTF-8">
+  <title>Staging Inventory Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary: #2d9d5f;
+      --header-bg: #216c6d;
+      --bg: #ffffff;
+      --surface: #f8fafc;
+      --border: #abb9c8;
+      --text: #1e293b;
+      --text-secondary: #475569;
+      --pass-bg: #dcf2e6;
+      --fail-bg: #fee2e2;
+      --fail-text: #b91c1c;
+    }
+    body { font-family: 'Ubuntu', sans-serif; max-width: 1250px; margin: 2rem auto; padding: 0 1rem; color: var(--text); background: #f1f5f9; }
+    h1 { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
+    .meta { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 2rem; text-align: center; }
+    
+    .dashboard-grid { margin-bottom: 2rem; }
+    .chart-card { 
+      background: linear-gradient(145deg, #ffffff, #f1f5f9); 
+      border: 1px solid rgba(171, 185, 200, 0.3); 
+      border-radius: 16px; 
+      padding: 1.6rem; 
+      box-shadow: 8px 8px 16px #e2e8f0, -4px -4px 12px #ffffff;
+      margin-bottom: 2rem;
+    }
+    .chart-card h4 { margin: 0 0 1rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--header-bg); border-bottom: 2px solid rgba(33, 108, 109, 0.1); padding-bottom: 0.6rem; font-weight: 800; }
+    .chart-container { position: relative; height: 350px; width: 100%; }
+
+    table { border-collapse: separate; border-spacing: 0; width: 100%; margin-top: 1rem; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+    th { background: var(--surface); color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+    th:last-child, td:last-child { border-right: none; }
+    tr:last-child td { border-bottom: none; }
+  </style>
 </head>
 <body>
-<h1>Sync Report</h1>
-<div class="meta"><p>Generated: ${new Date().toISOString()}</p>
-<p>Manifest entries (tracked keys): ${manifestEntries}</p>
-<p>Files in staging: ${files.length}</p></div>
-<table>
-<thead><tr><th>Path (staging)</th><th>Size (bytes)</th><th>Modified</th></tr></thead>
-<tbody>${rows || '<tr><td colspan="3">No synced files.</td></tr>'}</tbody>
-</table>
+  <h1>Staging Inventory Report</h1>
+  <div class="meta">
+    <p>Generated: ${new Date().toISOString()}</p>
+    <p>Manifest entries: ${manifestEntries} | Files in staging: ${files.length}</p>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="chart-card">
+      <h4>Download History (Last 30 Batches)</h4>
+      <div class="chart-container">
+        <canvas id="historyChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <h3>Current Staging Files</h3>
+  <table>
+    <thead><tr><th>Path (staging)</th><th>Size (bytes)</th><th>Modified</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="3">No synced files.</td></tr>'}</tbody>
+  </table>
+
+  <script>
+    const historyData = ${historyData};
+    if (historyData.length > 0) {
+      const ctx = document.getElementById('historyChart').getContext('2d');
+      const labels = historyData.map(d => {
+        const date = new Date(d.timestamp);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      });
+      
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Downloaded (New)',
+              data: historyData.map(d => d.synced),
+              backgroundColor: '#2d9d5f',
+            },
+            {
+              label: 'Skipped (Unchanged)',
+              data: historyData.map(d => d.skipped),
+              backgroundColor: '#94a3b8',
+            },
+            {
+              label: 'Errors',
+              data: historyData.map(d => d.errors),
+              backgroundColor: '#ef4444',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true }
+          },
+          plugins: {
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+    } else {
+      document.querySelector('.chart-card').style.display = 'none';
+      const msg = document.createElement('p');
+      msg.textContent = 'No download history available yet.';
+      msg.style.textAlign = 'center';
+      document.querySelector('.dashboard-grid').appendChild(msg);
+    }
+  </script>
 </body>
 </html>`;
 }
