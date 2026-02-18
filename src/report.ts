@@ -838,7 +838,7 @@ function htmlReportFromHistory(
     .run-section { margin-bottom: 1.25rem; background: white; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid var(--border); overflow: hidden; }
     .run-section[open] { border-color: var(--header-bg); }
     
-    .run-section-summary { cursor: pointer; padding: 1rem 1.25rem; background: var(--surface); list-style: none; transition: background 0.2s; }
+    .run-section-summary { cursor: pointer; padding: 1rem 1.25rem; background: #f8fafc; list-style: none; transition: background 0.2s; border-bottom: 1px solid var(--border-light); }
     .run-section-summary::-webkit-details-marker { display: none; }
     .run-section-summary:hover { background: #f1f5f9; }
     
@@ -869,9 +869,9 @@ function htmlReportFromHistory(
     .chip.fail { background: #fee2e2; color: #b91c1c; border-color: rgba(185, 28, 28, 0.2); }
     .chip.secondary { background: #f8fafc; color: var(--header-bg); font-weight: 700; border-color: var(--border-light); }
     
-    .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 2rem; }
-    .tab-btn { flex: 1; background: none; border: none; padding: 0.75rem 1.5rem; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; }
-    .tab-btn.active { color: var(--header-bg); border-bottom-color: var(--header-bg); }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; background: rgba(176, 191, 201, 0.15); padding: 5px; border-radius: var(--radius); border: 1px solid var(--border-light); }
+    .tab-btn { flex: 1; background: none; border: none; padding: 0.65rem 1.5rem; font-family: inherit; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; color: var(--text-secondary); border-radius: calc(var(--radius) - 4px); transition: all 0.25s ease; }
+    .tab-btn.active { background: var(--header-bg); color: white; box-shadow: 0 4px 12px rgba(33, 108, 109, 0.25); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
