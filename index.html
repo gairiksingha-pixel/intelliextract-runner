@@ -49,6 +49,12 @@
       * {
         box-sizing: border-box;
       }
+      button,
+      input,
+      select,
+      textarea {
+        font-family: inherit;
+      }
       /* Universal Button Sliding & Hover Effects */
       button:not(:disabled):not(.modal-close-icon):not(
           .filter-dropdown-trigger
@@ -1900,6 +1906,95 @@
       </div>
     </div>
 
+    <div
+      id="notification-modal-overlay"
+      class="modal-overlay"
+      aria-hidden="true"
+    >
+      <div
+        class="modal"
+        style="width: 450px; height: auto; max-height: 90vh"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="notification-modal-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="notification-modal-title">
+            <span class="title-badge" style="background: #c62828">EMAIL</span>
+            <span>Failure Notifications</span>
+          </div>
+          <button
+            type="button"
+            id="notification-modal-close-icon"
+            class="modal-close-icon"
+            aria-label="Close dialog"
+          >
+            &#10005;
+          </button>
+        </div>
+        <div class="modal-body">
+          <p
+            style="
+              font-size: 0.85rem;
+              color: var(--text-secondary);
+              margin-bottom: 1.25rem;
+            "
+          >
+            Stay updated on your extraction progress. Enter the email addresses
+            where you'd like to receive alerts when a task requires attention.
+          </p>
+
+          <div
+            class="header-label"
+            style="margin-bottom: 0.5rem; display: block"
+          >
+            Recipient Email IDs
+          </div>
+          <input
+            type="text"
+            id="recipient-email-input"
+            style="
+              width: 100%;
+              height: 42px;
+              padding: 0 1rem;
+              border: 1px solid var(--border-light);
+              border-radius: 8px;
+              font-family: inherit;
+              font-size: 0.95rem;
+              margin-bottom: 0.4rem;
+              box-sizing: border-box;
+            "
+            placeholder="e.g. alerts@company.com, admin@site.com"
+          />
+          <div
+            style="
+              font-size: 0.75rem;
+              color: var(--text-secondary);
+              margin-bottom: 0.5rem;
+            "
+          >
+            Separate multiple emails with commas.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn-secondary"
+            id="notification-modal-cancel"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="download-report-btn download-report-schedule-btn"
+            id="notification-save-btn"
+          >
+            <span>Save</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script type="module">
       (function () {
         var logo = document.getElementById("logo-img");
@@ -1929,6 +2024,7 @@
       const ICON_DELETE = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
       const ICON_BACK = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
       const ICON_CHECK = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      const ICON_MAIL = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:14px;height:14px;margin-right:8px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`;
 
       function setSystemStatus(isBusy, text) {
         var pill = document.querySelector(".system-status-pill");
@@ -3628,9 +3724,34 @@
         return year + month + day + "-" + h + m + "-" + s;
       }
 
-      (function initScheduleButton() {
+      (function initActionButtons() {
         var bar = document.getElementById("download-bar");
         if (!bar) return;
+
+        // Notification Button
+        var notificationBtn = document.createElement("button");
+        notificationBtn.type = "button";
+        notificationBtn.id = "notification-settings-btn";
+        notificationBtn.innerHTML = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg><span>Notifications</span>`;
+        notificationBtn.className = "download-report-btn";
+        notificationBtn.style.marginLeft = "0.5rem";
+        notificationBtn.style.width = "auto";
+        notificationBtn.style.padding = "0 1rem";
+        notificationBtn.style.setProperty("background", "#f1f5f9", "important");
+        notificationBtn.style.setProperty(
+          "color",
+          "var(--text-secondary)",
+          "important",
+        );
+        notificationBtn.style.setProperty(
+          "border",
+          "1px solid var(--border-light)",
+          "important",
+        );
+        notificationBtn.title = "Configure email notifications for failures";
+        bar.appendChild(notificationBtn);
+
+        // Schedule Button
         var scheduleBtn = document.createElement("button");
         scheduleBtn.type = "button";
         scheduleBtn.innerHTML = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Manage Schedules</span>`;
@@ -3641,6 +3762,7 @@
           openScheduleModal();
         };
         bar.appendChild(scheduleBtn);
+
         updateHeaderStatus();
         initScheduleModal();
       })();
@@ -4316,7 +4438,6 @@
             "<strong>⚠ Important Information:</strong> Ensure no other extraction missions are scheduled or active at this time. Manual processes or <strong>paused (Resume)</strong> states will cause this mission to be skipped to prevent data conflicts." +
             "</div>" +
             '<div class="modal-footer" style="border-top: none; padding-top: 0.5rem;"><button type="button" id="schedule-cancel-btn" class="btn-secondary">Discard</button><button type="button" id="schedule-save-btn" class="download-report-btn download-report-schedule-btn">' +
-            ICON_CHECK +
             "<span>" +
             (schedule ? "Update Changes" : "Launch Mission") +
             "</span>" +
@@ -4983,6 +5104,111 @@
         fetchConfig().then(function () {
           updateHeaderStatus();
         });
+
+        // Initialize notification modal logic
+        function initNotificationModal() {
+          var overlay = document.getElementById("notification-modal-overlay");
+          var openBtn = document.getElementById("notification-settings-btn");
+          var closeIcon = document.getElementById(
+            "notification-modal-close-icon",
+          );
+          var cancelBtn = document.getElementById("notification-modal-cancel");
+          var saveBtn = document.getElementById("notification-save-btn");
+          var emailInput = document.getElementById("recipient-email-input");
+
+          if (!overlay || !openBtn) return;
+
+          if (saveBtn) {
+            saveBtn.innerHTML = "<span>Save</span>";
+          }
+
+          function close() {
+            overlay.classList.remove("open");
+            overlay.setAttribute("aria-hidden", "true");
+          }
+
+          openBtn.onclick = function () {
+            // Fetch current config
+            fetch("/api/email-config")
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (data) {
+                if (data.recipientEmail) {
+                  emailInput.value = data.recipientEmail;
+                }
+                overlay.classList.add("open");
+                overlay.setAttribute("aria-hidden", "false");
+              })
+              .catch(function (e) {
+                console.warn("Failed to load config, opening anyway:", e);
+                overlay.classList.add("open");
+                overlay.setAttribute("aria-hidden", "false");
+              });
+          };
+
+          if (closeIcon) closeIcon.onclick = close;
+          if (cancelBtn) cancelBtn.onclick = close;
+
+          overlay.onclick = function (e) {
+            if (e.target === overlay) close();
+          };
+
+          if (saveBtn) {
+            saveBtn.onclick = function () {
+              var rawValue = emailInput.value.trim();
+              if (rawValue) {
+                var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                var emails = rawValue.split(",").map(function (e) {
+                  return e.trim();
+                });
+
+                for (var i = 0; i < emails.length; i++) {
+                  var emailToTest = emails[i];
+                  if (!emailToTest) {
+                    alert("List contains empty email entry.");
+                    return;
+                  }
+                  if (!emailRegex.test(emailToTest)) {
+                    alert(
+                      '"' + emailToTest + '" is not a valid email address.',
+                    );
+                    return;
+                  }
+                }
+              }
+              var email = rawValue;
+
+              saveBtn.disabled = true;
+              saveBtn.innerHTML = "<span>Saving...</span>";
+
+              fetch("/api/email-config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ recipientEmail: email }),
+              })
+                .then(function (r) {
+                  return r.json();
+                })
+                .then(function (data) {
+                  if (data.success) {
+                    alert("Notification settings saved successfully!");
+                    close();
+                  } else {
+                    alert("Failed to save.");
+                  }
+                })
+                .catch(function (e) {
+                  alert("Network error: " + e.message);
+                })
+                .finally(function () {
+                  saveBtn.disabled = false;
+                  saveBtn.innerHTML = "<span>Save</span>";
+                });
+            };
+          }
+        }
+        initNotificationModal();
       })();
       window.stopBackgroundJob = function (caseId) {
         if (confirm("Are you sure you want to stop auto extraction?")) {

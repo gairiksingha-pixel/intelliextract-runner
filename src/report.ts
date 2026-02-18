@@ -917,7 +917,7 @@ function htmlReportFromHistory(
     
     .muted { color: var(--text-secondary); font-style: italic; }
     .small { font-size: 0.75rem; }
-    td.file-path { font-family: monospace; font-size: 0.72rem; color: var(--text-secondary); overflow-wrap: anywhere; word-break: break-all; }
+    td.file-path { font-family: inherit; font-size: 0.72rem; color: var(--text-secondary); overflow-wrap: anywhere; word-break: break-all; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>

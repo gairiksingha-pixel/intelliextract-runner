@@ -10,6 +10,7 @@ import {
   extractOneFile,
   type FileJob,
   type LoadEngineResult,
+  type ExtractionFailure,
   NetworkAbortError,
 } from "./load-engine.js";
 import {
@@ -28,6 +29,7 @@ import {
   closeRequestResponseLogger,
 } from "./logger.js";
 import { computeMetrics } from "./metrics.js";
+import { sendConsolidatedFailureEmail } from "./mailer.js";
 import type { Config, RunMetrics } from "./types.js";
 
 export interface TenantPurchaserPair {
@@ -232,6 +234,7 @@ export async function runSyncExtractPipeline(
   let syncResults: SyncResult[] = [];
   let extractionQueued = 0;
   let extractionDone = 0;
+  const failures: ExtractionFailure[] = [];
   const skippedRecords: Array<{
     filePath: string;
     relativePath: string;
@@ -271,7 +274,9 @@ export async function runSyncExtractPipeline(
     extractionQueue.add(async () => {
       if (aborted) return;
       try {
-        await extractOneFile(config, runId, db, job);
+        await extractOneFile(config, runId, db, job, (f) => {
+          failures.push(f);
+        });
       } catch (err) {
         if (err instanceof NetworkAbortError) {
           aborted = true;
@@ -314,10 +319,16 @@ export async function runSyncExtractPipeline(
   }
 
   await extractionQueue.onIdle();
+
   const finishedAt = new Date();
   const records = getRecordsForRun(db, runId);
 
   const metrics = computeMetrics(runId, records, startedAt, finishedAt);
+
+  // Send consolidated failure email if any failures occurred
+  if (failures.length > 0) {
+    void sendConsolidatedFailureEmail(runId, failures, metrics);
+  }
 
   if (stdoutPiped) {
     process.stdout.write(

@@ -28,6 +28,7 @@ import {
 } from "node:path";
 import { fileURLToPath } from "node:url";
 import cron from "node-cron";
+import { getEmailConfig, saveEmailConfig } from "./dist/mailer.js";
 
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
@@ -1390,6 +1391,46 @@ createServer(async (req, res) => {
       const entries = readScheduleLogEntries();
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ entries }));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === "GET" && url === "/api/email-config") {
+    try {
+      const config = getEmailConfig();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(config));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === "POST" && url === "/api/email-config") {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    try {
+      const data = JSON.parse(body || "{}");
+      if (data.recipientEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emails = data.recipientEmail.split(",").map((e) => e.trim());
+        for (const email of emails) {
+          if (!email || !emailRegex.test(email)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "Invalid email address format: " + email,
+              }),
+            );
+            return;
+          }
+        }
+      }
+      saveEmailConfig(data);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true }));
     } catch (e) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: String(e.message) }));

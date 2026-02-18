@@ -36,6 +36,17 @@ import {
   closeRequestResponseLogger,
 } from "./logger.js";
 import { getStagingSubdir } from "./s3-sync.js";
+import { sendConsolidatedFailureEmail } from "./mailer.js";
+import { computeMetrics } from "./metrics.js";
+
+export interface ExtractionFailure {
+  filePath: string;
+  brand: string;
+  purchaser?: string;
+  patternKey?: string;
+  errorMessage?: string;
+  statusCode?: number;
+}
 
 export interface FileJob {
   filePath: string;
@@ -271,6 +282,7 @@ export async function extractOneFile(
   runId: string,
   db: CheckpointDb,
   job: FileJob,
+  onFailure?: (failure: ExtractionFailure) => void,
 ): Promise<void> {
   // Already handled in this run (done or error). Do not re-process or overwrite so the report
   // counts success/failed correctly.
@@ -310,6 +322,13 @@ export async function extractOneFile(
       finishedAt: new Date().toISOString(),
       errorMessage: `Read file: ${errMsg}`,
       runId,
+    });
+    // Record failure for consolidation
+    onFailure?.({
+      filePath: job.filePath,
+      brand: job.brand,
+      purchaser: job.purchaser,
+      errorMessage: `Read file: ${errMsg}`,
     });
     return;
   }
@@ -391,6 +410,18 @@ export async function extractOneFile(
     patternKey,
     runId,
   });
+
+  // Record failure for consolidation
+  if (!finalSuccess) {
+    onFailure?.({
+      filePath: job.filePath,
+      brand: job.brand,
+      purchaser: job.purchaser,
+      patternKey,
+      errorMessage,
+      statusCode: result.statusCode,
+    });
+  }
 }
 
 /**
@@ -499,6 +530,7 @@ export async function runExtraction(
   }
   const queue = new PQueue(queueOptions);
   const startedAt = new Date();
+  const failures: ExtractionFailure[] = [];
   const total = toProcess.length;
   let done = 0;
   const isTTY =
@@ -555,6 +587,13 @@ export async function runExtraction(
           bodyBase64 = readFileSync(job.filePath, { encoding: "base64" });
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : String(e);
+          const failure = {
+            filePath: job.filePath,
+            brand: job.brand,
+            purchaser: job.purchaser,
+            errorMessage: `Read file: ${errMsg}`,
+          };
+          failures.push(failure);
           upsertCheckpoint(db, {
             filePath: job.filePath,
             relativePath: job.relativePath,
@@ -644,6 +683,17 @@ export async function runExtraction(
             patternKey,
             runId: runIdToUse,
           });
+
+          if (status === "error") {
+            failures.push({
+              filePath: job.filePath,
+              brand: job.brand,
+              purchaser: job.purchaser,
+              patternKey,
+              errorMessage,
+              statusCode: result.statusCode,
+            });
+          }
         } catch (err) {
           if (err instanceof NetworkAbortError) {
             aborted = true;
@@ -685,11 +735,18 @@ export async function runExtraction(
 
   if (isTTY && total > 0) updateProgress();
   await queue.onIdle();
+
   if (isTTY && total > 0) {
     process.stdout.write("\r" + " ".repeat(60) + "\r");
   }
   const finishedAt = new Date();
   const records = getRecordsForRun(db, runIdToUse);
+  const metrics = computeMetrics(runIdToUse, records, startedAt, finishedAt);
+
+  // Send consolidated failure email if any failures occurred
+  if (failures.length > 0) {
+    void sendConsolidatedFailureEmail(runIdToUse, failures, metrics);
+  }
 
   const cumStats = getCumulativeStats(db, {
     tenant: options?.tenant,
