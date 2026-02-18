@@ -441,7 +441,29 @@ function buildExtractionDataPageHtml() {
   const successRate =
     totalAll > 0 ? Math.round((totalSuccess / totalAll) * 100) : 0;
 
-  const now = new Date().toLocaleString();
+  const d = new Date();
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const day = d.getDate();
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  let suffix = "th";
+  if (day % 10 === 1 && day !== 11) suffix = "st";
+  else if (day % 10 === 2 && day !== 12) suffix = "nd";
+  else if (day % 10 === 3 && day !== 13) suffix = "rd";
+  const now = `${day}${suffix} ${month} ${year}`;
 
   const escHtml = (s) =>
     String(s ?? "")
@@ -784,6 +806,26 @@ function buildExtractionDataPageHtml() {
     }
     .time-cell { font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
     .toggle-cell { width: 40px; text-align: center; }
+    .action-cell { width: 100px; text-align: center; }
+    .btn-download-row {
+      background: var(--bg);
+      border: 1px solid var(--border-light);
+      border-radius: 4px;
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      transition: all 0.15s;
+    }
+    .btn-download-row:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -848,6 +890,7 @@ function buildExtractionDataPageHtml() {
             <th>Pattern Key</th>
             <th>Purchaser</th>
             <th>Status</th>
+            <th class="action-cell">Action</th>
           </tr>
         </thead>
         <tbody id="table-body">
@@ -876,6 +919,11 @@ function buildExtractionDataPageHtml() {
 
     function syntaxHighlight(json) {
       var str = JSON.stringify(json, null, 2);
+      // PERFORMANCE FIX: Skip complex syntax highlighting for very large JSON (5k-10k+ lines)
+      // Browsers struggle with 100,000+ regex matches and DOM nodes.
+      if (str.length > 80000) {
+        return escHtml(str);
+      }
       return str.replace(/("(\\\\u[a-zA-Z0-9]{4}|\\\\[^u]|[^\\\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)/g, function(match) {
         var cls = 'json-number';
         if (/^"/.test(match)) {
@@ -905,6 +953,20 @@ function buildExtractionDataPageHtml() {
         }
         return true;
       });
+    }
+
+    function downloadRow(idx) {
+      const r = ALL_ROWS[idx];
+      if (!r) return;
+      const blob = new Blob([JSON.stringify(r.json, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = r.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
     function render() {
@@ -938,6 +1000,8 @@ function buildExtractionDataPageHtml() {
         html += '<td class="pattern-cell"><code>' + escHtml(r.patternKey || '—') + '</code></td>';
         html += '<td style="font-size:0.75rem">' + escHtml(r.purchaserKey || '—') + '</td>';
         html += '<td>' + badge + '</td>';
+        html += '<td class="action-cell"><button class="btn-download-row" onclick="event.stopPropagation(); downloadRow(' + globalIdx + ')">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> JSON</button></td>';
         html += '</tr>';
       });
       tbody.innerHTML = html;
@@ -970,19 +1034,24 @@ function buildExtractionDataPageHtml() {
             var expandTr = document.createElement('tr');
             expandTr.className = 'expand-row';
             expandTr.setAttribute('data-for', idx);
-            expandTr.innerHTML = '<td colspan="6"><div class="json-loader"><div class="json-spinner"></div><span>Loading JSON data…</span></div></td>';
+            expandTr.innerHTML = '<td colspan="7"><div class="json-loader"><div class="json-spinner"></div><span>Loading JSON data…</span></div></td>';
             clickedTr.parentNode.insertBefore(expandTr, clickedTr.nextSibling);
             clickedTr.classList.add('expanded');
             expandedRows.add(idx);
 
             // Yield to browser to paint spinner, then do heavy work
+            // Using 60ms to ensure the spinner is definitely rendered and visible across frames
             setTimeout(function() {
               var highlighted = syntaxHighlight(r.json);
               var td = expandTr.querySelector('td');
               if (td) {
-                td.innerHTML = '<div class="json-viewer"><pre>' + highlighted + '</pre></div>';
+                var container = document.createElement('div');
+                container.className = 'json-viewer';
+                container.innerHTML = '<pre>' + highlighted + '</pre>';
+                td.innerHTML = '';
+                td.appendChild(container);
               }
-            }, 0);
+            }, 60);
           }
         });
       });
@@ -1068,19 +1137,40 @@ function buildSyncReportHtml() {
     } catch (_) {}
   }
 
+  const formatDateHuman = (d) => {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    const day = d.getDate();
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    let suffix = "th";
+    if (day % 10 === 1 && day !== 11) suffix = "st";
+    else if (day % 10 === 2 && day !== 12) suffix = "nd";
+    else if (day % 10 === 3 && day !== 13) suffix = "rd";
+    return `${day}${suffix} ${month} ${year}`;
+  };
+
   const formatDate = (ms) => {
     if (!ms) return "—";
     const d = new Date(ms);
     return d.toISOString();
   };
-  const rows = files
-    .map(
-      (f) =>
-        `<tr><td>${escapeHtml(f.path)}</td><td>${f.size}</td><td>${formatDate(f.mtime)}</td></tr>`,
-    )
-    .join("");
-
   const historyData = JSON.stringify(history);
+  const filesJson = JSON.stringify(
+    files.map((f) => ({ path: f.path, size: f.size, mtime: f.mtime })),
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1149,6 +1239,48 @@ function buildSyncReportHtml() {
     th:last-child, td:last-child { border-right: none; }
     tr:last-child td { border-bottom: none; }
     td { font-size: 0.75rem; color: var(--text-secondary); }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      gap: 0.4rem;
+      justify-content: center;
+      margin: 2rem 0;
+      padding: 1rem;
+    }
+    .pg-btn {
+      min-width: 38px;
+      height: 38px;
+      padding: 0 0.8rem;
+      border: 1px solid var(--border-light);
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--header-bg);
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pg-btn:hover:not(:disabled) { 
+      background: var(--accent-light);
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-1px);
+    }
+    .pg-btn.active { 
+      background: var(--header-bg); 
+      color: white; 
+      border-color: var(--header-bg);
+      box-shadow: 0 4px 10px rgba(33, 108, 109, 0.2);
+    }
+    .pg-btn:disabled { 
+      opacity: 0.4; 
+      cursor: not-allowed; 
+      background: #f8fafc;
+    }
   </style>
 </head>
 <body>
@@ -1158,7 +1290,7 @@ function buildSyncReportHtml() {
       <h1 class="report-header-title">Staging Inventory Report</h1>
     </div>
     <div class="meta">
-      <p>Generated: ${new Date().toISOString().split("T")[0]}</p>
+      <p>Generated: ${formatDateHuman(new Date())}</p>
       <p>Manifest entries: ${manifestEntries} | Files in staging: ${files.length}</p>
     </div>
   </div>
@@ -1172,16 +1304,78 @@ function buildSyncReportHtml() {
     </div>
   </div>
 
-  <h3>Current Staging Files</h3>
-  <table>
+  <h3 id="files-title">Current Staging Files</h3>
+  <table id="files-table">
     <thead><tr><th>Path (staging)</th><th>Size (bytes)</th><th>Modified</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="3">No synced files.</td></tr>'}</tbody>
+    <tbody id="files-body"></tbody>
   </table>
+  <div id="pagination" class="pagination"></div>
 
   <script>
     const historyData = ${historyData};
-    if (historyData.length > 0) {
-      const ctx = document.getElementById('historyChart').getContext('2d');
+    const ALL_FILES = ${filesJson};
+    let currentPage = 1;
+    const pageSize = 100;
+
+    function esc(s) {
+      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('files-body');
+      if (!tbody) return;
+      
+      if (ALL_FILES.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3">No synced files.</td></tr>';
+        return;
+      }
+
+      const start = (currentPage - 1) * pageSize;
+      const end = Math.min(start + pageSize, ALL_FILES.length);
+      const page = ALL_FILES.slice(start, end);
+
+      tbody.innerHTML = page.map(f => \`
+        <tr>
+          <td>\${esc(f.path)}</td>
+          <td>\${f.size.toLocaleString()}</td>
+          <td>\${new Date(f.mtime).toISOString().replace('T', ' ').split('.')[0]}</td>
+        </tr>
+      \`).join('');
+      
+      renderPagination();
+    }
+
+    function renderPagination() {
+      const container = document.getElementById('pagination');
+      const totalPages = Math.ceil(ALL_FILES.length / pageSize);
+      if (totalPages <= 1) { container.innerHTML = ''; return; }
+      
+      let html = '';
+      html += '<button class="pg-btn" ' + (currentPage === 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')">Prev</button>';
+      
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          html += '<button class="pg-btn ' + (i === currentPage ? 'active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+          html += '<span style="padding:0.5rem; color:var(--text-secondary)">...</span>';
+        }
+      }
+      
+      html += '<button class="pg-btn" ' + (currentPage === totalPages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')">Next</button>';
+      container.innerHTML = html;
+    }
+
+    function goPage(p) {
+      currentPage = p;
+      renderTable();
+      const table = document.getElementById('files-title');
+      if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    window.onload = () => {
+      renderTable();
+      if (historyData.length > 0) {
+        const ctx = document.getElementById('historyChart').getContext('2d');
       const labels = historyData.map(d => {
         const date = new Date(d.timestamp);
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -1227,7 +1421,8 @@ function buildSyncReportHtml() {
       msg.textContent = 'No download history available yet.';
       msg.style.textAlign = 'center';
       document.querySelector('.dashboard-grid').appendChild(msg);
-    }
+      }
+    };
   </script>
 </body>
 </html>`;

@@ -507,6 +507,25 @@ function formatRunDateTime(iso: string): string {
   return `${month}-${day}-${year}-${h}:${min}:${ampm}`;
 }
 
+function formatDateHuman(d: Date): string {
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const day = d.getDate();
+  return `${dayOrdinal(day)} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 function formatBrandDisplayName(brandId?: string): string {
   if (!brandId) return "";
   if (brandId.includes("no-cow")) return "No Cow";
@@ -730,7 +749,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
         .replace(/_/g, "-")
     : "";
 
-  let sectionClass = "run-section";
+  let sectionClass = "run-section history-item";
   if (displayInfraFailed > 0) sectionClass += " status-error";
   else if (displayApiFailed > 0) sectionClass += " status-warning";
 
@@ -1127,10 +1146,52 @@ function htmlReportFromHistory(
     .log-row-hidden { display: none !important; }
 
     /* Premium Scrollbar */
-    .chart-scroll-wrapper::-webkit-scrollbar { height: 6px; }
-    .chart-scroll-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); border-radius: 10px; }
-    .chart-scroll-wrapper::-webkit-scrollbar-thumb { background: rgba(33, 108, 109, 0.15); border-radius: 10px; }
     .chart-scroll-wrapper::-webkit-scrollbar-thumb:hover { background: rgba(33, 108, 109, 0.3); }
+
+    /* History Pagination */
+    .history-pagination {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin: 2.5rem 0;
+      padding: 1rem;
+    }
+    .pg-btn {
+      padding: 0.55rem 1.1rem;
+      border: 1px solid var(--border);
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--header-bg);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+    .pg-btn:hover:not(:disabled) { 
+      background: var(--accent-light);
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-1px);
+    }
+    .pg-btn.active { 
+      background: var(--header-bg); 
+      color: white; 
+      border-color: var(--header-bg);
+      box-shadow: 0 4px 10px rgba(33, 108, 109, 0.2);
+    }
+    .pg-btn:disabled { 
+      opacity: 0.4; 
+      cursor: not-allowed; 
+      background: #f8fafc;
+    }
+    .pg-ellipsis {
+      padding: 0.5rem;
+      color: var(--text-secondary);
+      font-weight: 700;
+      display: flex;
+      align-items: flex-end;
+    }
 
     .btn-retry-batch {
       background: var(--header-bg);
@@ -1185,7 +1246,7 @@ function htmlReportFromHistory(
       <img src="${logoDataUri}" alt="intellirevenue" class="logo">
       <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
     </div>
-    <div class="meta">Generated: ${escapeHtml(formatRunDateTime(generatedAt))} — ${historicalSummaries.length} operation(s)</div>
+    <div class="meta">Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))} — ${historicalSummaries.length} operation(s)</div>
   </div>
 
   <div class="tabs">
@@ -1258,7 +1319,10 @@ function htmlReportFromHistory(
   </div>
 
   <div id="history" class="tab-content">
-    ${runsHtml}
+    <div id="history-items-container">
+      ${runsHtml}
+    </div>
+    <div id="history-pagination" class="history-pagination"></div>
   </div>
 
   <script>
@@ -1266,7 +1330,58 @@ function htmlReportFromHistory(
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
+      if (event && event.target) {
+        event.target.classList.add('active');
+      }
+      if (tabId === 'history') {
+        renderHistory();
+      }
+    }
+
+    let historyPage = 1;
+    const historyPageSize = 20;
+
+    function renderHistory() {
+      const items = document.querySelectorAll('.history-item');
+      if (items.length === 0) return;
+      const total = items.length;
+      const pages = Math.ceil(total / historyPageSize);
+      
+      if (historyPage > pages) historyPage = pages;
+      if (historyPage < 1) historyPage = 1;
+
+      items.forEach((item, idx) => {
+        const start = (historyPage - 1) * historyPageSize;
+        const end = start + historyPageSize;
+        item.style.display = (idx >= start && idx < end) ? 'block' : 'none';
+      });
+
+      // Render pagination buttons
+      const pgContainer = document.getElementById('history-pagination');
+      if (pages <= 1) { pgContainer.innerHTML = ''; return; }
+      
+      let html = '';
+      html += '<button class="pg-btn" ' + (historyPage === 1 ? 'disabled' : '') + ' onclick="goHistoryPage(' + (historyPage - 1) + ')">Prev</button>';
+      
+      const dots = '<span class="pg-ellipsis">...</span>';
+      
+      for (let i = 1; i <= pages; i++) {
+        // Always show first, last, current, and one around current
+        if (i === 1 || i === pages || (i >= historyPage - 1 && i <= historyPage + 1)) {
+          html += '<button class="pg-btn ' + (i === historyPage ? 'active' : '') + '" onclick="goHistoryPage(' + i + ')">' + i + '</button>';
+        } else if (i === historyPage - 2 || i === historyPage + 2) {
+          html += dots;
+        }
+      }
+
+      html += '<button class="pg-btn" ' + (historyPage === pages ? 'disabled' : '') + ' onclick="goHistoryPage(' + (historyPage + 1) + ')">Next</button>';
+      pgContainer.innerHTML = html;
+    }
+
+    function goHistoryPage(p) {
+      historyPage = p;
+      renderHistory();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // Dashboard Data
@@ -1289,6 +1404,7 @@ function htmlReportFromHistory(
 
     window.onload = () => {
       initCharts();
+      renderHistory();
     };
 
     function initCharts() {
