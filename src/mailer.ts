@@ -76,14 +76,13 @@ export async function sendConsolidatedFailureEmail(
     },
   });
 
-  const subject = `[intelliExtract] Extraction Failed-[${runId}]`;
+  const displayRunId =
+    runId.startsWith("RUN") || runId.startsWith("SKIP") ? `#${runId}` : runId;
+  const subject = `[intelliExtract] Extraction Failed-${displayRunId}`;
 
   // Map failures to the template format
   const report = {
-    total: metrics?.totalFiles ?? failures.length,
-    passed: metrics?.success ?? 0,
     failed: metrics?.failed ?? failures.length,
-    skipped: metrics?.skipped ?? 0,
     duration: metrics?.totalProcessingTimeMs
       ? metrics.totalProcessingTimeMs / 1000
       : 0,
@@ -116,8 +115,6 @@ export async function sendConsolidatedFailureEmail(
 
   const overallStatus = "Failed";
   const overallStatusColor = "#d93025";
-  const passRate =
-    report.total > 0 ? Math.round((report.passed / report.total) * 100) : 0;
 
   const playwrightRows = report.tests
     .map(
@@ -167,28 +164,12 @@ export async function sendConsolidatedFailureEmail(
                           <td style="padding:5px 0;color:${overallStatusColor};font-weight:bold;font-size:16px;">${overallStatus}</td>
                         </tr>
                         <tr>
-                          <td style="padding:5px 0;"><strong>Total Processed:</strong></td>
-                          <td style="padding:5px 0;">${report.total}</td>
-                        </tr>
-                        <tr>
-                          <td style="padding:5px 0;"><strong>Success:</strong></td>
-                          <td style="padding:5px 0;color:#216869;font-weight:bold;">${report.passed}</td>
-                        </tr>
-                        <tr>
                           <td style="padding:5px 0;"><strong>Failed:</strong></td>
                           <td style="padding:5px 0;color:#d93025;font-weight:bold;">${report.failed}</td>
                         </tr>
                         <tr>
-                          <td style="padding:5px 0;"><strong>Skipped:</strong></td>
-                          <td style="padding:5px 0;color:#888;font-weight:bold;">${report.skipped}</td>
-                        </tr>
-                        <tr>
-                          <td style="padding:5px 0;"><strong>Success Rate:</strong></td>
-                          <td style="padding:5px 0;font-weight:bold;">${passRate}%</td>
-                        </tr>
-                        <tr>
                           <td style="padding:5px 0;"><strong>Run ID:</strong></td>
-                          <td style="padding:5px 0;">${runId}</td>
+                          <td style="padding:5px 0;">${displayRunId}</td>
                         </tr>
                       </table>
                     </div>

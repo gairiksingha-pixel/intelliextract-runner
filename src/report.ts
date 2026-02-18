@@ -13,7 +13,12 @@ import {
   statSync,
 } from "node:fs";
 import { join, dirname, basename, extname } from "node:path";
-import type { Config, RunMetrics, ExecutiveSummary } from "./types.js";
+import type {
+  Config,
+  RunMetrics,
+  ExecutiveSummary,
+  CheckpointRecord,
+} from "./types.js";
 import {
   openCheckpointDb,
   getRecordsForRun,
@@ -33,11 +38,20 @@ export interface HistoricalRunSummary {
   runId: string;
   metrics: RunMetrics;
   extractionResults: ExtractionResultEntry[];
-  runDurationSeconds: number;
-  /** When all records in a run share the same brand, include it for display. */
+  records: CheckpointRecord[];
+  start: Date;
+  end: Date;
   brand?: string;
-  /** When all records in a run share the same purchaser (stagingDir/<brand>/<purchaser>/...), include it for display. */
   purchaser?: string;
+  runDurationSeconds: number;
+  sessions?: Array<{
+    runId: string;
+    start: Date;
+    end: Date;
+    success: number;
+    failed: number;
+    skipped: number;
+  }>;
 }
 
 function extractionResultFilenameFromRecord(record: {
@@ -127,24 +141,14 @@ function loadExtractionResults(
   return loadJsonEntries(baseDir, false);
 }
 
-function filterExtractionResultsForRun(
-  config: Config,
-  runId: string,
+function filterExtractionResultsForRecords(
+  records: CheckpointRecord[],
   allResults: ExtractionResultEntry[],
 ): ExtractionResultEntry[] {
-  const db = openCheckpointDb(config.run.checkpointPath);
-
-  // FIXED: Only include files from the current run to ensure metrics match execution
-  const relevantRecords = db._data.checkpoints.filter(
-    (r) => r.run_id === runId,
-  );
-
-  closeCheckpointDb(db);
-
   const relevantFilenames = new Set(
-    relevantRecords.map((r) =>
+    records.map((r) =>
       extractionResultFilenameFromRecord({
-        relativePath: r.relative_path,
+        relativePath: r.relativePath,
         brand: r.brand,
         purchaser: r.purchaser ?? undefined,
       }),
@@ -152,7 +156,6 @@ function filterExtractionResultsForRun(
   );
 
   if (relevantFilenames.size === 0) return [];
-
   return allResults.filter((e) => relevantFilenames.has(e.filename));
 }
 
@@ -179,31 +182,50 @@ function minMaxDatesFromRecords(
   } else {
     // Fallback: try to parse date from runId of the first record
     const runId = records[0]?.runId;
-    if (runId && runId.startsWith("run_")) {
-      // run_YYYY-MM-DD_HH-mm-ss_suffix
-      const parts = runId.split("_");
-      if (parts.length >= 3) {
-        const datePart = parts[1]; // YYYY-MM-DD
-        const timePart = parts[2]; // HH-mm-ss
-        const iso = `${datePart}T${timePart.replace(/-/g, ":")}Z`; // Treat as UTC or local? Original format uses local components but Date() might need help.
-        // Actually, formatRunId uses local time components.
-        // Let's try constructing it.
-        try {
-          // run_2026-02-14_13-53-49 -> 2026-02-14T13:53:49
-          const d = new Date(`${datePart}T${timePart.replace(/-/g, ":")}`);
-          if (!Number.isNaN(d.getTime())) {
-            start = d;
-          } else {
-            start = new Date(0);
+    if (runId) {
+      if (runId.startsWith("run_")) {
+        // Old format: run_YYYY-MM-DD_HH-mm-ss_suffix
+        const parts = runId.split("_");
+        if (parts.length >= 3) {
+          const datePart = parts[1]; // YYYY-MM-DD
+          const timePart = parts[2]; // HH-mm-ss
+          try {
+            const d = new Date(`${datePart}T${timePart.replace(/-/g, ":")}`);
+            start = !Number.isNaN(d.getTime()) ? d : new Date();
+          } catch {
+            start = new Date();
           }
-        } catch {
-          start = new Date(0);
+        } else {
+          start = new Date();
+        }
+      } else if (runId.startsWith("SKIP-")) {
+        // New format: SKIP-YYYYMMDD-HHmmss-suffix
+        const parts = runId.split("-");
+        if (parts.length >= 3) {
+          const dateStr = parts[1]; // YYYYMMDD
+          const timeStr = parts[2]; // HHmmss
+          const yr = dateStr.slice(0, 4);
+          const mo = dateStr.slice(4, 6);
+          const dy = dateStr.slice(6, 8);
+          const hr = timeStr.slice(0, 2);
+          const mn = timeStr.slice(2, 4);
+          const sc = timeStr.slice(4, 6);
+          try {
+            const d = new Date(`${yr}-${mo}-${dy}T${hr}:${mn}:${sc}`);
+            start = !Number.isNaN(d.getTime()) ? d : new Date();
+          } catch {
+            start = new Date();
+          }
+        } else {
+          start = new Date();
         }
       } else {
-        start = new Date(0);
+        // For RUN1, etc. if no record has startedAt, we just use current time
+        // to avoid the 1970/insane duration issue.
+        start = new Date();
       }
     } else {
-      start = new Date(0);
+      start = new Date();
     }
   }
 
@@ -235,39 +257,49 @@ export function loadHistoricalRunSummaries(
     const records = getRecordsForRun(db, runId);
     if (records.length === 0) continue;
 
-    const { start, end } = minMaxDatesFromRecords(records);
+    const allResultsForRun = loadExtractionResults(config, runId);
 
-    // Find brand and purchaser
-    const brandSet = new Set<string>();
-    const purchaserSet = new Set<string>();
+    // Group records in this run by (brand, purchaser)
+    const recordsByGroup = new Map<string, CheckpointRecord[]>();
     for (const r of records) {
-      if (r.brand) brandSet.add(r.brand);
-      if (r.purchaser) {
-        // Prefer explicit purchaser from record
-        purchaserSet.add(r.purchaser);
-      } else if (r.relativePath) {
-        // Fallback: infer from relativePath (legacy)
-        const firstSegment = r.relativePath.split(/[\\/]/)[0];
-        if (firstSegment) purchaserSet.add(firstSegment);
-      }
+      const key = `${r.brand}|${r.purchaser || ""}`;
+      if (!recordsByGroup.has(key)) recordsByGroup.set(key, []);
+      recordsByGroup.get(key)!.push(r);
     }
-    const brands = [...brandSet];
-    const purchasers = [...purchaserSet];
-    const brand = brands.length === 1 ? brands[0] : undefined;
-    const purchaser = purchasers.length === 1 ? purchasers[0] : undefined;
 
-    const allResults = loadExtractionResults(config, runId);
-    const results = filterExtractionResultsForRun(config, runId, allResults);
+    for (const [key, groupRecords] of recordsByGroup) {
+      const { start, end } = minMaxDatesFromRecords(groupRecords);
+      let [brand, purchaser] = key.split("|");
 
-    rawSummaries.push({
-      runId,
-      records,
-      start,
-      end,
-      brand,
-      purchaser,
-      results,
-    });
+      // Robust detection for display
+      if (!purchaser || purchaser === "") {
+        const pSet = new Set<string>();
+        for (const r of groupRecords) {
+          if (r.purchaser) pSet.add(r.purchaser);
+          else if (r.relativePath) {
+            const first = r.relativePath.split(/[\\/]/)[0];
+            if (first && first !== "output" && first !== "staging")
+              pSet.add(first);
+          }
+        }
+        if (pSet.size === 1) purchaser = [...pSet][0];
+      }
+
+      const results = filterExtractionResultsForRecords(
+        groupRecords,
+        allResultsForRun,
+      );
+
+      rawSummaries.push({
+        runId,
+        records: groupRecords,
+        start,
+        end,
+        brand: brand || undefined,
+        purchaser: purchaser || undefined,
+        results,
+      });
+    }
   }
   closeCheckpointDb(db);
 
@@ -381,23 +413,49 @@ export function loadHistoricalRunSummaries(
         0,
       );
 
-      out.push({
+      const sessions = cluster
+        .map((c) => {
+          const m = computeMetrics(c.runId, c.records, c.start, c.end);
+          return {
+            runId: c.runId,
+            start: c.start,
+            end: c.end,
+            success: m.success,
+            failed: m.failed,
+            skipped: m.skipped,
+          };
+        })
+        .sort((a, b) => b.start.getTime() - a.start.getTime()); // Newest first
+
+      const merged: HistoricalRunSummary = {
         runId: latestRun.runId,
         metrics,
         extractionResults: dedupedResults,
+        records: dedupedRecords,
+        start: clusterStart,
+        end: clusterEnd,
         runDurationSeconds,
         brand: latestRun.brand,
         purchaser: latestRun.purchaser,
-      });
+        sessions,
+      };
+      out.push(merged);
     }
   }
 
-  // Final sort by start time descending (newest groups first)
-  return out.sort(
-    (a, b) =>
-      new Date(b.metrics.startedAt).getTime() -
-      new Date(a.metrics.startedAt).getTime(),
-  );
+  // Final sort by run number descending, fallback to start time
+  return out.sort((a, b) => {
+    const getNum = (id: string) => {
+      const m = id.match(/RUN(\d+)/i);
+      return m ? parseInt(m[1], 10) : -1;
+    };
+    const numA = getNum(a.runId);
+    const numB = getNum(b.runId);
+    if (numA !== numB && numA !== -1 && numB !== -1) {
+      return numB - numA;
+    }
+    return b.start.getTime() - a.start.getTime();
+  });
 }
 
 function formatDuration(ms: number): string {
@@ -471,7 +529,7 @@ export function buildSummary(metrics: RunMetrics): ExecutiveSummary {
   const end = new Date(metrics.finishedAt).getTime();
   const runDurationSeconds = (end - start) / 1000;
   return {
-    title: "IntelliExtract Mission – Executive Summary",
+    title: "IntelliExtract Operation – Executive Summary",
     generatedAt: new Date().toISOString(),
     metrics,
     runDurationSeconds,
@@ -480,7 +538,10 @@ export function buildSummary(metrics: RunMetrics): ExecutiveSummary {
 
 function sectionForRun(entry: HistoricalRunSummary): string {
   const m = entry.metrics;
-  const wallClockMs = entry.runDurationSeconds * 1000;
+  const wallClockMs =
+    entry.runDurationSeconds !== undefined
+      ? entry.runDurationSeconds * 1000
+      : entry.end.getTime() - entry.start.getTime();
   const runDuration = formatDuration(wallClockMs);
   const succeededCount = entry.extractionResults.filter(
     (e) => e.extractionSuccess,
@@ -525,12 +586,6 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       ? "<ul>" + anomalyItems.join("") + "</ul>"
       : "<p>None detected.</p>";
 
-  const extractionSection =
-    entry.extractionResults.length > 0
-      ? `
-  <h3>Extraction results</h3>
-  <p class="extraction-note">${succeededCount} successful responses, ${failedCount} failed responses.</p>`
-      : "";
   const b = m.failureBreakdown;
   const failureBreakdownRows =
     m.failed > 0
@@ -660,51 +715,160 @@ function sectionForRun(entry: HistoricalRunSummary): string {
           .join("")}</ul>`
       : '<p class="muted">No notable anomalies detected.</p>';
 
+  const runBatchId =
+    entry.runId.startsWith("RUN") || entry.runId.startsWith("SKIP")
+      ? `#${entry.runId}`
+      : entry.runId;
   const runLabel = formatRunDateTime(m.startedAt);
-  let prefix = "";
-  if (entry.brand && entry.purchaser) {
-    const b = formatBrandDisplayName(entry.brand).toUpperCase();
-    const p = formatPurchaserDisplayName(entry.purchaser)
-      .toUpperCase()
-      .replace(/_/g, "-");
-    prefix = `[${b}]-${p}-`;
-  } else if (entry.brand) {
-    const b = formatBrandDisplayName(entry.brand).toUpperCase();
-    prefix = `[${b}]-`;
-  } else if (entry.purchaser) {
-    const p = formatPurchaserDisplayName(entry.purchaser)
-      .toUpperCase()
-      .replace(/_/g, "-");
-    prefix = `${p}-`;
-  }
-  const labelWithPrefix = `${prefix}${runLabel}`;
+
+  const brandDisplay = entry.brand
+    ? formatBrandDisplayName(entry.brand).toUpperCase()
+    : "";
+  const purchaserDisplay = entry.purchaser
+    ? formatPurchaserDisplayName(entry.purchaser)
+        .toUpperCase()
+        .replace(/_/g, "-")
+    : "";
+
+  let sectionClass = "run-section";
+  if (displayInfraFailed > 0) sectionClass += " status-error";
+  else if (displayApiFailed > 0) sectionClass += " status-warning";
+
+  const runBadge = `<span class="chip batch-id">${escapeHtml(runBatchId)}</span>`;
+  const purchaserBadge = purchaserDisplay
+    ? `<span class="badge-purchaser">${escapeHtml(purchaserDisplay)}</span>`
+    : "";
+  const brandLabel = brandDisplay
+    ? `<span class="badge-brand">[${escapeHtml(brandDisplay)}]</span> `
+    : "";
+
   const successBadge = `<span class="badge-status success">${displaySuccess} SUCCESS</span>`;
   const apiFailBadge = `<span class="badge-status secondary">${displayApiFailed} API FAIL</span>`;
   const infraFailBadge = `<span class="badge-status fail">${displayInfraFailed} INFRA FAIL</span>`;
 
+  // Create full log rows from records
+  const fullLogRows = entry.records
+    .map((rec) => {
+      const isSuccess = rec.status === "done";
+      const status = isSuccess
+        ? '<span class="status-icon success">✅</span> SUCCESS'
+        : '<span class="status-icon error">❌</span> FAILED';
+      return `<tr class="log-row" data-search="${escapeHtml((rec.filePath + status + (rec.patternKey || "")).toLowerCase())}">
+      <td>${status}</td>
+      <td class="file-path">${escapeHtml(rec.filePath)}</td>
+      <td>${escapeHtml(rec.patternKey ?? "—")}</td>
+      <td><span class="chip">${rec.latencyMs ? rec.latencyMs.toFixed(0) : "—"} ms</span></td>
+    </tr>`;
+    })
+    .join("");
+
+  const fullLogSection = `
+    <details class="full-log-container">
+      <summary class="run-section-summary" style="border-radius: 8px; border: 1px solid var(--border-light);">
+        <div class="summary-content">
+          <div style="font-weight: 800; font-size: 0.85rem; text-transform: uppercase;">📦 View Full Extraction Log (${entry.records.length} files)</div>
+        </div>
+      </summary>
+      <div style="padding: 1.5rem 0;">
+        <div class="log-search-container">
+          <input type="text" placeholder="Search files, patterns, or status..." onkeyup="filterSectionLog(this)">
+          <span>Showing results for this mission</span>
+        </div>
+        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+          <table class="log-table">
+            <thead>
+              <tr><th style="width: 140px;">Status</th><th>File Path</th><th style="width: 200px;">Pattern</th><th style="width: 100px;">Latency</th></tr>
+            </thead>
+            <tbody>
+              ${fullLogRows}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  `;
+
+  const sessionsRows = (entry.sessions || [])
+    .map((s) => {
+      const runIdLabel =
+        s.runId.startsWith("RUN") || s.runId.startsWith("SKIP")
+          ? `#${s.runId}`
+          : s.runId;
+      const startTime = formatRunDateTime(s.start.toISOString());
+      const duration = formatDuration(s.end.getTime() - s.start.getTime());
+      return `<tr>
+        <td><span class="chip batch-id" style="background:#475569 !important">${escapeHtml(runIdLabel)}</span></td>
+        <td>${escapeHtml(startTime)}</td>
+        <td>${escapeHtml(duration)}</td>
+        <td><span class="chip success">${s.success}</span></td>
+        <td><span class="chip fail">${s.failed}</span></td>
+        <td><span class="chip secondary">${s.skipped}</span></td>
+      </tr>`;
+    })
+    .join("");
+
+  const sessionsSection =
+    (entry.sessions?.length ?? 0) > 1
+      ? `
+  <details class="full-log-container" style="margin-top: 1rem; margin-bottom: 2rem;">
+    <summary class="run-section-summary" style="border-radius: 8px; border: 1px solid var(--border-light); background: #f8fafc;">
+      <div class="summary-content">
+        <div style="font-weight: 800; font-size: 0.85rem; text-transform: uppercase;">🕒 Execution Timeline (${entry.sessions!.length} Sessions)</div>
+      </div>
+    </summary>
+    <div style="padding: 1rem 0;">
+      <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">This operation consists of multiple sessions executed within a 2-hour window. Consolidated metrics above reflect the final state.</p>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr><th>Session ID</th><th>Started At</th><th>Duration</th><th>Success</th><th>Failed</th><th>Skipped</th></tr>
+          </thead>
+          <tbody>
+            ${sessionsRows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>`
+      : "";
+
   return `
-  <details class="run-section">
+  <details class="${sectionClass}">
   <summary class="run-section-summary">
     <div class="summary-content">
-      <div class="mission-pointer">${escapeHtml(labelWithPrefix)}</div>
+      <div class="mission-pointer">
+        ${runBadge}
+        ${brandLabel}${purchaserBadge}
+        <span class="run-time">${escapeHtml(runLabel)}</span>
+      </div>
       <div class="summary-badges">
         ${successBadge} ${apiFailBadge} ${infraFailBadge}
       </div>
     </div>
   </summary>
   <div class="run-section-body">
-  <h3>Overview</h3>
+    ${sessionsSection}
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+      <div style="flex: 1;">
+        <h3 style="margin-top: 0;">Consolidated Overview</h3>
+      </div>
+      <div class="retry-action-wrap">
+        <button class="btn-retry-batch" onclick="triggerRetry('${entry.brand || ""}', '${entry.purchaser || ""}')">
+          <span>🔄 Retry failures from this operation</span>
+        </button>
+      </div>
+    </div>
   <div class="table-responsive">
     <table>
       <tr><th>Metric</th><th>Value</th></tr>
       <tr><td>Total synced files</td><td><span class="chip secondary">${m.totalFiles}</span></td></tr>
       <tr><td>Total extraction results available</td><td><span class="chip secondary">${displaySuccess + displayApiFailed}</span></td></tr>
-      <tr><td>Files processed in this run</td><td><span class="chip secondary">${processed}</span></td></tr>
+      <tr><td>Files processed in this operation</td><td><span class="chip secondary">${processed}</span></td></tr>
       <tr><td>Files skipped (already handled)</td><td><span class="chip secondary">${m.skipped}</span></td></tr>
       <tr><td>Successful Response (Success: true)</td><td><span class="chip success">${displaySuccess}</span></td></tr>
       <tr><td>Successful Response (Success: false)</td><td><span class="chip secondary">${displayApiFailed}</span></td></tr>
       <tr><td>Failure (Infrastructure)</td><td><span class="chip fail">${displayInfraFailed}</span></td></tr>
-      <tr><td>Run duration (wall clock)</td><td><span class="chip">${runDuration}</span></td></tr>
+      <tr><td>Operation duration (wall clock)</td><td><span class="chip">${runDuration}</span></td></tr>
       <tr><td>Average API concurrency</td><td><span class="chip">${avgConcurrency}x</span></td></tr>
       <tr><td>Total API processing time</td><td><span class="chip">${totalApiTime}</span> <span class="muted small">(sum of latencies)</span></td></tr>
       <tr><td>Throughput (observed)</td><td><span class="chip">${throughputPerMinute.toFixed(2)} files/min</span></td></tr>
@@ -712,7 +876,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     </table>
   </div>
   <h3>Load testing / API capability</h3>
-  <p>Use these as a guide for batch sizes and expected capacity at similar concurrency and file mix.</p>
+  <p>Use these as a guide for operation sizes and expected capacity at similar concurrency and file mix.</p>
   <div class="table-responsive">
     <table>
       <tr><th>Attribute</th><th>Value</th></tr>
@@ -720,12 +884,12 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       <tr><td>API response time (P50 / P95 / P99)</td><td>${m.p50LatencyMs.toFixed(0)} ms / ${m.p95LatencyMs.toFixed(0)} ms / ${m.p99LatencyMs.toFixed(0)} ms</td></tr>
       <tr><td>Error rate at this load (Infra failures)</td><td>${(displayErrorRate * 100).toFixed(2)}%</td></tr>
       <tr><td>False Response Rate at this load</td><td>${(falseResponseRate * 100).toFixed(2)}%</td></tr>
-      <tr><td>Ideal extract count (≈5 min run)</td><td>~${Math.round(throughputPerMinute * 5)} files</td></tr>
-      <tr><td>Ideal extract count (≈10 min run)</td><td>~${Math.round(throughputPerMinute * 10)} files</td></tr>
-      <tr><td>Ideal extract count (≈15 min run)</td><td>~${Math.round(throughputPerMinute * 15)} files</td></tr>
+      <tr><td>Ideal extract count (≈5 min operation)</td><td>~${Math.round(throughputPerMinute * 5)} files</td></tr>
+      <tr><td>Ideal extract count (≈10 min operation)</td><td>~${Math.round(throughputPerMinute * 10)} files</td></tr>
+      <tr><td>Ideal extract count (≈15 min operation)</td><td>~${Math.round(throughputPerMinute * 15)} files</td></tr>
     </table>
   </div>
-  <p><strong>Summary:</strong> At this run&rsquo;s load, the API handled <strong>${processed} files</strong> (${m.skipped} skipped) in <strong>${runDuration}</strong> with <strong>${(displayErrorRate * 100).toFixed(2)}%</strong> infrastructure errors and <strong>${(falseResponseRate * 100).toFixed(2)}%</strong> false responses. For a target run of about 5 minutes, aim for batches of <strong>~${Math.round(throughputPerMinute * 5)} files</strong>; for 10 minutes, <strong>~${Math.round(throughputPerMinute * 10)} files</strong>.</p>
+  <p><strong>Summary:</strong> At this operation&rsquo;s load, the API handled <strong>${processed} files</strong> (${m.skipped} skipped) in <strong>${runDuration}</strong> with <strong>${(displayErrorRate * 100).toFixed(2)}%</strong> infrastructure errors and <strong>${(falseResponseRate * 100).toFixed(2)}%</strong> false responses. For a target operation of about 5 minutes, aim for chunks of <strong>~${Math.round(throughputPerMinute * 5)} files</strong>; for 10 minutes, <strong>~${Math.round(throughputPerMinute * 10)} files</strong>.</p>
   <h3>Latency (ms)</h3>
   <div class="table-responsive">
     <table>
@@ -748,12 +912,14 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   <div class="anomalies-container">
     ${anomaliesList}
   </div>
-  ${extractionSection}
+  ${fullLogSection}
   </div>
   </details>`;
+  // Note: I will need to properly integrate this into the sectionForRun string.
+  // I will do a single replacement for the whole return block to be safe.
 }
 
-const REPORT_TITLE = "IntelliExtract Mission Summary";
+const REPORT_TITLE = "IntelliExtract Operation Summary";
 
 function htmlReportFromHistory(
   historicalSummaries: HistoricalRunSummary[],
@@ -835,8 +1001,12 @@ function htmlReportFromHistory(
     .failure-details-table th:nth-child(2) { min-width: 400px; }
     .failure-details-table th:nth-child(3) { min-width: 400px; }
     
-    .run-section { margin-bottom: 1.25rem; background: white; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid var(--border); overflow: hidden; }
+    .run-section { margin-bottom: 1.25rem; background: white; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid var(--border); overflow: hidden; border-left: 6px solid #cbd5e1; transition: all 0.2s; }
     .run-section[open] { border-color: var(--header-bg); }
+    .run-section.status-error { border-left-color: #ef4444; }
+    .run-section.status-warning { border-left-color: #f59e0b; }
+    .run-section.status-error[open] { border-color: #ef4444; }
+    .run-section.status-warning[open] { border-color: #f59e0b; }
     
     .run-section-summary { cursor: pointer; padding: 1rem 1.25rem; background: #f8fafc; list-style: none; transition: background 0.2s; border-bottom: 1px solid var(--border-light); }
     .run-section-summary::-webkit-details-marker { display: none; }
@@ -845,16 +1015,24 @@ function htmlReportFromHistory(
     .summary-content { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
     
     .mission-pointer {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
       background: var(--header-bg);
       color: white;
       font-size: 0.75rem;
       font-weight: 700;
-      padding: 0.4rem 1.75rem 0.4rem 1rem;
+      padding: 0.4rem 2rem 0.4rem 1rem;
       clip-path: polygon(0% 0%, calc(100% - 15px) 0%, 100% 50%, calc(100% - 15px) 100%, 0% 100%);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       filter: drop-shadow(0 0 1.5px rgba(0,0,0,0.4));
     }
+    
+    .batch-id { background: rgba(255,255,255,0.2) !important; color: white !important; border: 1px solid rgba(255,255,255,0.3) !important; padding: 0.1rem 0.4rem !important; font-family: monospace; }
+    .badge-brand { opacity: 0.85; }
+    .badge-purchaser { background: #ffffff !important; color: var(--header-bg) !important; padding: 0.1rem 0.5rem !important; border-radius: 4px; font-weight: 800; }
+    .run-time { font-weight: 400; opacity: 0.9; margin-left: auto; }
     
     .summary-badges { display: flex; gap: 0.5rem; align-items: center; }
     .badge-status { font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.6rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -889,7 +1067,13 @@ function htmlReportFromHistory(
       box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
     }
     .chart-card h4 { margin: 0 0 1rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--header-bg); border-bottom: 2px solid rgba(33, 108, 109, 0.1); padding-bottom: 0.6rem; font-weight: 800; }
-    .chart-container { position: relative; height: 300px; width: 100%; }
+    .chart-scroll-wrapper { 
+      overflow-x: auto; 
+      overflow-y: hidden; 
+      padding-bottom: 8px;
+    }
+
+    .chart-container { position: relative; height: 300px; width: 100%; min-width: 100%; }
     
     .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
     .stat-card { 
@@ -918,8 +1102,71 @@ function htmlReportFromHistory(
     .muted { color: var(--text-secondary); font-style: italic; }
     .small { font-size: 0.75rem; }
     td.file-path { font-family: inherit; font-size: 0.72rem; color: var(--text-secondary); overflow-wrap: anywhere; word-break: break-all; }
+    
+    .full-log-container { margin-top: 1.5rem; }
+    .log-search-container { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .log-search-container input { flex: 1; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border); font-family: inherit; font-size: 0.85rem; }
+    .log-search-container span { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); }
+    
+    .status-icon { font-size: 1rem; margin-right: 4px; }
+    .status-icon.success { color: #2d9d5f; }
+    .status-icon.error { color: #ef4444; }
+    
+    .log-table th { position: sticky; top: 0; z-index: 10; background: #f8fafc; }
+    .log-row-hidden { display: none !important; }
+
+    /* Premium Scrollbar */
+    .chart-scroll-wrapper::-webkit-scrollbar { height: 6px; }
+    .chart-scroll-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); border-radius: 10px; }
+    .chart-scroll-wrapper::-webkit-scrollbar-thumb { background: rgba(33, 108, 109, 0.15); border-radius: 10px; }
+    .chart-scroll-wrapper::-webkit-scrollbar-thumb:hover { background: rgba(33, 108, 109, 0.3); }
+
+    .btn-retry-batch {
+      background: var(--header-bg);
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(33, 108, 109, 0.2);
+    }
+    .btn-retry-batch:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(33, 108, 109, 0.3);
+      filter: brightness(1.1);
+    }
+    .btn-retry-batch:active {
+      transform: translateY(0);
+    }
+    .retry-action-wrap {
+      flex-shrink: 0;
+      margin-left: 2rem;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    function triggerRetry(brand, purchaser) {
+      const baseUrl = window.location.protocol === 'file:' ? 'http://localhost:8765' : window.location.origin;
+      const url = new URL(baseUrl);
+      if (brand) url.searchParams.set('brand', brand);
+      if (purchaser) url.searchParams.set('purchaser', purchaser);
+      url.searchParams.set('caseId', 'P2');
+      url.searchParams.set('retryFailed', 'true');
+      url.searchParams.set('autoRun', 'true');
+      
+      const confirmMsg = "This will open the runner and automatically start retrying failures for: " + (purchaser || brand || "all") + ". Proceed?";
+      if (window.confirm(confirmMsg)) {
+        window.open(url.toString(), '_blank');
+      }
+    }
+  </script>
 </head>
 <body>
   <div class="report-header">
@@ -927,12 +1174,12 @@ function htmlReportFromHistory(
       <img src="${logoDataUri}" alt="intellirevenue" class="logo">
       <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
     </div>
-    <div class="meta">Generated: ${escapeHtml(formatRunDateTime(generatedAt))} — ${historicalSummaries.length} run(s)</div>
+    <div class="meta">Generated: ${escapeHtml(formatRunDateTime(generatedAt))} — ${historicalSummaries.length} operation(s)</div>
   </div>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('dashboard')">Analytics Dashboard</button>
-    <button class="tab-btn" onclick="switchTab('history')">Historical Runs</button>
+    <button class="tab-btn" onclick="switchTab('history')">Operation History</button>
   </div>
 
   <div id="dashboard" class="tab-content active">
@@ -961,27 +1208,33 @@ function htmlReportFromHistory(
       </div>
       <div class="stat-card">
         <span class="stat-value">${historicalSummaries.length}</span>
-        <span class="stat-label">Total Batches</span>
+        <span class="stat-label">Total Operations</span>
       </div>
     </div>
 
     <div class="dashboard-grid">
       <div class="chart-card">
         <h4>Extraction Volume Trend</h4>
-        <div class="chart-container">
-          <canvas id="volChart"></canvas>
+        <div class="chart-scroll-wrapper">
+          <div class="chart-container" id="volChartContainer">
+            <canvas id="volChart"></canvas>
+          </div>
         </div>
       </div>
       <div class="chart-card">
         <h4>Latency Performance (P50/P95)</h4>
-        <div class="chart-container">
-          <canvas id="latencyChart"></canvas>
+        <div class="chart-scroll-wrapper">
+          <div class="chart-container" id="latencyChartContainer">
+            <canvas id="latencyChart"></canvas>
+          </div>
         </div>
       </div>
       <div class="chart-card">
         <h4>System Throughput</h4>
-        <div class="chart-container">
-          <canvas id="throughputChart"></canvas>
+        <div class="chart-scroll-wrapper">
+          <div class="chart-container" id="throughputChartContainer">
+            <canvas id="throughputChart"></canvas>
+          </div>
         </div>
       </div>
       <div class="chart-card">
@@ -1028,8 +1281,16 @@ function htmlReportFromHistory(
     };
 
     function initCharts() {
-      // Limit to last 30 runs for the charts to prevent design distortion while maintaining performance trends
-      const sortedData = [...runData].sort((a, b) => new Date(a.time) - new Date(b.time)).slice(-30);
+      // Scale to last 100 runs. Beyond that, the history tab handles full audit. 
+      // Individual charts will auto-expand horizontally with scrollbars to prevent label overlap.
+      const sortedData = [...runData].sort((a, b) => new Date(a.time) - new Date(b.time)).slice(-100);
+      
+      const chartWidth = Math.max(100, sortedData.length * 60) + "px";
+      ['volChartContainer', 'latencyChartContainer', 'throughputChartContainer'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.width = chartWidth;
+      });
+
       const labels = sortedData.map(d => {
         const d_obj = new Date(d.time);
         return d_obj.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' ' + 
@@ -1116,6 +1377,20 @@ function htmlReportFromHistory(
         }
       });
     }
+
+    function filterSectionLog(input) {
+      const filter = input.value.toLowerCase();
+      const container = input.closest('.run-section-body');
+      const rows = container.querySelectorAll('.log-row');
+      rows.forEach(row => {
+        const text = row.getAttribute('data-search') || '';
+        if (text.includes(filter)) {
+          row.classList.remove('log-row-hidden');
+        } else {
+          row.classList.add('log-row-hidden');
+        }
+      });
+    }
   </script>
 </body>
 </html>`;
@@ -1129,6 +1404,9 @@ function htmlReport(
     runId: summary.metrics.runId,
     metrics: summary.metrics,
     extractionResults,
+    records: [], // Single run view might not have full records in memory
+    start: new Date(summary.metrics.startedAt),
+    end: new Date(summary.metrics.finishedAt),
     runDurationSeconds: summary.runDurationSeconds,
   };
   return htmlReportFromHistory([single], summary.generatedAt);
@@ -1219,7 +1497,7 @@ export function writeReports(config: Config, summary: ExecutiveSummary): void {
     }
     if (config.report.formats.includes("json")) {
       const path = join(outDir, `${base}.json`);
-      const runsPayload = historicalSummaries.map((r) => {
+      const operationsPayload = historicalSummaries.map((r) => {
         const processed = r.metrics.success + r.metrics.failed;
         const throughputPerMinute =
           r.runDurationSeconds > 0
@@ -1251,7 +1529,7 @@ export function writeReports(config: Config, summary: ExecutiveSummary): void {
       const jsonPayload = {
         title: REPORT_TITLE,
         generatedAt,
-        runs: runsPayload,
+        operations: operationsPayload,
       };
       writeFileSync(path, JSON.stringify(jsonPayload, null, 2), "utf-8");
     }

@@ -485,23 +485,13 @@ export async function runExtraction(
   const existingRecordsParams = getRecordsForRun(db, runId);
   const alreadyInRun = new Set(existingRecordsParams.map((r) => r.filePath));
 
-  // Record files already completed as 'skipped' for this specific run so metrics
-  // correctly identify them as such (not Success, not Failed). Batch upsert to avoid N file writes.
-  const skippedRecords = jobs
-    .filter((j) => completed.has(j.filePath) && !alreadyInRun.has(j.filePath))
-    .map((job) => ({
-      filePath: job.filePath,
-      relativePath: job.relativePath,
-      brand: job.brand,
-      purchaser: job.purchaser,
-      status: "skipped" as const,
-      runId,
-    }));
-  if (skippedRecords.length > 0) {
-    upsertCheckpoints(db, skippedRecords);
-  }
-
-  let toProcess = jobs.filter((j) => !completed.has(j.filePath));
+  let toProcess = jobs.filter((j) => {
+    const isCompleted = completed.has(j.filePath);
+    if (options?.retryFailed && errorPaths?.has(j.filePath)) {
+      return true; // Bypass completed check if we are explicitly retrying failures
+    }
+    return !isCompleted;
+  });
 
   if (errorPaths) {
     toProcess = toProcess.filter((j) => errorPaths.has(j.filePath));
@@ -510,10 +500,33 @@ export async function runExtraction(
   if (extractLimit !== undefined && extractLimit > 0) {
     toProcess = toProcess.slice(0, extractLimit);
   }
-  // When there is nothing to extract (all done or no files), use a new run ID for this invocation only (do not persist as current run) so metrics are 0 and the next run still sees previously completed files and shows "All files in the stage are extracted. Please sync new files." again.
-  let runIdToUse = runId;
+
+  // Determine the final run ID to use.
+  // When there is nothing to extract (all done or no files), use a new SKIP- style ID
+  // so we don't consume a "RUNn" sequence number for a no-op, and metrics remain 0-based for the session.
+  const runIdToUse = toProcess.length === 0 ? createRunIdOnly() : runId;
+
+  // Record files already completed as 'skipped' for this specific run so metrics
+  // correctly identify them as such (not Success, not Failed). Batch upsert to avoid N file writes.
+  // IMPORTANT: Use runIdToUse so skipped records belong to the same session as the metrics.
+  const skippedRecords = jobs
+    .filter((j) => completed.has(j.filePath) && !alreadyInRun.has(j.filePath))
+    .map((job) => ({
+      filePath: job.filePath,
+      relativePath: job.relativePath,
+      brand: job.brand,
+      purchaser: job.purchaser,
+      status: "skipped" as const,
+      runId: runIdToUse,
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+    }));
+
+  if (skippedRecords.length > 0) {
+    upsertCheckpoints(db, skippedRecords);
+  }
+
   if (toProcess.length === 0) {
-    runIdToUse = createRunIdOnly();
     initRequestResponseLogger(config, runIdToUse);
   }
   const concurrency = config.run.concurrency;

@@ -256,7 +256,7 @@ export async function runSyncExtractPipeline(
       return;
     }
 
-    if (completed.has(job.filePath)) {
+    if (completed.has(job.filePath) && !errorPaths?.has(job.filePath)) {
       extractionDone++;
       options.onExtractionProgress?.(extractionDone, extractionQueued);
       skippedRecords.push({

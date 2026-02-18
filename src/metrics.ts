@@ -79,26 +79,30 @@ export function computeMetrics(
   const success = allDone.length;
   const skipped = skippedRecords.length;
 
-  const latencies = allDone
+  // Processed requests are those that reached the API (done) or attempted but failed with tracking (error)
+  const processedRecords = records.filter(
+    (r) =>
+      (r.status === "done" || r.status === "error") &&
+      typeof r.latencyMs === "number" &&
+      r.latencyMs >= 0,
+  );
+
+  const latencies = processedRecords.map((r) => r.latencyMs!);
+  const totalProcessingTimeMs = latencies.reduce((a, b) => a + b, 0);
+  const totalLatencyMs = allDone
     .map((r) => r.latencyMs!)
-    .filter((n) => typeof n === "number" && n >= 0);
-  const totalLatencyMs = latencies.reduce((a, b) => a + b, 0);
-  // Total time spent on extraction = sum of latency for all processed files (done + error with latency)
-  const totalProcessingTimeMs = records
-    .filter(
-      (r) =>
-        (r.status === "done" || r.status === "error") &&
-        typeof r.latencyMs === "number" &&
-        r.latencyMs >= 0,
-    )
-    .reduce((sum, r) => sum + (r.latencyMs ?? 0), 0);
+    .filter((n) => typeof n === "number" && n >= 0)
+    .reduce((a, b) => a + b, 0);
+
   const processed = allDone.length + failed.length;
   const totalProcessingTimeSeconds = totalProcessingTimeMs / 1000;
   const throughputPerSecond =
     totalProcessingTimeSeconds > 0 ? processed / totalProcessingTimeSeconds : 0;
   const throughputPerMinute = throughputPerSecond * 60;
 
-  const avgLatencyMs = latencies.length ? totalLatencyMs / latencies.length : 0;
+  const avgLatencyMs = latencies.length
+    ? totalProcessingTimeMs / latencies.length
+    : 0;
   const p50LatencyMs = latencies.length ? quantile(latencies, 0.5) : 0;
   const p95LatencyMs = latencies.length ? quantile(latencies, 0.95) : 0;
   const p99LatencyMs = latencies.length ? quantile(latencies, 0.99) : 0;

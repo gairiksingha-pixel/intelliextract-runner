@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 import type { CheckpointRecord, CheckpointStatus } from "./types.js";
 
 const RUN_ID_KEY = "current_run_id";
+const LAST_RUN_NUM_KEY = "last_run_number";
 
 // Retry configuration for lock acquisition
 const LOCK_RETRIES = 10;
@@ -212,8 +213,11 @@ export function openCheckpointDb(checkpointPath: string): CheckpointDb {
   return { _path: path, _data };
 }
 
-/** Format run ID as human-readable date and time (e.g. run_2025-02-11_14-30-52). */
-function formatRunId(date: Date): string {
+/** Format run ID as a sequence number (RUN1) or human-readable date for temporary IDs. */
+function formatRunId(date: Date, num?: number): string {
+  if (num !== undefined) {
+    return `RUN${num}`;
+  }
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
@@ -221,7 +225,25 @@ function formatRunId(date: Date): string {
   const min = String(date.getMinutes()).padStart(2, "0");
   const s = String(date.getSeconds()).padStart(2, "0");
   const suffix = Math.random().toString(36).slice(2, 4);
-  return `run_${y}-${m}-${d}_${h}-${min}-${s}_${suffix}`;
+  // For non-work/skipped runs, use a distinctive format so we don't consume a sequence number
+  return `SKIP-${y}${m}${d}-${h}${min}${s}-${suffix}`;
+}
+
+function getNextRunNumber(db: CheckpointDb): number {
+  const lastNumStr = db._data.run_meta[LAST_RUN_NUM_KEY];
+  if (lastNumStr) {
+    return parseInt(lastNumStr, 10) + 1;
+  }
+  // Fallback: scan existing checkpoints for max RUNn (supports both old #RUN and new RUN formats)
+  let max = 0;
+  for (const c of db._data.checkpoints) {
+    const m = c.run_id.match(/#?RUN(\d+)/i);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > max) max = n;
+    }
+  }
+  return max + 1;
 }
 
 /** Generate a new run ID without persisting it (for "no work" runs so we don't overwrite the current run). */
@@ -230,8 +252,10 @@ export function createRunIdOnly(): string {
 }
 
 export function startRun(db: CheckpointDb): string {
-  const runId = formatRunId(new Date());
+  const nextNum = getNextRunNumber(db);
+  const runId = formatRunId(new Date(), nextNum);
   db._data.run_meta[RUN_ID_KEY] = runId;
+  db._data.run_meta[LAST_RUN_NUM_KEY] = String(nextNum);
   saveStore(db);
   return runId;
 }
@@ -304,7 +328,8 @@ export function getCompletedPaths(db: CheckpointDb): Set<string> {
   //   were already completed) continue to be treated as completed even
   //   if older "done" rows are no longer present in the checkpoint file.
   const rows = db._data.checkpoints.filter(
-    (c) => c.status === "done" || c.status === "skipped",
+    (c) =>
+      c.status === "done" || c.status === "skipped" || c.status === "error",
   );
   return new Set(rows.map((r) => r.file_path));
 }

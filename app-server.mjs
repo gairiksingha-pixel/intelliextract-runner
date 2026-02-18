@@ -1093,6 +1093,7 @@ createServer(async (req, res) => {
     let body = "";
     for await (const chunk of req) body += chunk;
     try {
+      const parsed = JSON.parse(body || "{}");
       const {
         caseId,
         syncLimit,
@@ -1103,7 +1104,9 @@ createServer(async (req, res) => {
         resume,
         lastSyncDone,
         lastExtractDone,
-      } = JSON.parse(body || "{}");
+        retryFailed,
+      } = parsed;
+
       if (!caseId || !CASE_COMMANDS[caseId]) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid or missing caseId" }));
@@ -1128,7 +1131,7 @@ createServer(async (req, res) => {
         if (purchaser && typeof purchaser === "string")
           params.purchaser = purchaser.trim();
       }
-      if (body.retryFailed === true) {
+      if (retryFailed === true) {
         params.retryFailed = true;
       }
       const runOpts =
@@ -1707,7 +1710,12 @@ createServer(async (req, res) => {
     const rest = url.slice("/api/reports/".length);
     const slash = rest.indexOf("/");
     const format = slash === -1 ? rest : rest.slice(0, slash);
-    const filename = slash === -1 ? null : rest.slice(slash + 1);
+    let filename = slash === -1 ? null : rest.slice(slash + 1);
+    if (filename) {
+      try {
+        filename = decodeURIComponent(filename);
+      } catch (_) {}
+    }
     if (!filename || !["html", "json"].includes(format)) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Invalid or missing caseId" }));

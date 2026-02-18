@@ -485,7 +485,7 @@
         vertical-align: middle;
       }
       .op-name {
-        text-align: left;
+        text-align: center;
       }
       thead th:first-child {
         border-top-left-radius: 0;
@@ -526,6 +526,9 @@
       }
       tbody tr.row-inactive {
         opacity: 0.85;
+      }
+      tbody tr.row-inactive td {
+        border-color: rgba(33, 108, 109, 0.45);
       }
       tbody tr.row-inactive td:not(.op-name) {
         background: var(--row-alt);
@@ -1871,9 +1874,9 @@
           <thead>
             <tr>
               <th class="op-name">Operations</th>
-              <th class="limits-col">Batch limits</th>
-              <th class="run-cell">Run controls</th>
-              <th class="result-header">Run output</th>
+              <th class="limits-col">Operation limits</th>
+              <th class="run-cell">Operation controls</th>
+              <th class="result-header">Operation output</th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
@@ -1920,8 +1923,8 @@
       >
         <div class="modal-header">
           <div class="modal-title" id="notification-modal-title">
-            <span class="title-badge" style="background: #c62828">EMAIL</span>
-            <span>Failure Notifications</span>
+            <span class="title-badge" style="background: #c62828">NOTIFY</span>
+            <span>Automated Alert Setup</span>
           </div>
           <button
             type="button"
@@ -1940,8 +1943,9 @@
               margin-bottom: 1.25rem;
             "
           >
-            Stay updated on your extraction progress. Enter the email addresses
-            where you'd like to receive alerts when a task requires attention.
+            Configure who should be notified when an extractions operation
+            encounters issues. Recipients will receive automated emails
+            detailing any failures or files requiring manual review.
           </p>
 
           <div
@@ -2094,8 +2098,8 @@
 
       function getRunButtonLabel(caseId) {
         if (caseId === "P1") return "Start Download";
-        if (caseId === "P2") return "Start Extraction";
-        if (caseId === "PIPE") return "Sync & Extract";
+        if (caseId === "P2") return "Start Operation";
+        if (caseId === "PIPE") return "Sync & Operation";
         return "Run";
       }
 
@@ -2385,7 +2389,7 @@
           )
             return false;
           if (line.indexOf("Report(s) written:") !== -1) return false;
-          if (/Run run_\S+ finished\./.test(line)) return false;
+          if (/Run (?:run_|RUN|SKIP-)\S+ finished\./.test(line)) return false;
           return true;
         }
         var stdoutFiltered = stdoutStr
@@ -2941,8 +2945,10 @@
             controller.abort();
           };
         }
-        var initStatus =
-          caseId === "P1" || caseId === "P4" || caseId === "E3"
+        var isRetry = !!(runOptions && runOptions.retryFailed);
+        var initStatus = isRetry
+          ? "Retrying Failed Extractions..."
+          : caseId === "P1" || caseId === "P4" || caseId === "E3"
             ? "Syncing Files..."
             : caseId === "P2" ||
                 caseId === "P5" ||
@@ -3411,7 +3417,7 @@
             if (!data || !data.activeRuns || data.activeRuns.length === 0)
               return;
 
-            setSystemStatus(true, "Extraction in Progress...");
+            setSystemStatus(true, "Operation in Progress...");
             data.activeRuns.forEach(function (run) {
               var caseRow = tbody
                 ? tbody.querySelector('tr[data-case-id="' + run.caseId + '"]')
@@ -3694,18 +3700,18 @@
           ICON_INVENTORY,
         );
         createBtn(
-          "Extraction Summary",
+          "Operation Summary",
           "download-report-btn download-report-html-btn",
-          "Download latest summary report",
+          "Download latest operation summary report",
           function (b) {
             downloadLatestReport(b, "html");
           },
           ICON_SUMMARY,
         );
         createBtn(
-          "Download Response",
+          "Operation Data",
           "download-report-btn download-report-json-btn",
-          "Download extractions ZIP",
+          "Download operation responses ZIP",
           function (b) {
             downloadExtractionsZip(b);
           },
@@ -3732,7 +3738,7 @@
         var notificationBtn = document.createElement("button");
         notificationBtn.type = "button";
         notificationBtn.id = "notification-settings-btn";
-        notificationBtn.innerHTML = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg><span>Notifications</span>`;
+        notificationBtn.innerHTML = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg><span>Alert Recipients</span>`;
         notificationBtn.className = "download-report-btn";
         notificationBtn.style.marginLeft = "0.5rem";
         notificationBtn.style.width = "auto";
@@ -4134,24 +4140,24 @@
       }
 
       function renderScheduleListView(state, direction) {
-        updateModalTitle("Mission Dashboard");
+        updateModalTitle("Operation Dashboard");
         var body = document.getElementById("schedule-modal-body");
         if (!body) return;
         var schedules =
           state && Array.isArray(state.schedules) ? state.schedules : [];
         var tz = state && Array.isArray(state.timezones) ? state.timezones : [];
         var html =
-          '<div class="schedule-header-row"><div class="subtitle-chip">Configure automated periodic missions</div><div style="display:flex;gap:0.51rem;flex-wrap:wrap;"><button type="button" id="schedule-history-btn" class="btn-secondary">' +
+          '<div class="schedule-header-row"><div class="subtitle-chip">Configure automated periodic operations</div><div style="display:flex;gap:0.51rem;flex-wrap:wrap;"><button type="button" id="schedule-history-btn" class="btn-secondary">' +
           ICON_HISTORY +
           '<span>History</span></button><button type="button" id="schedule-create-btn" class="download-report-btn download-report-schedule-btn">' +
           ICON_PLUS +
-          '<span>Create Mission</span></button></div></div><div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
+          '<span>Create Operation</span></button></div></div><div style="flex:1;display:flex;flex-direction:column;min-height:0;">';
         if (!schedules.length) {
           html +=
-            '<div class="schedule-empty">No active schedules. Start by creating a mission.</div>';
+            '<div class="schedule-empty">No active schedules. Start by creating an operation.</div>';
         } else {
           html +=
-            '<div style="flex:1;overflow-y:auto;padding-right:4px;"><table class="schedule-list"><thead><tr><th>Brand Scope</th><th>Purchaser Scope</th><th>Mission Time</th><th>Timezone</th><th>Created</th><th style="text-align:right">Actions</th></tr></thead><tbody>';
+            '<div style="flex:1;overflow-y:auto;padding-right:4px;"><table class="schedule-list"><thead><tr><th>Brand Scope</th><th>Purchaser Scope</th><th>Operation Time</th><th>Timezone</th><th>Created</th><th style="text-align:right">Actions</th></tr></thead><tbody>';
           schedules.forEach(function (s) {
             var brands =
               s.brands && s.brands.length
@@ -4359,7 +4365,7 @@
       }
       function renderScheduleCreateForm(timezones, schedule, direction) {
         updateModalTitle(
-          "Dashboard / " + (schedule ? "Edit Mission" : "New Mission"),
+          "Dashboard / " + (schedule ? "Edit Operation" : "New Operation"),
         );
         var body = document.getElementById("schedule-modal-body");
         if (!body) return;
@@ -4416,8 +4422,8 @@
             ICON_BACK +
             '</button><div class="subtitle-chip">' +
             (schedule
-              ? "Edit mission parameters"
-              : "Launch a new mission schedule") +
+              ? "Edit operation parameters"
+              : "Launch a new operation schedule") +
             "</div></div></div>" +
             '<div style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:visible;padding-right:4px;">' +
             '<div class="schedule-form-grid">' +
@@ -4435,11 +4441,11 @@
             '<div id="schedule-error" class="schedule-error"></div>' +
             "</div>" +
             '<div class="schedule-note-card">' +
-            "<strong>⚠ Important Information:</strong> Ensure no other extraction missions are scheduled or active at this time. Manual processes or <strong>paused (Resume)</strong> states will cause this mission to be skipped to prevent data conflicts." +
+            "<strong>⚠ Important Information:</strong> Ensure no other extraction operations are scheduled or active at this time. Manual processes or <strong>paused (Resume)</strong> states will cause this operation to be skipped to prevent data conflicts." +
             "</div>" +
             '<div class="modal-footer" style="border-top: none; padding-top: 0.5rem;"><button type="button" id="schedule-cancel-btn" class="btn-secondary">Discard</button><button type="button" id="schedule-save-btn" class="download-report-btn download-report-schedule-btn">' +
             "<span>" +
-            (schedule ? "Update Changes" : "Launch Mission") +
+            (schedule ? "Update Changes" : "Launch Operation") +
             "</span>" +
             "</button></div>",
           direction || "right",
@@ -4701,7 +4707,7 @@
               '</button><div class="subtitle-chip">Schedule execution logs</div></div></div><div style="flex:1;display:flex;flex-direction:column;overflow-y:auto;padding-right:4px;">';
             if (!entries.length) {
               html +=
-                '<div class="schedule-empty">No execution history found yet. Logs for missions will appear here.</div>';
+                '<div class="schedule-empty">No execution history found yet. Logs for operations will appear here.</div>';
             } else {
               html +=
                 '<table class="schedule-list"><thead><tr><th>Time</th><th>Schedule ID</th><th>Outcome</th><th>Message</th></tr></thead><tbody>';
@@ -4721,9 +4727,9 @@
                 var msg = e.message || "";
                 if (outcome === "executed") {
                   if (e.exitCode === 0) {
-                    msg = "Mission completed successfully";
+                    msg = "Operation completed successfully";
                   } else if (e.exitCode != null) {
-                    msg = "Mission completed with issues";
+                    msg = "Operation completed with issues";
                   }
                 }
                 if (e.error) {
@@ -4758,7 +4764,7 @@
           .catch(function () {
             renderWithTransition(
               body,
-              '<div class="schedule-header-row"><div class="subtitle-chip">Execution Log Error</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load mission execution history logs.</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
+              '<div class="schedule-header-row"><div class="subtitle-chip">Execution Log Error</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load operation execution history logs.</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
               direction || "right",
             );
             backBtn = document.getElementById("schedule-log-back-btn");
@@ -5103,6 +5109,62 @@
           });
         fetchConfig().then(function () {
           updateHeaderStatus();
+
+          // Handle deep linking from reports
+          var urlParams = new URLSearchParams(window.location.search);
+          var brandParam = urlParams.get("brand");
+          var purchaserParam = urlParams.get("purchaser");
+          var caseIdParam = urlParams.get("caseId");
+          var autoRun = urlParams.get("autoRun") === "true";
+          var retryFailed = urlParams.get("retryFailed") === "true";
+
+          if (brandParam) {
+            var brandPanel = document.getElementById("brand-dropdown-panel");
+            if (brandPanel) {
+              var brandCb = brandPanel.querySelector(
+                'input[type=checkbox][value="' + brandParam + '"]',
+              );
+              if (brandCb) {
+                brandCb.checked = true;
+                refreshPurchaserOptions();
+              }
+            }
+          }
+          if (purchaserParam) {
+            var purchaserPanel = document.getElementById(
+              "purchaser-dropdown-panel",
+            );
+            if (purchaserPanel) {
+              var purchaserCb = purchaserPanel.querySelector(
+                'input[type=checkbox][value="' + purchaserParam + '"]',
+              );
+              if (purchaserCb) {
+                purchaserCb.checked = true;
+              }
+            }
+          }
+          if (brandParam || purchaserParam) {
+            updateFilterDropdownTrigger("brand");
+            updateFilterDropdownTrigger("purchaser");
+            updateHeaderStatus();
+          }
+
+          if (autoRun && caseIdParam) {
+            var caseRow = document.querySelector(
+              'tr[data-case-id="' + caseIdParam + '"]',
+            );
+            if (caseRow) {
+              var runBtn = caseRow.querySelector("button.run");
+              var resultDiv = caseRow.querySelector(".result");
+              var retryBtn = caseRow.querySelector(".retry-failed-btn");
+
+              if (retryFailed && retryBtn) {
+                retryBtn.click();
+              } else if (runBtn) {
+                runBtn.click();
+              }
+            }
+          }
         });
 
         // Initialize notification modal logic
