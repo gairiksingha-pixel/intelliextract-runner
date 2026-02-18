@@ -471,7 +471,7 @@ export function buildSummary(metrics: RunMetrics): ExecutiveSummary {
   const end = new Date(metrics.finishedAt).getTime();
   const runDurationSeconds = (end - start) / 1000;
   return {
-    title: "IntelliExtract Test Run – Executive Summary",
+    title: "IntelliExtract Mission – Executive Summary",
     generatedAt: new Date().toISOString(),
     metrics,
     runDurationSeconds,
@@ -753,7 +753,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   </details>`;
 }
 
-const REPORT_TITLE = "IntelliExtract Test Run – Executive Summary";
+const REPORT_TITLE = "IntelliExtract Mission Summary";
 
 function htmlReportFromHistory(
   historicalSummaries: HistoricalRunSummary[],
@@ -762,6 +762,18 @@ function htmlReportFromHistory(
   const runsHtml = historicalSummaries
     .map((entry) => sectionForRun(entry))
     .join("");
+  let logoDataUri = "";
+  try {
+    const logoRelPath = join(process.cwd(), "assets", "logo.png");
+    if (existsSync(logoRelPath)) {
+      const logoBuffer = readFileSync(logoRelPath);
+      logoDataUri = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+    }
+  } catch (e) {
+    // Fallback to relative if read fails
+    logoDataUri = "../../assets/logo.png";
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -772,25 +784,46 @@ function htmlReportFromHistory(
   <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #2d9d5f;
+      --bg: #f5f7f9;
+      --surface: #ffffff;
+      --text: #2c2c2c;
+      --text-secondary: #5a5a5a;
+      --border: #b0bfc9;
+      --border-light: #cbd5e1;
       --header-bg: #216c6d;
-      --bg: #ffffff;
-      --surface: #f8fafc;
-      --border: #abb9c8;
-      --text: #1e293b;
-      --text-secondary: #475569;
-      --pass-bg: #dcf2e6;
-      --fail-bg: #fee2e2;
-      --fail-text: #b91c1c;
+      --header-text: #ffffff;
+      --header-border: #1a5758;
+      --primary: #2d9d5f;
+      --accent: #2d9d5f;
+      --accent-light: #e8f5ee;
+      --radius: 12px;
+      --radius-sm: 8px;
     }
-    body { font-family: 'Ubuntu', sans-serif; max-width: 1250px; margin: 2rem auto; padding: 0 1rem; color: var(--text); background: #f1f5f9; }
+    body { font-family: 'JetBrains Mono', 'Consolas', monospace; max-width: 1250px; margin: 0 auto; padding: 0 1rem; color: var(--text); background: var(--bg); }
+    
+    .report-header {
+      background: var(--surface);
+      color: var(--header-bg);
+      padding: 1.5rem 2rem;
+      border-radius: 0 0 var(--radius) var(--radius);
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--border-light);
+    }
+    .report-header-left { display: flex; align-items: center; gap: 1.5rem; }
+    .report-header .logo { height: 32px; width: auto; object-fit: contain; }
+    .report-header-title { margin: 0; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+    
     h1 { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
     h2 { color: var(--text-secondary); font-size: 1.1rem; font-weight: 500; margin-bottom: 1.5rem; text-align: center; }
-    h3 { color: var(--header-bg); font-size: 0.95rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 1.5rem 0 0.75rem; border-bottom: 1.5px solid var(--border); padding-bottom: 0.25rem; }
+    h3 { color: var(--header-bg); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 1.5rem 0 0.75rem; border-bottom: 2px solid var(--border-light); padding-bottom: 0.4rem; }
     
-    .meta { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 2rem; text-align: center; }
+    .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
     
-    .table-responsive { width: 100%; overflow-x: auto; margin-bottom: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid var(--border); background: white; }
+    .table-responsive { width: 100%; overflow-x: auto; margin-bottom: 1.5rem; border-radius: var(--radius-sm); box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); background: var(--surface); }
     table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: auto; min-width: 800px; }
     th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); word-break: break-all; overflow-wrap: anywhere; }
     th { background: var(--surface); color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
@@ -825,19 +858,19 @@ function htmlReportFromHistory(
     
     .summary-badges { display: flex; gap: 0.5rem; align-items: center; }
     .badge-status { font-size: 0.65rem; font-weight: 800; padding: 0.25rem 0.6rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
-    .badge-status.success { background: var(--pass-bg); color: var(--primary); }
-    .badge-status.fail { background: var(--fail-bg); color: var(--fail-text); }
-    .badge-status.secondary { background: #e2e8f0; color: #475569; }
+    .badge-status.success { background: var(--accent-light); color: var(--primary); border: 1px solid rgba(45, 157, 95, 0.2); }
+    .badge-status.fail { background: #fee2e2; color: #b91c1c; border: 1px solid rgba(185, 28, 28, 0.2); }
+    .badge-status.secondary { background: #f1f5f9; color: var(--text-secondary); border: 1px solid var(--border-light); }
     
     .run-section-body { padding: 0.5rem 1.5rem 1.5rem; }
     
     .chip { display: inline-flex; align-items: center; background: #f1f5f9; color: var(--text); padding: 0.2rem 0.6rem; border-radius: 100px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border); }
-    .chip.success { background: var(--pass-bg); color: var(--primary); border-color: rgba(45, 157, 95, 0.2); }
-    .chip.fail { background: var(--fail-bg); color: var(--fail-text); border-color: rgba(185, 28, 28, 0.2); }
-    .chip.secondary { background: #f8fafc; color: var(--header-bg); font-weight: 700; }
+    .chip.success { background: var(--accent-light); color: var(--primary); border-color: rgba(45, 157, 95, 0.2); }
+    .chip.fail { background: #fee2e2; color: #b91c1c; border-color: rgba(185, 28, 28, 0.2); }
+    .chip.secondary { background: #f8fafc; color: var(--header-bg); font-weight: 700; border-color: var(--border-light); }
     
-    .tabs { display: flex; gap: 1rem; border-bottom: 2px solid var(--border); margin-bottom: 2rem; }
-    .tab-btn { background: none; border: none; padding: 0.75rem 1.5rem; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+    .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 2rem; }
+    .tab-btn { flex: 1; background: none; border: none; padding: 0.75rem 1.5rem; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -2px; }
     .tab-btn.active { color: var(--header-bg); border-bottom-color: var(--header-bg); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -848,16 +881,12 @@ function htmlReportFromHistory(
       border: 1px solid rgba(171, 185, 200, 0.3); 
       border-radius: 16px; 
       padding: 1.6rem; 
-      box-shadow: 
-        8px 8px 16px #e2e8f0,
-        -4px -4px 12px #ffffff;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
       transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
     .chart-card:hover {
       transform: translateY(-6px) scale(1.01);
-      box-shadow: 
-        12px 12px 24px #cbd5e1,
-        -4px -4px 12px #ffffff;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
     }
     .chart-card h4 { margin: 0 0 1rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--header-bg); border-bottom: 2px solid rgba(33, 108, 109, 0.1); padding-bottom: 0.6rem; font-weight: 800; }
     .chart-container { position: relative; height: 300px; width: 100%; }
@@ -869,9 +898,7 @@ function htmlReportFromHistory(
       border-radius: 14px; 
       padding: 1.4rem; 
       text-align: center;
-      box-shadow: 
-        4px 4px 8px #e2e8f0,
-        -2px -2px 6px #ffffff;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
       transition: transform 0.2s ease;
     }
     .stat-card:hover { transform: scale(1.03); }
@@ -895,8 +922,13 @@ function htmlReportFromHistory(
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <h1>${escapeHtml(REPORT_TITLE)}</h1>
-  <p class="meta">Generated: ${escapeHtml(formatRunDateTime(generatedAt))} — ${historicalSummaries.length} run(s) (sync &amp; extract)</p>
+  <div class="report-header">
+    <div class="report-header-left">
+      <img src="${logoDataUri}" alt="intellirevenue" class="logo">
+      <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
+    </div>
+    <div class="meta">Generated: ${escapeHtml(formatRunDateTime(generatedAt))} — ${historicalSummaries.length} run(s)</div>
+  </div>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('dashboard')">Analytics Dashboard</button>
@@ -962,7 +994,6 @@ function htmlReportFromHistory(
   </div>
 
   <div id="history" class="tab-content">
-    <h2>Mission Activity History</h2>
     ${runsHtml}
   </div>
 

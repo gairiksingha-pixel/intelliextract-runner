@@ -97,6 +97,16 @@ const LAST_RUN_STATE_PATH = join(
 // Active process tracking
 const ACTIVE_RUNS = new Map();
 
+// Load logo for reports
+let REPORT_LOGO_DATA_URI = "";
+try {
+  const logoPath = join(ROOT, "assets", "logo.png");
+  if (existsSync(logoPath)) {
+    const buffer = readFileSync(logoPath);
+    REPORT_LOGO_DATA_URI = `data:image/png;base64,${buffer.toString("base64")}`;
+  }
+} catch (_) {}
+
 // Define which cases support resume functionality
 const RESUME_CAPABLE_CASES = new Set(["P1", "P2", "PIPE", "P5", "P6"]);
 
@@ -431,49 +441,77 @@ function buildSyncReportHtml() {
   <title>Staging Inventory Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
-      --primary: #2d9d5f;
+      --bg: #f5f7f9;
+      --surface: #ffffff;
+      --text: #2c2c2c;
+      --text-secondary: #5a5a5a;
+      --border: #b0bfc9;
+      --border-light: #cbd5e1;
       --header-bg: #216c6d;
-      --bg: #ffffff;
-      --surface: #f8fafc;
-      --border: #abb9c8;
-      --text: #1e293b;
-      --text-secondary: #475569;
-      --pass-bg: #dcf2e6;
-      --fail-bg: #fee2e2;
-      --fail-text: #b91c1c;
+      --header-text: #ffffff;
+      --primary: #2d9d5f;
+      --accent: #2d9d5f;
+      --accent-light: #e8f5ee;
+      --radius: 12px;
+      --radius-sm: 8px;
     }
-    body { font-family: 'Ubuntu', sans-serif; max-width: 1250px; margin: 2rem auto; padding: 0 1rem; color: var(--text); background: #f1f5f9; }
-    h1 { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
-    .meta { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 2rem; text-align: center; }
+    body { font-family: 'JetBrains Mono', 'Consolas', monospace; max-width: 1250px; margin: 0 auto; padding: 0 1rem; color: var(--text); background: var(--bg); }
+    
+    .report-header {
+      background: var(--surface);
+      color: var(--header-bg);
+      padding: 1.5rem 2rem;
+      border-radius: 0 0 var(--radius) var(--radius);
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--border-light);
+    }
+    .report-header-left { display: flex; align-items: center; gap: 1.5rem; }
+    .report-header .logo { height: 32px; width: auto; object-fit: contain; }
+    .report-header-title { margin: 0; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+    
+    .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
+    .meta p { margin: 2px 0; }
     
     .dashboard-grid { margin-bottom: 2rem; }
     .chart-card { 
-      background: linear-gradient(145deg, #ffffff, #f1f5f9); 
-      border: 1px solid rgba(171, 185, 200, 0.3); 
+      background: var(--surface);
+      border: 1px solid var(--border-light);
       border-radius: 16px; 
       padding: 1.6rem; 
-      box-shadow: 8px 8px 16px #e2e8f0, -4px -4px 12px #ffffff;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
       margin-bottom: 2rem;
     }
     .chart-card h4 { margin: 0 0 1rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--header-bg); border-bottom: 2px solid rgba(33, 108, 109, 0.1); padding-bottom: 0.6rem; font-weight: 800; }
     .chart-container { position: relative; height: 350px; width: 100%; }
 
-    table { border-collapse: separate; border-spacing: 0; width: 100%; margin-top: 1rem; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid var(--border); }
-    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
-    th { background: var(--surface); color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+    h3 { color: var(--header-bg); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 2rem 0 1rem; border-bottom: 2px solid var(--border-light); padding-bottom: 0.4rem; }
+
+    table { border-collapse: separate; border-spacing: 0; width: 100%; margin-top: 1rem; background: white; border-radius: var(--radius-sm); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); word-break: break-all; }
+    th { background: var(--surface); color: var(--text-secondary); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
     th:last-child, td:last-child { border-right: none; }
     tr:last-child td { border-bottom: none; }
+    td { font-size: 0.75rem; color: var(--text-secondary); }
   </style>
 </head>
 <body>
-  <h1>Staging Inventory Report</h1>
-  <div class="meta">
-    <p>Generated: ${new Date().toISOString()}</p>
-    <p>Manifest entries: ${manifestEntries} | Files in staging: ${files.length}</p>
+  <div class="report-header">
+    <div class="report-header-left">
+      <img src="${REPORT_LOGO_DATA_URI}" alt="logo" class="logo">
+      <h1 class="report-header-title">Staging Inventory Report</h1>
+    </div>
+    <div class="meta">
+      <p>Generated: ${new Date().toISOString().split("T")[0]}</p>
+      <p>Manifest entries: ${manifestEntries} | Files in staging: ${files.length}</p>
+    </div>
   </div>
 
   <div class="dashboard-grid">
