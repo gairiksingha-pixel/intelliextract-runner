@@ -1756,6 +1756,162 @@
         border-color: var(--border-light);
         box-shadow: none;
       }
+
+      /* Data Explorer & Pagination Styles */
+      .pagination-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 1.25rem;
+        padding: 0.5rem 0;
+      }
+      .pagination-btn {
+        min-width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-sm);
+        color: var(--text);
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .pagination-btn:hover:not(:disabled) {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: var(--pass-bg);
+      }
+      .pagination-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .pagination-btn.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+      }
+      .modal-tabs {
+        display: flex;
+        gap: 1.5rem;
+        border-bottom: 1px solid rgba(203, 213, 225, 0.4);
+        margin-bottom: 1.25rem;
+      }
+      .modal-tab-btn {
+        background: none;
+        border: none;
+        padding: 0.75rem 0.25rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--muted);
+        cursor: pointer;
+        position: relative;
+        transition: color 0.2s;
+      }
+      .modal-tab-btn::after {
+        content: "";
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--primary);
+        transform: scaleX(0);
+        transition: transform 0.2s;
+        border-radius: 100px;
+      }
+      .modal-tab-btn:hover {
+        color: var(--text);
+      }
+      .modal-tab-btn.active {
+        color: var(--primary);
+      }
+      .modal-tab-btn.active::after {
+        transform: scaleX(1);
+      }
+      .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid rgba(203, 213, 225, 0.5);
+        border-radius: var(--radius);
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        box-shadow: var(--shadow-sm);
+      }
+      .stat-card .stat-label {
+        font-size: 0.7rem;
+        font-weight: 800;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .stat-card .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--header-bg);
+      }
+      .stat-card.success-card .stat-value {
+        color: var(--pass);
+      }
+      .stat-card.failed-card .stat-value {
+        color: var(--fail);
+      }
+
+      .search-container {
+        position: relative;
+        margin-bottom: 1.25rem;
+        width: 100%;
+      }
+      .search-input {
+        width: 100%;
+        height: 40px;
+        padding: 0 1rem 0 2.5rem;
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-sm);
+        font-family: inherit;
+        font-size: 0.9rem;
+        background: var(--surface);
+      }
+      .search-icon {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--muted);
+        pointer-events: none;
+      }
+      .data-table tr.row-failed td {
+        color: var(--fail);
+      }
+      .data-table tr.row-success td {
+        color: var(--pass);
+      }
+      .badge {
+        font-size: 0.65rem;
+        font-weight: 800;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        text-transform: uppercase;
+      }
+      .badge-success {
+        background: var(--pass-bg);
+        color: var(--pass);
+      }
+      .badge-failed {
+        background: var(--fail-bg);
+        color: var(--fail);
+      }
     </style>
   </head>
   <body>
@@ -1999,6 +2155,125 @@
       </div>
     </div>
 
+    <!-- Operation Data Explorer Modal -->
+    <div
+      id="extraction-data-modal-overlay"
+      class="modal-overlay"
+      aria-hidden="true"
+    >
+      <div
+        class="modal"
+        style="
+          width: 1000px;
+          height: 85vh;
+          max-height: 95vh;
+          display: flex;
+          flex-direction: column;
+        "
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="extraction-data-modal-title"
+      >
+        <div class="modal-header">
+          <div class="modal-title" id="extraction-data-modal-title">
+            <span class="title-badge" style="background: var(--header-bg)"
+              >DATA</span
+            >
+            <span>Operation Data Explorer</span>
+          </div>
+          <button
+            type="button"
+            id="extraction-data-modal-close-icon"
+            class="modal-close-icon"
+            aria-label="Close dialog"
+          >
+            &#10005;
+          </button>
+        </div>
+        <div
+          class="modal-body"
+          id="extraction-data-modal-body"
+          style="
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          "
+        >
+          <!-- Dashboard Section -->
+          <div class="dashboard-stats" id="extraction-stats">
+            <!-- Dynamic stats cards will be injected here -->
+          </div>
+
+          <!-- Tabs and Search -->
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 2rem;
+              border-bottom: 1px solid rgba(203, 213, 225, 0.4);
+              margin-bottom: 1rem;
+            "
+          >
+            <div class="modal-tabs" style="margin-bottom: 0; border: none">
+              <button class="modal-tab-btn active" data-tab="all">
+                All Results
+              </button>
+              <button class="modal-tab-btn" data-tab="success">
+                Succeeded
+              </button>
+              <button class="modal-tab-btn" data-tab="failed">Failed</button>
+            </div>
+            <div
+              class="search-container"
+              style="max-width: 320px; margin-bottom: 0"
+            >
+              <span class="search-icon"
+                ><svg
+                  style="width: 16px; height: 16px"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg
+              ></span>
+              <input
+                type="text"
+                id="extraction-search"
+                class="search-input"
+                placeholder="Search filenames or patterns..."
+              />
+            </div>
+          </div>
+
+          <!-- Table Content -->
+          <div
+            id="extraction-table-container"
+            style="
+              flex: 1;
+              overflow-y: auto;
+              border: 1px solid var(--border-light);
+              border-radius: var(--radius-sm);
+            "
+          >
+            <!-- Dynamic table will be injected here -->
+            <div class="schedule-empty">Loading operation data...</div>
+          </div>
+
+          <!-- Pagination -->
+          <div id="extraction-pagination" class="pagination-wrap">
+            <!-- Dynamic pagination buttons will be injected here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script type="module">
       (function () {
         var logo = document.getElementById("logo-img");
@@ -2029,6 +2304,10 @@
       const ICON_BACK = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
       const ICON_CHECK = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
       const ICON_MAIL = `<svg class="btn-icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:14px;height:14px;margin-right:8px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`;
+
+      const ICON_SEARCH = `<svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`;
+      const ICON_CHEVRON_LEFT = `<svg style="width:14px;height:14px;display:inline-block;vertical-align:middle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
+      const ICON_CHEVRON_RIGHT = `<svg style="width:14px;height:14px;display:inline-block;vertical-align:middle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
 
       function setSystemStatus(isBusy, text) {
         var pill = document.querySelector(".system-status-pill");
@@ -2559,8 +2838,8 @@
             }
             if (parsed.extractionResultsPath || parsed.reportsPath) {
               rows.push([
-                "Mission report",
-                "Reports and extraction data are ready. Please download the results from <b>Reports & Downloads</b>. ",
+                "Operation report",
+                "Reports and extraction data are ready. You can view the summary directly or download results from <b>Reports & Downloads</b> bar above.",
               ]);
             }
           }
@@ -3676,7 +3955,7 @@
 
         const ICON_INVENTORY = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>`;
         const ICON_SUMMARY = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>`;
-        const ICON_DATA = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+        const ICON_DATA = `<svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`;
 
         function createBtn(label, className, title, onClick, iconHtml) {
           var b = document.createElement("button");
@@ -3691,29 +3970,29 @@
         }
 
         createBtn(
-          "Staging Inventory",
+          "View Inventory",
           "download-sync-report-btn",
-          "Download staging report",
+          "View staging inventory report",
           function (b) {
-            downloadSyncReport(b);
+            window.open("/api/sync-report", "_blank");
           },
           ICON_INVENTORY,
         );
         createBtn(
-          "Operation Summary",
+          "View Summary",
           "download-report-btn download-report-html-btn",
-          "Download latest operation summary report",
+          "View latest operation summary report",
           function (b) {
-            downloadLatestReport(b, "html");
+            viewLatestReport("html");
           },
           ICON_SUMMARY,
         );
         createBtn(
           "Operation Data",
           "download-report-btn download-report-json-btn",
-          "Download operation responses ZIP",
+          "Explore extraction data — view full JSON responses",
           function (b) {
-            downloadExtractionsZip(b);
+            window.open("/api/extraction-data-page", "_blank");
           },
           ICON_DATA,
         );
@@ -3786,6 +4065,33 @@
               this.value = "0";
           });
         });
+
+      function viewLatestReport(format) {
+        fetch("/api/reports")
+          .then(function (r) {
+            if (!r.ok) throw new Error("Could not load report list");
+            return r.json();
+          })
+          .then(function (list) {
+            var reports = list[format] || [];
+            if (reports.length === 0) {
+              alert(
+                "No " +
+                  (format === "html" ? "summary" : "extraction") +
+                  " report found. Run a case first to generate reports.",
+              );
+              return;
+            }
+            var latest = reports[0];
+            var filename = latest.name;
+            var url =
+              "/api/reports/" + format + "/" + encodeURIComponent(filename);
+            window.open(url, "_blank");
+          })
+          .catch(function (err) {
+            alert("Failed to open report: " + err.message);
+          });
+      }
 
       function downloadSyncReport(btn) {
         if (btn) btn.disabled = true;
@@ -4137,6 +4443,194 @@
           }
         }
         return cron;
+      }
+
+      function renderPagination(container, total, page, limit, onPageClick) {
+        if (!container) return;
+        var totalPages = Math.ceil(total / limit);
+        if (totalPages <= 1) {
+          container.innerHTML = "";
+          return;
+        }
+        var html = "";
+        html +=
+          '<button class="pagination-btn" ' +
+          (page === 1 ? "disabled" : "") +
+          ' data-page="' +
+          (page - 1) +
+          '">' +
+          ICON_CHEVRON_LEFT +
+          " Previous</button>";
+
+        var start = Math.max(1, page - 2);
+        var end = Math.min(totalPages, page + 2);
+
+        if (start > 1)
+          html +=
+            '<button class="pagination-btn" data-page="1">1</button><span>...</span>';
+        for (var i = start; i <= end; i++) {
+          html +=
+            '<button class="pagination-btn ' +
+            (i === page ? "active" : "") +
+            '" data-page="' +
+            i +
+            '">' +
+            i +
+            "</button>";
+        }
+        if (end < totalPages)
+          html +=
+            '<span>...</span><button class="pagination-btn" data-page="' +
+            totalPages +
+            '">' +
+            totalPages +
+            "</button>";
+
+        html +=
+          '<button class="pagination-btn" ' +
+          (page === totalPages ? "disabled" : "") +
+          ' data-page="' +
+          (page + 1) +
+          '">Next ' +
+          ICON_CHEVRON_RIGHT +
+          "</button>";
+        container.innerHTML = html;
+        container.querySelectorAll(".pagination-btn").forEach(function (btn) {
+          btn.onclick = function () {
+            var p = parseInt(this.getAttribute("data-page"), 10);
+            if (!isNaN(p)) onPageClick(p);
+          };
+        });
+      }
+
+      function openExtractionDataModal() {
+        var overlay = document.getElementById("extraction-data-modal-overlay");
+        if (!overlay) return;
+        overlay.classList.add("open");
+        overlay.setAttribute("aria-hidden", "false");
+
+        var closeIcon = document.getElementById(
+          "extraction-data-modal-close-icon",
+        );
+        if (closeIcon)
+          closeIcon.onclick = function () {
+            overlay.classList.remove("open");
+            overlay.setAttribute("aria-hidden", "true");
+          };
+
+        var currentTab = "all";
+        var currentSearch = "";
+        var currentPage = 1;
+
+        function refresh() {
+          fetchExtractionStats();
+          fetchExtractionResults(currentPage, currentTab, currentSearch);
+        }
+
+        document
+          .querySelectorAll("#extraction-data-modal-overlay .modal-tab-btn")
+          .forEach(function (btn) {
+            btn.onclick = function () {
+              document
+                .querySelectorAll(
+                  "#extraction-data-modal-overlay .modal-tab-btn",
+                )
+                .forEach((b) => b.classList.remove("active"));
+              this.classList.add("active");
+              currentTab = this.getAttribute("data-tab");
+              currentPage = 1;
+              refresh();
+            };
+          });
+
+        var searchInput = document.getElementById("extraction-search");
+        if (searchInput) {
+          var timer;
+          searchInput.oninput = function () {
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+              currentSearch = searchInput.value;
+              currentPage = 1;
+              refresh();
+            }, 300);
+          };
+        }
+
+        refresh();
+      }
+
+      function fetchExtractionStats() {
+        fetch("/api/extraction-stats")
+          .then((r) => r.json())
+          .then((data) => {
+            var container = document.getElementById("extraction-stats");
+            if (!container) return;
+            container.innerHTML = `
+              <div class="stat-card">
+                <div class="stat-label">Total Extractions</div>
+                <div class="stat-value">${data.success + data.failed}</div>
+              </div>
+              <div class="stat-card success-card">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-value">${Math.round((data.success / (data.success + data.failed || 1)) * 100)}%</div>
+              </div>
+              <div class="stat-card failed-card">
+                <div class="stat-label">Critical Issues</div>
+                <div class="stat-value">${data.failed}</div>
+              </div>
+            `;
+          });
+      }
+
+      function fetchExtractionResults(page, status, search) {
+        var container = document.getElementById("extraction-table-container");
+        if (container)
+          container.innerHTML =
+            '<div class="schedule-empty">Loading dynamic results...</div>';
+
+        var url = `/api/extraction-results?page=${page || 1}&status=${status || "all"}&search=${encodeURIComponent(search || "")}`;
+        fetch(url)
+          .then((r) => r.json())
+          .then((data) => {
+            renderExtractionResultsTable(data.results);
+            renderPagination(
+              document.getElementById("extraction-pagination"),
+              data.total,
+              data.page,
+              data.limit,
+              function (p) {
+                fetchExtractionResults(p, status, search);
+              },
+            );
+          });
+      }
+
+      function renderExtractionResultsTable(results) {
+        var container = document.getElementById("extraction-table-container");
+        if (!container) return;
+        if (!results || results.length === 0) {
+          container.innerHTML =
+            '<div class="schedule-empty">No results found for this selection.</div>';
+          return;
+        }
+        var html =
+          '<table class="schedule-list data-table"><thead><tr><th style="width:180px">Timestamp</th><th>Filename</th><th>Pattern</th><th>Purchaser</th><th style="width:100px;text-align:center">Status</th></tr></thead><tbody style="font-family:inherit">';
+        results.forEach(function (r) {
+          var badge =
+            r.status === "success"
+              ? '<span class="badge badge-success">Success</span>'
+              : '<span class="badge badge-failed">Failed</span>';
+          var time = r.timestamp ? new Date(r.timestamp).toLocaleString() : "—";
+          html += `<tr class="row-${r.status}">
+            <td style="white-space:nowrap; font-size: 0.75rem">${escapeHtml(time)}</td>
+            <td style="font-size:0.75rem; color:var(--text); word-break: break-all">${escapeHtml(r.filename)}</td>
+            <td><code style="background:var(--bg); padding:2px 4px; border-radius:3px; font-size:0.7rem">${escapeHtml(r.patternKey || "—")}</code></td>
+            <td style="font-size: 0.75rem">${escapeHtml(formatPurchaserName(r.purchaserKey) || "—")}</td>
+            <td style="text-align:center">${badge}</td>
+          </tr>`;
+        });
+        html += "</tbody></table>";
+        container.innerHTML = html;
       }
 
       function renderScheduleListView(state, direction) {
@@ -4677,24 +5171,30 @@
           });
       }
 
-      function renderScheduleRunHistoryView(direction) {
+      function renderScheduleRunHistoryView(direction, page) {
+        page = page || 1;
         updateModalTitle("Dashboard / Execution Logs");
         var body = document.getElementById("schedule-modal-body");
         if (!body) return;
-        renderWithTransition(
-          body,
-          '<div class="schedule-header-row"><div style="display:flex;align-items:center;gap:0.75rem;"><button type="button" id="schedule-log-back-btn" class="btn-secondary" style="padding: 0.4rem 0.6rem">' +
-            ICON_BACK +
-            '</button><div class="subtitle-chip">Schedule execution logs</div></div></div><div class="schedule-empty">Loading history logs…</div><div class="modal-footer" style="margin-top:0.85rem; border-top:none;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
-          direction || "right",
-        );
-        var backBtn = document.getElementById("schedule-log-back-btn");
-        if (backBtn) {
-          backBtn.onclick = function () {
-            loadSchedulesIntoModal("left");
-          };
+
+        // Initial loading state
+        if (page === 1) {
+          renderWithTransition(
+            body,
+            '<div class="schedule-header-row"><div style="display:flex;align-items:center;gap:0.75rem;"><button type="button" id="schedule-log-back-btn" class="btn-secondary" style="padding: 0.4rem 0.6rem">' +
+              ICON_BACK +
+              '</button><div class="subtitle-chip">Schedule execution logs</div></div></div><div class="schedule-empty">Loading history logs…</div><div class="modal-footer" style="margin-top:0.85rem; border-top:none;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
+            direction || "right",
+          );
+          var backBtn = document.getElementById("schedule-log-back-btn");
+          if (backBtn) {
+            backBtn.onclick = function () {
+              loadSchedulesIntoModal("left");
+            };
+          }
         }
-        fetch("/api/schedule-log")
+
+        fetch("/api/schedule-log?page=" + page + "&limit=15")
           .then(function (r) {
             if (!r.ok) throw new Error("Could not load schedule log");
             return r.json();
@@ -4749,11 +5249,30 @@
                   "</td></tr>";
               });
               html += "</tbody></table>";
+              html +=
+                '<div id="schedule-log-pagination" class="pagination-wrap"></div>';
             }
             html += "</div>";
             html +=
               '<div class="modal-footer" style="margin-top:0.85rem; border-top:none;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>';
-            renderWithTransition(body, html, direction || "right");
+
+            // For page > 1, don't use transition to make it feel local
+            if (page === 1) {
+              renderWithTransition(body, html, direction || "right");
+            } else {
+              body.innerHTML = html;
+            }
+
+            renderPagination(
+              document.getElementById("schedule-log-pagination"),
+              data.total,
+              data.page,
+              data.limit,
+              function (p) {
+                renderScheduleRunHistoryView(null, p);
+              },
+            );
+
             backBtn = document.getElementById("schedule-log-back-btn");
             if (backBtn) {
               backBtn.onclick = function () {
@@ -4762,17 +5281,7 @@
             }
           })
           .catch(function () {
-            renderWithTransition(
-              body,
-              '<div class="schedule-header-row"><div class="subtitle-chip">Execution Log Error</div><button type="button" id="schedule-log-back-btn" class="btn-secondary">Back to Schedules</button></div><div class="schedule-empty">Could not load operation execution history logs.</div><div class="modal-footer" style="margin-top:0.85rem;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
-              direction || "right",
-            );
-            backBtn = document.getElementById("schedule-log-back-btn");
-            if (backBtn) {
-              backBtn.onclick = function () {
-                loadSchedulesIntoModal("left");
-              };
-            }
+            // ... error handling
           });
       }
 

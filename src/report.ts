@@ -936,8 +936,18 @@ function htmlReportFromHistory(
       logoDataUri = `data:image/png;base64,${logoBuffer.toString("base64")}`;
     }
   } catch (e) {
-    // Fallback to relative if read fails
     logoDataUri = "../../assets/logo.png";
+  }
+
+  let faviconDataUri = "";
+  try {
+    const favRelPath = join(process.cwd(), "assets", "favicon.ico");
+    if (existsSync(favRelPath)) {
+      const favBuffer = readFileSync(favRelPath);
+      faviconDataUri = `data:image/x-icon;base64,${favBuffer.toString("base64")}`;
+    }
+  } catch (e) {
+    faviconDataUri = "../../assets/favicon.ico";
   }
 
   return `<!DOCTYPE html>
@@ -945,6 +955,7 @@ function htmlReportFromHistory(
 <head>
   <meta charset="UTF-8">
   <title>${escapeHtml(REPORT_TITLE)}</title>
+  ${faviconDataUri ? `<link rel="icon" href="${faviconDataUri}" type="image/x-icon">` : ""}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">

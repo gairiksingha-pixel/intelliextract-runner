@@ -108,6 +108,16 @@ try {
   }
 } catch (_) {}
 
+// Load favicon for reports
+let REPORT_FAVICON_DATA_URI = "";
+try {
+  const favPath = join(ROOT, "assets", "favicon.ico");
+  if (existsSync(favPath)) {
+    const buffer = readFileSync(favPath);
+    REPORT_FAVICON_DATA_URI = `data:image/x-icon;base64,${buffer.toString("base64")}`;
+  }
+} catch (_) {}
+
 // Define which cases support resume functionality
 const RESUME_CAPABLE_CASES = new Set(["P1", "P2", "PIPE", "P5", "P6"]);
 
@@ -397,6 +407,643 @@ const SYNC_HISTORY_PATH = join(
   "sync-history.json",
 );
 
+function buildExtractionDataPageHtml() {
+  const succDir = join(EXTRACTIONS_DIR, "succeeded");
+  const failDir = join(EXTRACTIONS_DIR, "failed");
+
+  const loadFiles = (dir, status) => {
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => {
+        const path = join(dir, f);
+        let content = {};
+        let mtime = 0;
+        try {
+          content = JSON.parse(readFileSync(path, "utf-8"));
+        } catch (_) {}
+        try {
+          mtime = statSync(path).mtimeMs;
+        } catch (_) {}
+        return { filename: f, status, content, mtime };
+      });
+  };
+
+  const succFiles = loadFiles(succDir, "success");
+  const failFiles = loadFiles(failDir, "failed");
+  const allFiles = [...succFiles, ...failFiles].sort(
+    (a, b) => b.mtime - a.mtime,
+  );
+
+  const totalSuccess = succFiles.length;
+  const totalFailed = failFiles.length;
+  const totalAll = allFiles.length;
+  const successRate =
+    totalAll > 0 ? Math.round((totalSuccess / totalAll) * 100) : 0;
+
+  const now = new Date().toLocaleString();
+
+  const escHtml = (s) =>
+    String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const rowsJson = JSON.stringify(
+    allFiles.map((f) => ({
+      filename: f.filename,
+      status: f.status,
+      mtime: f.mtime,
+      patternKey: f.content?.pattern?.pattern_key ?? null,
+      purchaserKey: f.content?.pattern?.purchaser_key ?? null,
+      success: f.content?.success ?? null,
+      json: f.content,
+    })),
+  );
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operation Data Explorer — IntelliExtract</title>
+  ${REPORT_FAVICON_DATA_URI ? `<link rel="icon" href="${REPORT_FAVICON_DATA_URI}" type="image/x-icon">` : ""}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f5f7f9;
+      --surface: #ffffff;
+      --text: #2c2c2c;
+      --text-secondary: #5a5a5a;
+      --border: #b0bfc9;
+      --border-light: #cbd5e1;
+      --header-bg: #216c6d;
+      --header-text: #ffffff;
+      --primary: #2d9d5f;
+      --accent-light: #e8f5ee;
+      --pass: #248f54;
+      --pass-bg: #e8f5ee;
+      --fail: #c62828;
+      --fail-bg: #ffebee;
+      --muted: #6b7c85;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', 'Consolas', monospace;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+      font-size: 13px;
+    }
+    .page-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-light);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .page-header-left { display: flex; align-items: center; gap: 1.25rem; }
+    .page-header-logo { height: 28px; width: auto; object-fit: contain; }
+    .page-title-wrap { display: flex; flex-direction: column; gap: 0.1rem; }
+    .page-title { font-size: 1.1rem; font-weight: 800; color: var(--header-bg); margin: 0; text-transform: uppercase; letter-spacing: 0.08em; }
+    .page-subtitle { font-size: 0.7rem; color: var(--muted); font-weight: 500; }
+    .page-meta { font-size: 0.7rem; color: var(--muted); text-align: right; }
+    .page-meta strong { color: var(--header-bg); }
+
+    .page-body { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .stat-card .stat-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+    .stat-card .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--header-bg);
+      line-height: 1;
+    }
+    .stat-card .stat-sub { font-size: 0.7rem; color: var(--muted); }
+    .stat-card.success .stat-value { color: var(--pass); }
+    .stat-card.failed .stat-value { color: var(--fail); }
+    .stat-card.rate .stat-value { color: var(--primary); }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .tab-group { display: flex; gap: 0.25rem; }
+    .tab-btn {
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 0.45rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover { background: var(--bg); color: var(--text); }
+    .tab-btn.active { background: var(--header-bg); color: white; border-color: var(--header-bg); }
+    .tab-btn .count {
+      display: inline-block;
+      background: rgba(255,255,255,0.25);
+      border-radius: 100px;
+      padding: 0 0.4rem;
+      font-size: 0.7rem;
+      margin-left: 0.35rem;
+    }
+    .tab-btn:not(.active) .count { background: var(--bg); color: var(--muted); }
+
+    .search-wrap { position: relative; flex: 1; max-width: 400px; }
+    .search-wrap svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+    .search-input {
+      width: 100%;
+      height: 38px;
+      padding: 0 1rem 0 2.5rem;
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .search-input:focus { border-color: var(--primary); background: white; }
+
+    .results-info { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+
+    .data-table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .data-table thead th {
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-light);
+      text-align: left;
+    }
+    .data-table tbody tr {
+      border-bottom: 1px solid rgba(203,213,225,0.4);
+      transition: background 0.1s;
+      cursor: pointer;
+    }
+    .data-table tbody tr:hover { background: #f8fafc; }
+    .data-table tbody tr:last-child { border-bottom: none; }
+    .data-table td {
+      padding: 0.75rem 1rem;
+      vertical-align: middle;
+    }
+    .data-table tr.expanded { background: #f0f9ff; }
+    .data-table tr.expanded:hover { background: #e0f2fe; }
+
+    .expand-row td {
+      padding: 0;
+      background: #0f172a;
+      cursor: default;
+    }
+    .expand-row:hover td { background: #0f172a; }
+    .json-viewer {
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      max-height: 500px;
+      overflow-y: auto;
+      animation: slideDown 0.28s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    @keyframes slideDown {
+      from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+      to   { opacity: 1; max-height: 500px; }
+    }
+    @keyframes slideUp {
+      from { opacity: 1; max-height: 500px; }
+      to   { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+    }
+    .json-viewer pre {
+      margin: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .json-key { color: #93c5fd; }
+    .json-string { color: #86efac; }
+    .json-number { color: #fbbf24; }
+    .json-bool-true { color: #34d399; }
+    .json-bool-false { color: #f87171; }
+    .json-null { color: #94a3b8; }
+
+    /* Expand loader spinner */
+    .json-loader {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1.5rem 1.75rem;
+      color: #94a3b8;
+      font-size: 0.78rem;
+      animation: slideDown 0.18s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .json-spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(148,163,184,0.25);
+      border-top-color: #93c5fd;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.6rem;
+      font-weight: 800;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-success { background: var(--pass-bg); color: var(--pass); }
+    .badge-failed { background: var(--fail-bg); color: var(--fail); }
+
+    .expand-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border-light);
+      color: var(--muted);
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    tr.expanded .expand-icon { background: var(--header-bg); color: white; border-color: var(--header-bg); transform: rotate(90deg); }
+
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 1.25rem;
+      border-top: 1px solid var(--border-light);
+    }
+    .pg-btn {
+      min-width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      padding: 0 0.5rem;
+    }
+    .pg-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: var(--pass-bg); }
+    .pg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
+    .empty-state p { margin: 0; font-size: 0.85rem; }
+
+    .filename-cell { font-size: 0.72rem; word-break: break-all; color: var(--text); max-width: 280px; }
+    .pattern-cell code {
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      color: var(--header-bg);
+    }
+    .time-cell { font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
+    .toggle-cell { width: 40px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <div class="page-header-left">
+      ${REPORT_LOGO_DATA_URI ? `<img src="${REPORT_LOGO_DATA_URI}" alt="logo" class="page-header-logo">` : ""}
+      <div class="page-title-wrap">
+        <div class="page-title">Operation Data Explorer</div>
+        <div class="page-subtitle">Extraction results — click any row to expand full JSON response</div>
+      </div>
+    </div>
+    <div class="page-meta">
+      <p>Generated: <strong>${escHtml(now)}</strong></p>
+      <p>Total records: <strong>${totalAll}</strong></p>
+    </div>
+  </div>
+
+  <div class="page-body">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Extractions</div>
+        <div class="stat-value">${totalAll}</div>
+        <div class="stat-sub">All time</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-label">Succeeded</div>
+        <div class="stat-value">${totalSuccess}</div>
+        <div class="stat-sub">Extraction success</div>
+      </div>
+      <div class="stat-card failed">
+        <div class="stat-label">Failed</div>
+        <div class="stat-value">${totalFailed}</div>
+        <div class="stat-sub">Require attention</div>
+      </div>
+      <div class="stat-card rate">
+        <div class="stat-label">Success Rate</div>
+        <div class="stat-value">${successRate}%</div>
+        <div class="stat-sub">${totalSuccess} of ${totalAll} succeeded</div>
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <div class="tab-group">
+        <button class="tab-btn active" data-filter="all">All <span class="count">${totalAll}</span></button>
+        <button class="tab-btn" data-filter="success">Succeeded <span class="count">${totalSuccess}</span></button>
+        <button class="tab-btn" data-filter="failed">Failed <span class="count">${totalFailed}</span></button>
+      </div>
+      <div class="search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" class="search-input" id="search-input" placeholder="Search filename, pattern, purchaser…">
+      </div>
+      <div class="results-info" id="results-info"></div>
+    </div>
+
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="toggle-cell"></th>
+            <th>Timestamp</th>
+            <th>Filename</th>
+            <th>Pattern Key</th>
+            <th>Purchaser</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+        </tbody>
+      </table>
+      <div class="pagination-bar" id="pagination-bar"></div>
+    </div>
+  </div>
+
+  <script>
+    var ALL_ROWS = ${rowsJson};
+    var PAGE_SIZE = 20;
+    var currentPage = 1;
+    var currentFilter = 'all';
+    var currentSearch = '';
+    var expandedRows = new Set();
+
+    function escHtml(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatTime(ms) {
+      if (!ms) return '—';
+      return new Date(ms).toLocaleString();
+    }
+
+    function syntaxHighlight(json) {
+      var str = JSON.stringify(json, null, 2);
+      return str.replace(/("(\\\\u[a-zA-Z0-9]{4}|\\\\[^u]|[^\\\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)/g, function(match) {
+        var cls = 'json-number';
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'json-key';
+          } else {
+            cls = 'json-string';
+          }
+        } else if (/true/.test(match)) {
+          cls = 'json-bool-true';
+        } else if (/false/.test(match)) {
+          cls = 'json-bool-false';
+        } else if (/null/.test(match)) {
+          cls = 'json-null';
+        }
+        return '<span class="' + cls + '">' + escHtml(match) + '</span>';
+      });
+    }
+
+    function getFilteredRows() {
+      return ALL_ROWS.filter(function(r) {
+        if (currentFilter !== 'all' && r.status !== currentFilter) return false;
+        if (currentSearch) {
+          var q = currentSearch.toLowerCase();
+          var haystack = (r.filename + ' ' + (r.patternKey || '') + ' ' + (r.purchaserKey || '')).toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function render() {
+      var filtered = getFilteredRows();
+      var total = filtered.length;
+      var totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      var start = (currentPage - 1) * PAGE_SIZE;
+      var page = filtered.slice(start, start + PAGE_SIZE);
+
+      document.getElementById('results-info').textContent = 'Showing ' + (total === 0 ? 0 : start + 1) + '–' + Math.min(start + PAGE_SIZE, total) + ' of ' + total + ' results';
+
+      var tbody = document.getElementById('table-body');
+      if (page.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📂</div><p>No extraction results match your filter.</p></div></td></tr>';
+        document.getElementById('pagination-bar').innerHTML = '';
+        return;
+      }
+
+      var html = '';
+      page.forEach(function(r, idx) {
+        var globalIdx = start + idx;
+        var badge = r.status === 'success'
+          ? '<span class="badge badge-success">Success</span>'
+          : '<span class="badge badge-failed">Failed</span>';
+        var expandIcon = '<span class="expand-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>';
+        html += '<tr data-idx="' + globalIdx + '" data-row-key="row-' + globalIdx + '">';
+        html += '<td class="toggle-cell">' + expandIcon + '</td>';
+        html += '<td class="time-cell">' + escHtml(formatTime(r.mtime)) + '</td>';
+        html += '<td class="filename-cell">' + escHtml(r.filename) + '</td>';
+        html += '<td class="pattern-cell"><code>' + escHtml(r.patternKey || '—') + '</code></td>';
+        html += '<td style="font-size:0.75rem">' + escHtml(r.purchaserKey || '—') + '</td>';
+        html += '<td>' + badge + '</td>';
+        html += '</tr>';
+      });
+      tbody.innerHTML = html;
+
+      // Attach smooth in-place expand/collapse handlers
+      tbody.querySelectorAll('tr[data-idx]').forEach(function(tr) {
+        tr.addEventListener('click', function() {
+          var idx = parseInt(this.getAttribute('data-idx'), 10);
+          var existingExpand = tbody.querySelector('tr.expand-row[data-for="' + idx + '"]');
+          if (existingExpand) {
+            // Collapse: animate out then remove
+            var viewer = existingExpand.querySelector('.json-viewer');
+            if (viewer) {
+              viewer.style.animation = 'slideUp 0.22s cubic-bezier(0.5, 0, 0.75, 0) forwards';
+              viewer.addEventListener('animationend', function() {
+                if (existingExpand.parentNode) existingExpand.parentNode.removeChild(existingExpand);
+              }, { once: true });
+            } else {
+              existingExpand.parentNode.removeChild(existingExpand);
+            }
+            this.classList.remove('expanded');
+            expandedRows.delete(idx);
+          } else {
+            // Expand: show spinner immediately, then render JSON async
+            var clickedTr = this;
+            var r = getFilteredRows()[idx];
+            if (!r) return;
+
+            // Insert row with spinner right away
+            var expandTr = document.createElement('tr');
+            expandTr.className = 'expand-row';
+            expandTr.setAttribute('data-for', idx);
+            expandTr.innerHTML = '<td colspan="6"><div class="json-loader"><div class="json-spinner"></div><span>Loading JSON data…</span></div></td>';
+            clickedTr.parentNode.insertBefore(expandTr, clickedTr.nextSibling);
+            clickedTr.classList.add('expanded');
+            expandedRows.add(idx);
+
+            // Yield to browser to paint spinner, then do heavy work
+            setTimeout(function() {
+              var highlighted = syntaxHighlight(r.json);
+              var td = expandTr.querySelector('td');
+              if (td) {
+                td.innerHTML = '<div class="json-viewer"><pre>' + highlighted + '</pre></div>';
+              }
+            }, 0);
+          }
+        });
+      });
+
+      renderPagination(total, totalPages);
+    }
+
+    function renderPagination(total, totalPages) {
+      var bar = document.getElementById('pagination-bar');
+      if (totalPages <= 1) { bar.innerHTML = ''; return; }
+      var html = '';
+      html += '<button class="pg-btn" ' + (currentPage === 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')">&#8592; Prev</button>';
+      var s = Math.max(1, currentPage - 2);
+      var e = Math.min(totalPages, currentPage + 2);
+      if (s > 1) html += '<button class="pg-btn" onclick="goPage(1)">1</button><span style="color:var(--muted)">…</span>';
+      for (var i = s; i <= e; i++) {
+        html += '<button class="pg-btn ' + (i === currentPage ? 'active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+      }
+      if (e < totalPages) html += '<span style="color:var(--muted)">…</span><button class="pg-btn" onclick="goPage(' + totalPages + ')">' + totalPages + '</button>';
+      html += '<button class="pg-btn" ' + (currentPage === totalPages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')">Next &#8594;</button>';
+      bar.innerHTML = html;
+    }
+
+    function goPage(p) {
+      currentPage = p;
+      expandedRows.clear();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Tab buttons
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentFilter = this.getAttribute('data-filter');
+        currentPage = 1;
+        expandedRows.clear();
+        render();
+      });
+    });
+
+    // Search
+    var searchTimer;
+    document.getElementById('search-input').addEventListener('input', function() {
+      clearTimeout(searchTimer);
+      var val = this.value;
+      searchTimer = setTimeout(function() {
+        currentSearch = val;
+        currentPage = 1;
+        expandedRows.clear();
+        render();
+      }, 250);
+    });
+
+    render();
+  </script>
+</body>
+</html>`;
+}
+
 function buildSyncReportHtml() {
   const files = listStagingFiles(STAGING_DIR, STAGING_DIR, []);
   files.sort((a, b) => b.mtime - a.mtime);
@@ -440,6 +1087,7 @@ function buildSyncReportHtml() {
 <head>
   <meta charset="UTF-8">
   <title>Staging Inventory Report</title>
+  ${REPORT_FAVICON_DATA_URI ? `<link rel="icon" href="${REPORT_FAVICON_DATA_URI}" type="image/x-icon">` : ""}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -1391,12 +2039,140 @@ createServer(async (req, res) => {
   }
   if (req.method === "GET" && url === "/api/schedule-log") {
     try {
-      const entries = readScheduleLogEntries();
+      const q = new URL(req.url, `http://${req.headers.host}`).searchParams;
+      const page = parseInt(q.get("page") || "1", 10);
+      const limit = parseInt(q.get("limit") || "20", 10);
+      const allEntries = readScheduleLogEntries();
+      const total = allEntries.length;
+      const startIndex = (page - 1) * limit;
+      const entries = allEntries.slice(startIndex, startIndex + limit);
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ entries }));
+      res.end(JSON.stringify({ entries, total, page, limit }));
     } catch (e) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === "GET" && url === "/api/extraction-stats") {
+    try {
+      const stats = { success: 0, failed: 0, brands: {}, purchasers: {} };
+      const succDir = join(EXTRACTIONS_DIR, "succeeded");
+      const failDir = join(EXTRACTIONS_DIR, "failed");
+
+      const countDir = (dir, isSuccess) => {
+        if (!existsSync(dir)) return;
+        const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+        if (isSuccess) stats.success += files.length;
+        else stats.failed += files.length;
+
+        files.forEach((f) => {
+          const brand = f.split("_")[0];
+          if (brand) stats.brands[brand] = (stats.brands[brand] || 0) + 1;
+        });
+      };
+
+      countDir(succDir, true);
+      countDir(failDir, false);
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(stats));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === "GET" && url === "/api/extraction-results") {
+    try {
+      const q = new URL(req.url, `http://${req.headers.host}`).searchParams;
+      const page = parseInt(q.get("page") || "1", 10);
+      const limit = parseInt(q.get("limit") || "15", 10);
+      const status = q.get("status") || "all"; // all, success, failed
+      const search = (q.get("search") || "").toLowerCase();
+
+      let allFiles = [];
+      const succDir = join(EXTRACTIONS_DIR, "succeeded");
+      const failDir = join(EXTRACTIONS_DIR, "failed");
+
+      if (status === "all" || status === "success") {
+        if (existsSync(succDir)) {
+          allFiles = allFiles.concat(
+            readdirSync(succDir)
+              .filter((f) => f.endsWith(".json"))
+              .map((f) => ({
+                name: f,
+                status: "success",
+                path: join(succDir, f),
+              })),
+          );
+        }
+      }
+      if (status === "all" || status === "failed") {
+        if (existsSync(failDir)) {
+          allFiles = allFiles.concat(
+            readdirSync(failDir)
+              .filter((f) => f.endsWith(".json"))
+              .map((f) => ({
+                name: f,
+                status: "failed",
+                path: join(failDir, f),
+              })),
+          );
+        }
+      }
+
+      // Sort by modified time (latest first)
+      allFiles.sort((a, b) => {
+        try {
+          return statSync(b.path).mtimeMs - statSync(a.path).mtimeMs;
+        } catch (_) {
+          return 0;
+        }
+      });
+
+      if (search) {
+        allFiles = allFiles.filter((f) =>
+          f.name.toLowerCase().includes(search),
+        );
+      }
+
+      const total = allFiles.length;
+      const startIndex = (page - 1) * limit;
+      const paginated = allFiles.slice(startIndex, startIndex + limit);
+
+      // Load content for paginated results (minimal info)
+      const results = paginated.map((f) => {
+        let content = {};
+        try {
+          content = JSON.parse(readFileSync(f.path, "utf-8"));
+        } catch (_) {}
+        return {
+          filename: f.name,
+          status: f.status,
+          success: content.success,
+          patternKey: content.pattern?.pattern_key,
+          purchaserKey: content.pattern?.purchaser_key,
+          timestamp: statSync(f.path).mtime,
+        };
+      });
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ results, total, page, limit }));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === "GET" && url === "/api/extraction-data-page") {
+    try {
+      const html = buildExtractionDataPageHtml();
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Error generating page: " + e.message);
     }
     return;
   }
@@ -1747,21 +2523,39 @@ createServer(async (req, res) => {
       const contentType = format === "html" ? "text/html" : "application/json";
       const headers = {
         "Content-Type": contentType,
-        "Content-Disposition":
-          'attachment; filename="' + filename.replace(/"/g, '\\"') + '"',
         "Content-Length": stat.size,
       };
-      res.writeHead(200, headers);
-      req.setTimeout(0);
-      res.setTimeout(0);
-      const stream = createReadStream(filePath);
-      stream.on("error", (e) => {
-        if (!res.writableEnded) {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: String(e.message) }));
+      if (format === "html") {
+        // For HTML reports, we inject the favicon dynamically so old reports get it too
+        let content = readFileSync(filePath, "utf-8");
+        if (!content.includes('rel="icon"')) {
+          const faviconHtml = REPORT_FAVICON_DATA_URI
+            ? `<link rel="icon" href="${REPORT_FAVICON_DATA_URI}" type="image/x-icon">`
+            : "";
+          content = content.replace("<head>", "<head>\n  " + faviconHtml);
         }
-      });
-      stream.pipe(res);
+        res.writeHead(200, {
+          "Content-Type": "text/html",
+          "Content-Length": Buffer.byteLength(content),
+        });
+        res.end(content);
+      } else {
+        const headers = {
+          "Content-Type": contentType,
+          "Content-Length": stat.size,
+          "Content-Disposition":
+            'attachment; filename="' + filename.replace(/"/g, '\\"') + '"',
+        };
+        res.writeHead(200, headers);
+        const stream = createReadStream(filePath);
+        stream.on("error", (e) => {
+          if (!res.writableEnded) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: String(e.message) }));
+          }
+        });
+        stream.pipe(res);
+      }
     } catch (e) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: String(e.message) }));
@@ -1773,7 +2567,6 @@ createServer(async (req, res) => {
       const html = buildSyncReportHtml();
       res.writeHead(200, {
         "Content-Type": "text/html",
-        "Content-Disposition": 'attachment; filename="sync-report.html"',
       });
       res.end(html);
     } catch (e) {
