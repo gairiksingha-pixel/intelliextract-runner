@@ -1319,9 +1319,11 @@
         align-items: center;
         justify-content: center;
         z-index: 1000;
+        pointer-events: none;
       }
       .modal-overlay.open {
         display: flex;
+        pointer-events: all;
         animation: fadeIn 0.15s ease-out forwards;
       }
       @keyframes fadeIn {
@@ -3252,6 +3254,9 @@
 
         if (!overlay || !frame) return;
 
+        // Do not open a report view if an alert/confirmation modal is currently open
+        if (window._alertIsOpen) return;
+
         loader.style.display = "flex";
         frame.src = url;
         overlay.style.display = "flex";
@@ -4357,11 +4362,13 @@
         });
 
       function viewInventory() {
+        if (window._alertIsOpen) return;
         fetch("/api/staging-stats")
           .then(function (r) {
             return r.json();
           })
           .then(function (data) {
+            if (window._alertIsOpen) return;
             if (data.count === 0) {
               showAppAlert(
                 "No Inventory Data",
@@ -4373,6 +4380,7 @@
             }
           })
           .catch(function (err) {
+            if (window._alertIsOpen) return;
             showAppAlert(
               "Sync Error",
               "Failed to check inventory: " + err.message,
@@ -4382,11 +4390,13 @@
       }
 
       function viewOperationData() {
+        if (window._alertIsOpen) return;
         fetch("/api/extraction-stats")
           .then(function (r) {
             return r.json();
           })
           .then(function (data) {
+            if (window._alertIsOpen) return;
             if (data.success + data.failed === 0) {
               showAppAlert(
                 "No Operation Data",
@@ -4401,6 +4411,7 @@
             }
           })
           .catch(function (err) {
+            if (window._alertIsOpen) return;
             showAppAlert(
               "Sync Error",
               "Failed to check extraction data: " + err.message,
@@ -4410,12 +4421,14 @@
       }
 
       function viewLatestReport(format) {
+        if (window._alertIsOpen) return;
         fetch("/api/reports")
           .then(function (r) {
             if (!r.ok) throw new Error("Could not load report list");
             return r.json();
           })
           .then(function (list) {
+            if (window._alertIsOpen) return;
             var reports = list[format] || [];
             if (reports.length === 0) {
               showAppAlert(
@@ -4434,6 +4447,7 @@
             openReportView(url, "Run Summary (" + format.toUpperCase() + ")");
           })
           .catch(function (err) {
+            if (window._alertIsOpen) return;
             showAppAlert(
               "Sync Error",
               "Failed to open report: " + err.message,
@@ -6238,11 +6252,13 @@
 
           overlay.classList.add("open");
           overlay.setAttribute("aria-hidden", "false");
+          window._alertIsOpen = true;
         };
 
         window.closeAppAlert = function () {
           var overlay = document.getElementById("app-alert-modal-overlay");
           if (!overlay) return;
+          window._alertIsOpen = false;
           overlay.classList.add("closing");
           overlay.setAttribute("aria-hidden", "true");
           setTimeout(function () {
