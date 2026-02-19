@@ -368,17 +368,18 @@
       }
       .filter-dropdown-panel.open {
         display: block;
-        animation: dropdownSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: dropdownSlideDown 0.15s cubic-bezier(0.2, 0, 0, 1) forwards;
         transform-origin: top;
+        will-change: transform, opacity;
       }
       @keyframes dropdownSlideDown {
         from {
           opacity: 0;
-          transform: translateY(-8px) scaleY(0.95);
+          transform: translateY(-6px);
         }
         to {
           opacity: 1;
-          transform: translateY(0) scaleY(1);
+          transform: translateY(0);
         }
       }
       .filter-dropdown-option {
@@ -1313,9 +1314,7 @@
       .modal-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(15, 23, 42, 0.45);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
+        background: rgba(10, 18, 32, 0.6);
         display: none;
         align-items: center;
         justify-content: center;
@@ -1323,7 +1322,7 @@
       }
       .modal-overlay.open {
         display: flex;
-        animation: fadeIn 0.3s ease-out;
+        animation: fadeIn 0.15s ease-out forwards;
       }
       @keyframes fadeIn {
         from {
@@ -1356,40 +1355,43 @@
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
-        animation: modalScaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation: modalSlideUp 0.18s cubic-bezier(0.2, 0, 0, 1) forwards;
         overflow: hidden;
       }
-      @keyframes modalScaleUp {
+      .modal-overlay.open .modal,
+      .modal-overlay.closing .modal {
+        will-change: transform, opacity;
+      }
+      @keyframes modalSlideUp {
         from {
           opacity: 0;
-          transform: scale(0.9) translateY(20px);
+          transform: translateY(16px);
         }
         to {
           opacity: 1;
-          transform: scale(1) translateY(0);
+          transform: translateY(0);
         }
       }
-      @keyframes modalScaleDown {
+      @keyframes modalSlideDown {
         from {
           opacity: 1;
-          transform: scale(1) translateY(0);
+          transform: translateY(0);
         }
         to {
           opacity: 0;
-          transform: scale(0.9) translateY(20px);
+          transform: translateY(16px);
         }
       }
       .modal-overlay.closing {
-        animation: fadeOut 0.25s ease-in forwards;
+        animation: fadeOut 0.15s ease-in forwards;
       }
       .modal-overlay.closing .modal {
-        animation: modalScaleDown 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)
-          forwards;
+        animation: modalSlideDown 0.15s ease-in forwards;
       }
       @keyframes slideInRight {
         from {
           opacity: 0;
-          transform: translateX(20px);
+          transform: translateX(14px);
         }
         to {
           opacity: 1;
@@ -1399,7 +1401,7 @@
       @keyframes slideInLeft {
         from {
           opacity: 0;
-          transform: translateX(-20px);
+          transform: translateX(-14px);
         }
         to {
           opacity: 1;
@@ -1414,10 +1416,10 @@
         overflow: visible;
       }
       .modal-screen-animate.slide-right {
-        animation: slideInRight 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        animation: slideInRight 0.18s cubic-bezier(0.2, 0, 0, 1) forwards;
       }
       .modal-screen-animate.slide-left {
-        animation: slideInLeft 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        animation: slideInLeft 0.18s cubic-bezier(0.2, 0, 0, 1) forwards;
       }
       .modal-header {
         display: flex;
@@ -1979,6 +1981,62 @@
         background: var(--fail-bg);
         color: var(--fail);
       }
+      /* Report Overlay */
+      #report-view-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        z-index: 5000;
+        flex-direction: column;
+      }
+
+      @keyframes reportFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      #report-view-overlay.active {
+        display: flex;
+        animation: reportFadeIn 0.18s cubic-bezier(0.2, 0, 0, 1) forwards;
+        will-change: transform, opacity;
+      }
+      .report-overlay-body {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        position: relative;
+        background: var(--bg);
+      }
+      #report-view-frame {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+      }
+      #report-view-loader {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(248, 250, 252, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary);
+      }
     </style>
   </head>
   <body>
@@ -2340,6 +2398,20 @@
           <div id="extraction-pagination" class="pagination-wrap">
             <!-- Dynamic pagination buttons will be injected here -->
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inline Report View Overlay (Full Screen Navigation) -->
+    <div
+      id="report-view-overlay"
+      class="report-view-overlay"
+      aria-hidden="true"
+    >
+      <div class="report-overlay-body">
+        <iframe id="report-view-frame" title="Report Content"></iframe>
+        <div id="report-view-loader">
+          <div class="loading-dots"></div>
         </div>
       </div>
     </div>
@@ -3104,6 +3176,46 @@
             : Math.max(0, extractLimit),
         };
       }
+
+      function openReportView(url, title) {
+        var overlay = document.getElementById("report-view-overlay");
+        var frame = document.getElementById("report-view-frame");
+        var loader = document.getElementById("report-view-loader");
+
+        if (!overlay || !frame) return;
+
+        loader.style.display = "flex";
+        frame.src = url;
+        overlay.style.display = "flex";
+        overlay.classList.add("active");
+        overlay.setAttribute("aria-hidden", "false");
+
+        frame.onload = function () {
+          loader.style.display = "none";
+        };
+
+        // Push state to allow browser back button to close the report
+        var state = { mode: "report" };
+        history.pushState(state, "", "");
+      }
+      window.openReportView = openReportView;
+
+      function closeReportView() {
+        var overlay = document.getElementById("report-view-overlay");
+        if (!overlay) return;
+        overlay.style.display = "none";
+        overlay.classList.remove("active");
+        overlay.setAttribute("aria-hidden", "true");
+        document.getElementById("report-view-frame").src = "about:blank";
+      }
+      window.closeReportView = closeReportView;
+
+      window.addEventListener("popstate", function (event) {
+        var overlay = document.getElementById("report-view-overlay");
+        if (overlay && overlay.style.display === "flex") {
+          closeReportView();
+        }
+      });
 
       function attachSelectAll(panelId, onToggle) {
         var panel = document.getElementById(panelId);
@@ -4056,7 +4168,7 @@
           "download-sync-report-btn",
           "View staging inventory report",
           function (b) {
-            window.open("/api/sync-report", "_blank");
+            openReportView("/api/sync-report", "Staging Inventory");
           },
           ICON_INVENTORY,
         );
@@ -4074,7 +4186,10 @@
           "download-report-btn download-report-json-btn",
           "Explore extraction data — view full JSON responses",
           function (b) {
-            window.open("/api/extraction-data-page", "_blank");
+            openReportView(
+              "/api/extraction-data-page",
+              "Operation Data Explorer",
+            );
           },
           ICON_DATA,
         );
@@ -4168,7 +4283,7 @@
             var filename = latest.name;
             var url =
               "/api/reports/" + format + "/" + encodeURIComponent(filename);
-            window.open(url, "_blank");
+            openReportView(url, "Run Summary (" + format.toUpperCase() + ")");
           })
           .catch(function (err) {
             alert("Failed to open report: " + err.message);
@@ -4442,11 +4557,11 @@
           if (overlay.classList.contains("closing")) return;
           overlay.classList.add("closing");
           overlay.setAttribute("aria-hidden", "true");
-          // Wait for animation to finish (duration is 0.25s)
+          // Wait for animation to finish (duration is 0.15s)
           setTimeout(function () {
             overlay.classList.remove("open");
             overlay.classList.remove("closing");
-          }, 250);
+          }, 160);
         }
         window.closeScheduleModal = close;
         if (closeIcon) closeIcon.onclick = close;

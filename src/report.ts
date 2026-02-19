@@ -1041,18 +1041,47 @@ function htmlReportFromHistory(
     .page-body { padding: 0.75rem 0; }
     
     .report-header {
-      background: var(--surface);
-      color: var(--header-bg);
-      padding: 1.5rem 2rem;
-      border-radius: 0 0 var(--radius) var(--radius);
-      margin-bottom: 0.75rem;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 1rem 2rem;
+      border-radius: 0 0 16px 16px;
+      margin-bottom: 1rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border: 1px solid var(--border-light);
+      border: 1px solid rgba(176, 191, 201, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
       min-height: 72px;
     }
+    .btn-back-main {
+      background: var(--header-bg) !important;
+      color: white !important;
+      border: none;
+      border-radius: 8px;
+      height: 36px;
+      padding: 0 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace !important;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(33, 108, 109, 0.2);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .btn-back-main:hover {
+      background: var(--primary) !important;
+      transform: translateX(-4px);
+      box-shadow: 0 6px 16px rgba(45, 157, 95, 0.3);
+    }
+    .btn-back-main svg { width: 16px; height: 16px; transition: transform 0.2s; }
+    .btn-back-main:hover svg { transform: translateX(-2px); }
     .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
     .report-header .logo { height: 32px; width: auto; object-fit: contain; }
     .report-header-title {
@@ -1370,14 +1399,34 @@ function htmlReportFromHistory(
       
       const confirmMsg = "This will open the runner and automatically start retrying failures for: " + (purchaser || brand || "all") + ". Proceed?";
       if (window.confirm(confirmMsg)) {
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.location.href = url.toString();
+            return;
+          }
+        } catch (e) {}
         window.open(url.toString(), '_blank');
       }
     }
 
-    function goToHome() {
+    function goToHome() { 
+      try {
+        if (window.parent && typeof window.parent.closeReportView === 'function') {
+          window.parent.closeReportView();
+          return;
+        }
+      } catch (e) {}
       const baseUrl = window.location.protocol === 'file:' ? 'http://localhost:8765' : window.location.origin;
       window.location.href = baseUrl;
     }
+
+    // Push a history entry so pressing browser Back navigates home instead of leaving the app
+    if (window.history && window.history.pushState) {
+      history.pushState({ page: 'report' }, document.title, window.location.href);
+    }
+    window.addEventListener('popstate', function() {
+      goToHome();
+    });
   </script>
   <style>
     .report-header-left .logo { cursor: pointer; }
@@ -1391,7 +1440,13 @@ function htmlReportFromHistory(
       </a>
       <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
         <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-          <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <button type="button" onclick="goToHome()" class="btn-back-main">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Back</span>
+            </button>
+            <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
+          </div>
           <div class="report-header-right">
              <div class="header-filter-row">
                   <div class="header-field-wrap brand-field-wrap">
