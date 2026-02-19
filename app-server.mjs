@@ -2931,6 +2931,17 @@ createServer(async (req, res) => {
     }
     return;
   }
+  if (req.method === "GET" && url === "/api/staging-stats") {
+    try {
+      const files = listStagingFiles(STAGING_DIR, STAGING_DIR, []);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ count: files.length }));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
   if (req.method === "GET" && url === "/api/extraction-stats") {
     try {
       const stats = { success: 0, failed: 0, brands: {}, purchasers: {} };

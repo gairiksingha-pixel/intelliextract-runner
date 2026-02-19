@@ -2054,7 +2054,7 @@
           >
         </a>
         <div class="header-status-panel">
-          <span class="header-status-label" title="Current mission filter"
+          <span class="header-status-label" title="Current run filter"
             >Current Scope:</span
           >
           <span class="header-status-value" id="header-status-scope"
@@ -2278,6 +2278,74 @@
           >
             <span>Save</span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Application Alert Modal (Reusable replacement for alert()) -->
+    <div id="app-alert-modal-overlay" class="modal-overlay" aria-hidden="true">
+      <div
+        class="modal"
+        style="width: 420px; height: auto; max-height: 90vh; min-height: unset"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="app-alert-title"
+      >
+        <div class="modal-header" style="padding: 1rem 1.5rem">
+          <div class="modal-title" id="app-alert-title">
+            <span
+              class="title-badge"
+              id="app-alert-badge"
+              style="background: var(--primary)"
+              >INFO</span
+            >
+            <span id="app-alert-header-text" style="font-weight: 700"
+              >Notification</span
+            >
+          </div>
+          <button
+            type="button"
+            class="modal-close-icon"
+            onclick="closeAppAlert()"
+            aria-label="Close dialog"
+          >
+            &#10005;
+          </button>
+        </div>
+        <div
+          class="modal-body"
+          style="padding: 2rem 1.5rem; text-align: center"
+        >
+          <div
+            id="app-alert-message"
+            style="
+              margin-bottom: 1.5rem;
+              font-size: 1rem;
+              line-height: 1.6;
+              color: var(--text-secondary);
+              font-weight: 500;
+            "
+          ></div>
+          <div style="display: flex; justify-content: center; gap: 1rem">
+            <button
+              type="button"
+              class="btn-secondary"
+              id="app-alert-cancel-btn"
+              style="min-width: 110px; height: 42px; display: none"
+              onclick="closeAppAlert()"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="download-report-btn download-report-schedule-btn"
+              id="app-alert-confirm-btn"
+              style="min-width: 120px; height: 42px; border-radius: 10px"
+              onclick="closeAppAlert()"
+            >
+              <span id="app-alert-confirm-text">Dismiss</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -3490,209 +3558,250 @@
         var isNoLimit =
           (hasSyncLimit && syncIsZero) || (hasExtractLimit && extractIsZero);
         if (isNoLimit && !isResume) {
-          var proceed = window.confirm(
+          showAppAlert(
+            "High Load Warning",
             "Limit is set to 0 (no limit). This will process all files and may take a long time. Continue?",
-          );
-          if (!proceed) {
-            btn.disabled = false;
-            resetCase(resultDiv, { clearLimits: false });
-            restoreResetBtn();
-            return;
-          }
-        }
-        try {
-          var body = {
-            caseId: caseId,
-            syncLimit: params.syncLimit,
-            extractLimit: params.extractLimit,
-            retryFailed: !!(runOptions && runOptions.retryFailed),
-          };
-          if (isResume) {
-            body.resume = true;
-            if (
-              row &&
-              (row._resumeSync != null || row._resumeExtract != null)
-            ) {
-              if (row._resumeSync != null)
-                body.lastSyncDone = row._resumeSync.done;
-              if (row._resumeExtract != null)
-                body.lastExtractDone = row._resumeExtract.done;
-            }
-            if (row && row._resumeRunId) {
-              body.runId = row._resumeRunId;
-            }
-          }
-          if (tp.pairs && tp.pairs.length > 0) {
-            body.pairs = tp.pairs;
-            if (tp.pairs.length === 1) {
-              body.tenant = tp.pairs[0].tenant;
-              body.purchaser = tp.pairs[0].purchaser;
-            }
-          } else {
-            body.tenant = tp.tenant;
-            body.purchaser = tp.purchaser;
-          }
-          var r = await fetch("/run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-            signal: controller.signal,
-          });
-          if (!r.ok || !r.body) {
-            var errText = await r.text();
-            try {
-              var errJson = JSON.parse(errText);
-              if (errJson.error) errText = errJson.error;
-            } catch (_) {}
-            showResult(
-              resultDiv,
-              { exitCode: 1, stdout: "", stderr: errText },
-              false,
-              null,
-              null,
-              null,
-              caseId,
-              null,
-              null,
-              null, // logMessage
-            );
-            return;
-          }
-          var reader = r.body.getReader();
-          var decoder = new TextDecoder();
-          var buffer = "";
-          var data = null;
-          var lastSyncProgress = null;
-          var lastExtractionProgress = null;
-          var lastResumeSkipSync = null;
-          var lastResumeSkipExtract = null;
-          var lastLogMessage = null;
-          row._lastLogMessage = null;
-          while (true) {
-            var chunk = await reader.read();
-            if (chunk.done) break;
-            buffer += decoder.decode(chunk.value, { stream: true });
-            var lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-            for (var i = 0; i < lines.length; i++) {
-              var line = lines[i].trim();
-              if (!line) continue;
-              try {
-                var msg = JSON.parse(line);
-                if (msg.type === "progress" && msg.percent != null) {
-                  showResult(
-                    resultDiv,
-                    null,
-                    false,
-                    { percent: msg.percent, done: msg.done, total: msg.total },
-                    null,
-                    null,
-                    caseId,
-                    lastResumeSkipSync,
-                    lastResumeSkipExtract,
-                    lastLogMessage,
-                  );
-                } else if (msg.type === "log") {
-                  lastLogMessage = msg.message;
-                  if (row) row._lastLogMessage = msg.message;
-                  showResult(
-                    resultDiv,
-                    null,
-                    false,
-                    null,
-                    lastSyncProgress,
-                    lastExtractionProgress,
-                    caseId,
-                    lastResumeSkipSync,
-                    lastResumeSkipExtract,
-                    lastLogMessage,
-                  );
-                } else if (msg.type === "resume_skip_sync") {
-                  setSystemStatus(true, "Skipping Synced Files...");
-                  lastResumeSkipSync = {
-                    skipped: msg.skipped,
-                    total: msg.total,
-                  };
-                  showResult(
-                    resultDiv,
-                    null,
-                    false,
-                    null,
-                    lastSyncProgress,
-                    lastExtractionProgress,
-                    caseId,
-                    lastResumeSkipSync,
-                    lastResumeSkipExtract,
-                    lastLogMessage,
-                  );
-                } else if (msg.type === "resume_skip") {
-                  setSystemStatus(true, "Skipping Extracted Files...");
-                  lastResumeSkipExtract = {
-                    skipped: msg.skipped,
-                    total: msg.total,
-                  };
-                  showResult(
-                    resultDiv,
-                    null,
-                    false,
-                    null,
-                    lastSyncProgress,
-                    lastExtractionProgress,
-                    caseId,
-                    lastResumeSkipSync,
-                    lastResumeSkipExtract,
-                  );
-                } else if (msg.type === "sync_progress") {
-                  setSystemStatus(true, "Syncing Files...");
-                  lastSyncProgress = { done: msg.done, total: msg.total };
-                  showResult(
-                    resultDiv,
-                    null,
-                    false,
-                    null,
-                    lastSyncProgress,
-                    lastExtractionProgress,
-                    caseId,
-                    lastResumeSkipSync,
-                    lastResumeSkipExtract,
-                  );
-                } else if (msg.type === "extraction_progress") {
-                  setSystemStatus(true, "Extracting Files...");
-                  lastExtractionProgress = { done: msg.done, total: msg.total };
-                  showResult(
-                    resultDiv,
-                    null,
-                    false,
-                    null,
-                    lastSyncProgress,
-                    lastExtractionProgress,
-                    caseId,
-                    lastResumeSkipSync,
-                    lastResumeSkipExtract,
-                  );
-                } else if (msg.type === "run_id") {
-                  if (row) row._currentRunId = msg.runId;
-                } else if (msg.type === "result") {
-                  data = msg;
-                } else if (msg.error) {
-                  data = { exitCode: 1, stdout: "", stderr: msg.error };
+            {
+              isConfirm: true,
+              onConfirm: function () {
+                executeRun();
+              },
+              confirmText: "Continue",
+              onCancel: function () {
+                setSystemStatus(false);
+                if (row) {
+                  row.querySelectorAll("button.run").forEach(function (b) {
+                    b.disabled = false;
+                  });
+                } else {
+                  btn.disabled = false;
                 }
+                resetCase(resultDiv, { clearLimits: false });
+                restoreResetBtn();
+                setOtherRowsActive();
+              },
+            },
+          );
+          return;
+        }
+        executeRun();
+
+        async function executeRun() {
+          try {
+            var body = {
+              caseId: caseId,
+              syncLimit: params.syncLimit,
+              extractLimit: params.extractLimit,
+              retryFailed: !!(runOptions && runOptions.retryFailed),
+            };
+            if (isResume) {
+              body.resume = true;
+              if (
+                row &&
+                (row._resumeSync != null || row._resumeExtract != null)
+              ) {
+                if (row._resumeSync != null)
+                  body.lastSyncDone = row._resumeSync.done;
+                if (row._resumeExtract != null)
+                  body.lastExtractDone = row._resumeExtract.done;
+              }
+              if (row && row._resumeRunId) {
+                body.runId = row._resumeRunId;
+              }
+            }
+            if (tp.pairs && tp.pairs.length > 0) {
+              body.pairs = tp.pairs;
+              if (tp.pairs.length === 1) {
+                body.tenant = tp.pairs[0].tenant;
+                body.purchaser = tp.pairs[0].purchaser;
+              }
+            } else {
+              body.tenant = tp.tenant;
+              body.purchaser = tp.purchaser;
+            }
+            var r = await fetch("/run", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+              signal: controller.signal,
+            });
+            if (!r.ok || !r.body) {
+              var errText = await r.text();
+              try {
+                var errJson = JSON.parse(errText);
+                if (errJson.error) errText = errJson.error;
+              } catch (_) {}
+              showResult(
+                resultDiv,
+                { exitCode: 1, stdout: "", stderr: errText },
+                false,
+                null,
+                null,
+                null,
+                caseId,
+                null,
+                null,
+                null, // logMessage
+              );
+              return;
+            }
+            var reader = r.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = "";
+            var data = null;
+            var lastSyncProgress = null;
+            var lastExtractionProgress = null;
+            var lastResumeSkipSync = null;
+            var lastResumeSkipExtract = null;
+            var lastLogMessage = null;
+            row._lastLogMessage = null;
+            while (true) {
+              var chunk = await reader.read();
+              if (chunk.done) break;
+              buffer += decoder.decode(chunk.value, { stream: true });
+              var lines = buffer.split("\n");
+              buffer = lines.pop() || "";
+              for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line) continue;
+                try {
+                  var msg = JSON.parse(line);
+                  if (msg.type === "progress" && msg.percent != null) {
+                    showResult(
+                      resultDiv,
+                      null,
+                      false,
+                      {
+                        percent: msg.percent,
+                        done: msg.done,
+                        total: msg.total,
+                      },
+                      null,
+                      null,
+                      caseId,
+                      lastResumeSkipSync,
+                      lastResumeSkipExtract,
+                      lastLogMessage,
+                    );
+                  } else if (msg.type === "log") {
+                    lastLogMessage = msg.message;
+                    if (row) row._lastLogMessage = msg.message;
+                    showResult(
+                      resultDiv,
+                      null,
+                      false,
+                      null,
+                      lastSyncProgress,
+                      lastExtractionProgress,
+                      caseId,
+                      lastResumeSkipSync,
+                      lastResumeSkipExtract,
+                      lastLogMessage,
+                    );
+                  } else if (msg.type === "resume_skip_sync") {
+                    setSystemStatus(true, "Skipping Synced Files...");
+                    lastResumeSkipSync = {
+                      skipped: msg.skipped,
+                      total: msg.total,
+                    };
+                    showResult(
+                      resultDiv,
+                      null,
+                      false,
+                      null,
+                      lastSyncProgress,
+                      lastExtractionProgress,
+                      caseId,
+                      lastResumeSkipSync,
+                      lastResumeSkipExtract,
+                      lastLogMessage,
+                    );
+                  } else if (msg.type === "resume_skip") {
+                    setSystemStatus(true, "Skipping Extracted Files...");
+                    lastResumeSkipExtract = {
+                      skipped: msg.skipped,
+                      total: msg.total,
+                    };
+                    showResult(
+                      resultDiv,
+                      null,
+                      false,
+                      null,
+                      lastSyncProgress,
+                      lastExtractionProgress,
+                      caseId,
+                      lastResumeSkipSync,
+                      lastResumeSkipExtract,
+                    );
+                  } else if (msg.type === "sync_progress") {
+                    setSystemStatus(true, "Syncing Files...");
+                    lastSyncProgress = { done: msg.done, total: msg.total };
+                    showResult(
+                      resultDiv,
+                      null,
+                      false,
+                      null,
+                      lastSyncProgress,
+                      lastExtractionProgress,
+                      caseId,
+                      lastResumeSkipSync,
+                      lastResumeSkipExtract,
+                    );
+                  } else if (msg.type === "extraction_progress") {
+                    setSystemStatus(true, "Extracting Files...");
+                    lastExtractionProgress = {
+                      done: msg.done,
+                      total: msg.total,
+                    };
+                    showResult(
+                      resultDiv,
+                      null,
+                      false,
+                      null,
+                      lastSyncProgress,
+                      lastExtractionProgress,
+                      caseId,
+                      lastResumeSkipSync,
+                      lastResumeSkipExtract,
+                    );
+                  } else if (msg.type === "run_id") {
+                    if (row) row._currentRunId = msg.runId;
+                  } else if (msg.type === "result") {
+                    data = msg;
+                  } else if (msg.error) {
+                    data = { exitCode: 1, stdout: "", stderr: msg.error };
+                  }
+                } catch (_) {}
+              }
+            }
+            if (buffer.trim()) {
+              try {
+                var msg = JSON.parse(buffer.trim());
+                if (msg.type === "result") data = msg;
+                else if (msg.error)
+                  data = { exitCode: 1, stdout: "", stderr: msg.error };
               } catch (_) {}
             }
-          }
-          if (buffer.trim()) {
-            try {
-              var msg = JSON.parse(buffer.trim());
-              if (msg.type === "result") data = msg;
-              else if (msg.error)
-                data = { exitCode: 1, stdout: "", stderr: msg.error };
-            } catch (_) {}
-          }
-          if (!data) {
+            if (!data) {
+              showResult(
+                resultDiv,
+                { exitCode: 1, stdout: "", stderr: "No result from server" },
+                false,
+                null,
+                null,
+                null,
+                caseId,
+                null,
+                null,
+              );
+              return;
+            }
+            var expectFail = caseId.indexOf("N") === 0;
+            var pass = expectFail ? data.exitCode !== 0 : data.exitCode === 0;
             showResult(
               resultDiv,
-              { exitCode: 1, stdout: "", stderr: "No result from server" },
-              false,
+              data,
+              pass,
               null,
               null,
               null,
@@ -3700,118 +3809,105 @@
               null,
               null,
             );
-            return;
-          }
-          var expectFail = caseId.indexOf("N") === 0;
-          var pass = expectFail ? data.exitCode !== 0 : data.exitCode === 0;
-          showResult(
-            resultDiv,
-            data,
-            pass,
-            null,
-            null,
-            null,
-            caseId,
-            null,
-            null,
-          );
-        } catch (e) {
-          if (e.name === "AbortError") {
-            // If abort was triggered via a hard reset, fully reset UI/state and do not enter resume mode.
-            if (row && row._abortedByHardReset) {
-              row._abortedByHardReset = false;
-              if (row._resumeSync !== undefined) delete row._resumeSync;
-              if (row._resumeExtract !== undefined) delete row._resumeExtract;
-              if (row._resumeSyncLimit !== undefined)
-                delete row._resumeSyncLimit;
-              if (row._resumeExtractLimit !== undefined)
-                delete row._resumeExtractLimit;
-              resetCase(resultDiv);
+          } catch (e) {
+            if (e.name === "AbortError") {
+              // If abort was triggered via a hard reset, fully reset UI/state and do not enter resume mode.
+              if (row && row._abortedByHardReset) {
+                row._abortedByHardReset = false;
+                if (row._resumeSync !== undefined) delete row._resumeSync;
+                if (row._resumeExtract !== undefined) delete row._resumeExtract;
+                if (row._resumeSyncLimit !== undefined)
+                  delete row._resumeSyncLimit;
+                if (row._resumeExtractLimit !== undefined)
+                  delete row._resumeExtractLimit;
+                resetCase(resultDiv);
+              } else {
+                if (row) {
+                  row._aborted = true;
+                  row._resumeSync = lastSyncProgress;
+                  row._resumeExtract = lastExtractionProgress;
+                  if (row._currentRunId) row._resumeRunId = row._currentRunId;
+                  var limitInputs = row.querySelectorAll(
+                    ".limit-sync, .limit-extract",
+                  );
+                  limitInputs.forEach(function (input) {
+                    input.disabled = true;
+                  });
+                }
+                if (resetBtn) {
+                  resetBtn.innerHTML = ICON_RESUME + "<span>Resume</span>";
+                  resetBtn.classList.remove("stop-btn", "pause-btn");
+                  resetBtn.classList.add("resume-btn");
+                  resetBtn.onclick = function () {
+                    runCase(caseId, btn, resultDiv, { resume: true });
+                  };
+                }
+                var resetDuringResumeBtn = row
+                  ? row.querySelector(".reset-during-resume")
+                  : null;
+                if (resetDuringResumeBtn)
+                  resetDuringResumeBtn.classList.add("show-during-resume");
+                var syncDone =
+                  row && row._resumeSync ? row._resumeSync.done : 0;
+                var extDone =
+                  row && row._resumeExtract ? row._resumeExtract.done : 0;
+                var msg =
+                  "Stopped. Click Resume to continue from where you left off.";
+                if (syncDone > 0 || extDone > 0) {
+                  msg =
+                    "Stopped (sync: " +
+                    syncDone +
+                    ", extract: " +
+                    extDone +
+                    "). Click Resume to continue from the next file.";
+                }
+                resultDiv.className = "result result-placeholder";
+                resultDiv.innerHTML =
+                  '<span class="result-placeholder-text">' +
+                  escapeHtml(msg) +
+                  "</span>";
+              }
             } else {
-              if (row) {
-                row._aborted = true;
-                row._resumeSync = lastSyncProgress;
-                row._resumeExtract = lastExtractionProgress;
-                if (row._currentRunId) row._resumeRunId = row._currentRunId;
-                var limitInputs = row.querySelectorAll(
-                  ".limit-sync, .limit-extract",
-                );
-                limitInputs.forEach(function (input) {
-                  input.disabled = true;
-                });
-              }
-              if (resetBtn) {
-                resetBtn.innerHTML = ICON_RESUME + "<span>Resume</span>";
-                resetBtn.classList.remove("stop-btn", "pause-btn");
-                resetBtn.classList.add("resume-btn");
-                resetBtn.onclick = function () {
-                  runCase(caseId, btn, resultDiv, { resume: true });
-                };
-              }
+              showResult(
+                resultDiv,
+                { exitCode: 1, stdout: "", stderr: e.message },
+                false,
+                null,
+                null,
+                null,
+                caseId,
+                null,
+                null,
+              );
+              // Clear localStorage on error
+              try {
+                localStorage.removeItem("intelliextract-run-state-" + caseId);
+              } catch (_) {}
+            }
+          } finally {
+            setSystemStatus(false);
+            if (row) row._activeController = null;
+            if (row && row._aborted) {
+              row._aborted = false;
+              row.querySelectorAll("button.run").forEach(function (b) {
+                b.disabled = true;
+                b.title =
+                  "Please reset the download/extraction to start a new download/extraction";
+              });
+              setOtherRowsInactive(row, RESUME_OTHER_DISABLED_TITLE);
+            } else {
+              setOtherRowsActive();
+              restoreResetBtn();
               var resetDuringResumeBtn = row
                 ? row.querySelector(".reset-during-resume")
                 : null;
               if (resetDuringResumeBtn)
-                resetDuringResumeBtn.classList.add("show-during-resume");
-              var syncDone = row && row._resumeSync ? row._resumeSync.done : 0;
-              var extDone =
-                row && row._resumeExtract ? row._resumeExtract.done : 0;
-              var msg =
-                "Stopped. Click Resume to continue from where you left off.";
-              if (syncDone > 0 || extDone > 0) {
-                msg =
-                  "Stopped (sync: " +
-                  syncDone +
-                  ", extract: " +
-                  extDone +
-                  "). Click Resume to continue from the next file.";
-              }
-              resultDiv.className = "result result-placeholder";
-              resultDiv.innerHTML =
-                '<span class="result-placeholder-text">' +
-                escapeHtml(msg) +
-                "</span>";
+                resetDuringResumeBtn.classList.remove("show-during-resume");
+              // Clear localStorage on successful completion
+              try {
+                localStorage.removeItem("intelliextract-run-state-" + caseId);
+              } catch (_) {}
             }
-          } else {
-            showResult(
-              resultDiv,
-              { exitCode: 1, stdout: "", stderr: e.message },
-              false,
-              null,
-              null,
-              null,
-              caseId,
-              null,
-              null,
-            );
-            // Clear localStorage on error
-            try {
-              localStorage.removeItem("intelliextract-run-state-" + caseId);
-            } catch (_) {}
-          }
-        } finally {
-          setSystemStatus(false);
-          if (row) row._activeController = null;
-          if (row && row._aborted) {
-            row._aborted = false;
-            row.querySelectorAll("button.run").forEach(function (b) {
-              b.disabled = true;
-              b.title =
-                "Please reset the download/extraction to start a new download/extraction";
-            });
-            setOtherRowsInactive(row, RESUME_OTHER_DISABLED_TITLE);
-          } else {
-            setOtherRowsActive();
-            restoreResetBtn();
-            var resetDuringResumeBtn = row
-              ? row.querySelector(".reset-during-resume")
-              : null;
-            if (resetDuringResumeBtn)
-              resetDuringResumeBtn.classList.remove("show-during-resume");
-            // Clear localStorage on successful completion
-            try {
-              localStorage.removeItem("intelliextract-run-state-" + caseId);
-            } catch (_) {}
           }
         }
       }
@@ -4168,7 +4264,7 @@
           "download-sync-report-btn",
           "View staging inventory report",
           function (b) {
-            openReportView("/api/sync-report", "Staging Inventory");
+            viewInventory();
           },
           ICON_INVENTORY,
         );
@@ -4186,10 +4282,7 @@
           "download-report-btn download-report-json-btn",
           "Explore extraction data — view full JSON responses",
           function (b) {
-            openReportView(
-              "/api/extraction-data-page",
-              "Operation Data Explorer",
-            );
+            viewOperationData();
           },
           ICON_DATA,
         );
@@ -4263,6 +4356,59 @@
           });
         });
 
+      function viewInventory() {
+        fetch("/api/staging-stats")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            if (data.count === 0) {
+              showAppAlert(
+                "No Inventory Data",
+                "Staging is currently empty. Start a sync run to populate it.",
+                true,
+              );
+            } else {
+              openReportView("/api/sync-report", "Staging Inventory");
+            }
+          })
+          .catch(function (err) {
+            showAppAlert(
+              "Sync Error",
+              "Failed to check inventory: " + err.message,
+              true,
+            );
+          });
+      }
+
+      function viewOperationData() {
+        fetch("/api/extraction-stats")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            if (data.success + data.failed === 0) {
+              showAppAlert(
+                "No Operation Data",
+                "No extraction data found. Start an extraction run first.",
+                true,
+              );
+            } else {
+              openReportView(
+                "/api/extraction-data-page",
+                "Operation Data Explorer",
+              );
+            }
+          })
+          .catch(function (err) {
+            showAppAlert(
+              "Sync Error",
+              "Failed to check extraction data: " + err.message,
+              true,
+            );
+          });
+      }
+
       function viewLatestReport(format) {
         fetch("/api/reports")
           .then(function (r) {
@@ -4272,10 +4418,12 @@
           .then(function (list) {
             var reports = list[format] || [];
             if (reports.length === 0) {
-              alert(
+              showAppAlert(
+                "No Reports Found",
                 "No " +
                   (format === "html" ? "summary" : "extraction") +
-                  " report found. Run a case first to generate reports.",
+                  " reports are currently available. Start a run first to generate them.",
+                true,
               );
               return;
             }
@@ -4286,7 +4434,11 @@
             openReportView(url, "Run Summary (" + format.toUpperCase() + ")");
           })
           .catch(function (err) {
-            alert("Failed to open report: " + err.message);
+            showAppAlert(
+              "Sync Error",
+              "Failed to open report: " + err.message,
+              true,
+            );
           });
       }
 
@@ -4328,7 +4480,8 @@
             URL.revokeObjectURL(a.href);
           })
           .catch(function (err) {
-            if (typeof err.message === "string") alert(err.message);
+            if (typeof err.message === "string")
+              showAppAlert("Download Error", err.message, true);
           })
           .then(function () {
             if (btn) btn.disabled = false;
@@ -4345,10 +4498,12 @@
           .then(function (list) {
             var reports = list[format] || [];
             if (reports.length === 0) {
-              alert(
+              showAppAlert(
+                "Download unavailable",
                 "No " +
                   (format === "html" ? "summary" : "extraction") +
-                  " report found. Run a case first to generate reports.",
+                  " report found. Start a run first to generate downloadable files.",
+                true,
               );
               if (btn) btn.disabled = false;
               return;
@@ -4380,16 +4535,22 @@
                 if (btn) btn.disabled = false;
               })
               .catch(function (err) {
-                alert("Download failed: " + err.message);
+                showAppAlert(
+                  "Download Error",
+                  "Download failed: " + err.message,
+                  true,
+                );
                 if (btn) btn.disabled = false;
               });
           })
           .catch(function (err) {
-            alert(
+            showAppAlert(
+              "Download Error",
               "Download failed: " +
                 (err && err.message
                   ? err.message
                   : "Could not fetch report list."),
+              true,
             );
           })
           .then(function () {
@@ -4777,19 +4938,19 @@
             var container = document.getElementById("extraction-stats");
             if (!container) return;
             container.innerHTML = `
-              <div class="stat-card">
-                <div class="stat-label">Total Extractions</div>
-                <div class="stat-value">${data.success + data.failed}</div>
-              </div>
-              <div class="stat-card success-card">
-                <div class="stat-label">Success Rate</div>
-                <div class="stat-value">${Math.round((data.success / (data.success + data.failed || 1)) * 100)}%</div>
-              </div>
-              <div class="stat-card failed-card">
-                <div class="stat-label">Critical Issues</div>
-                <div class="stat-value">${data.failed}</div>
-              </div>
-            `;
+                <div class="stat-card">
+                  <div class="stat-label">Total Extractions</div>
+                  <div class="stat-value">${data.success + data.failed}</div>
+                </div>
+                <div class="stat-card success-card">
+                  <div class="stat-label">Success Rate</div>
+                  <div class="stat-value">${Math.round((data.success / (data.success + data.failed || 1)) * 100)}%</div>
+                </div>
+                <div class="stat-card failed-card">
+                  <div class="stat-label">Critical Issues</div>
+                  <div class="stat-value">${data.failed}</div>
+                </div>
+              `;
           });
       }
 
@@ -4833,12 +4994,12 @@
               : '<span class="badge badge-failed">Failed</span>';
           var time = r.timestamp ? new Date(r.timestamp).toLocaleString() : "—";
           html += `<tr class="row-${r.status}">
-            <td style="white-space:nowrap; font-size: 0.75rem">${escapeHtml(time)}</td>
-            <td style="font-size:0.75rem; color:var(--text); word-break: break-all">${escapeHtml(r.filename)}</td>
-            <td><code style="background:var(--bg); padding:2px 4px; border-radius:3px; font-size:0.7rem">${escapeHtml(r.patternKey || "—")}</code></td>
-            <td style="font-size: 0.75rem">${escapeHtml(formatPurchaserName(r.purchaserKey) || "—")}</td>
-            <td style="text-align:center">${badge}</td>
-          </tr>`;
+              <td style="white-space:nowrap; font-size: 0.75rem">${escapeHtml(time)}</td>
+              <td style="font-size:0.75rem; color:var(--text); word-break: break-all">${escapeHtml(r.filename)}</td>
+              <td><code style="background:var(--bg); padding:2px 4px; border-radius:3px; font-size:0.7rem">${escapeHtml(r.patternKey || "—")}</code></td>
+              <td style="font-size: 0.75rem">${escapeHtml(formatPurchaserName(r.purchaserKey) || "—")}</td>
+              <td style="text-align:center">${badge}</td>
+            </tr>`;
         });
         html += "</tbody></table>";
         container.innerHTML = html;
@@ -4930,9 +5091,16 @@
             var tr = btn.closest("tr");
             var id = tr && tr.getAttribute("data-sched-id");
             if (!id) return;
-            if (!window.confirm("Delete this schedule? This cannot be undone."))
-              return;
-            deleteSchedule(id);
+            showAppAlert(
+              "Delete Schedule",
+              "Are you sure you want to delete this schedule? This action cannot be undone.",
+              {
+                isConfirm: true,
+                onConfirm: function () {
+                  deleteSchedule(id);
+                },
+              },
+            );
           });
         });
       }
@@ -5948,12 +6116,18 @@
                 for (var i = 0; i < emails.length; i++) {
                   var emailToTest = emails[i];
                   if (!emailToTest) {
-                    alert("List contains empty email entry.");
+                    showAppAlert(
+                      "Validation Error",
+                      "List contains empty email entry.",
+                      true,
+                    );
                     return;
                   }
                   if (!emailRegex.test(emailToTest)) {
-                    alert(
+                    showAppAlert(
+                      "Invalid Email",
                       '"' + emailToTest + '" is not a valid email address.',
+                      true,
                     );
                     return;
                   }
@@ -5974,14 +6148,26 @@
                 })
                 .then(function (data) {
                   if (data.success) {
-                    alert("Notification settings saved successfully!");
+                    showAppAlert(
+                      "Settings Saved",
+                      "Notification settings saved successfully!",
+                      false,
+                    );
                     close();
                   } else {
-                    alert("Failed to save.");
+                    showAppAlert(
+                      "Save Failed",
+                      "Failed to save settings.",
+                      true,
+                    );
                   }
                 })
                 .catch(function (e) {
-                  alert("Network error: " + e.message);
+                  showAppAlert(
+                    "Network Error",
+                    "Network error: " + e.message,
+                    true,
+                  );
                 })
                 .finally(function () {
                   saveBtn.disabled = false;
@@ -5991,9 +6177,93 @@
           }
         }
         initNotificationModal();
+
+        // Application Alert Modal Helper
+        var currentConfirmCallback = null;
+        window.showAppAlert = function (title, message, options) {
+          var overlay = document.getElementById("app-alert-modal-overlay");
+          var headerText = document.getElementById("app-alert-header-text");
+          var msgEl = document.getElementById("app-alert-message");
+          var badge = document.getElementById("app-alert-badge");
+          var cancelBtn = document.getElementById("app-alert-cancel-btn");
+          var confirmBtn = document.getElementById("app-alert-confirm-btn");
+          var confirmText = document.getElementById("app-alert-confirm-text");
+
+          if (!overlay || !msgEl) return;
+
+          // Normalize options
+          if (typeof options === "boolean") {
+            options = { isError: options };
+          }
+          options = options || {};
+
+          headerText.textContent = title || "Notification";
+          msgEl.textContent = message || "";
+
+          if (badge) {
+            badge.textContent = options.isError
+              ? "ERROR"
+              : options.isConfirm
+                ? "CONFIRM"
+                : "INFO";
+            badge.style.background = options.isError
+              ? "#c62828"
+              : "var(--primary)";
+          }
+
+          if (options.isConfirm) {
+            cancelBtn.style.display = "block";
+            cancelBtn.textContent = options.cancelText || "Cancel";
+            confirmText.textContent = options.confirmText || "Confirm";
+            currentConfirmCallback = options.onConfirm || null;
+          } else {
+            cancelBtn.style.display = "none";
+            confirmText.textContent = "Dismiss";
+            currentConfirmCallback = null;
+          }
+
+          confirmBtn.onclick = function () {
+            if (currentConfirmCallback) {
+              currentConfirmCallback();
+            }
+            closeAppAlert();
+          };
+
+          cancelBtn.onclick = function () {
+            if (options.onCancel) {
+              options.onCancel();
+            }
+            closeAppAlert();
+          };
+
+          overlay.classList.add("open");
+          overlay.setAttribute("aria-hidden", "false");
+        };
+
+        window.closeAppAlert = function () {
+          var overlay = document.getElementById("app-alert-modal-overlay");
+          if (!overlay) return;
+          overlay.classList.add("closing");
+          overlay.setAttribute("aria-hidden", "true");
+          setTimeout(function () {
+            overlay.classList.remove("open");
+            overlay.classList.remove("closing");
+          }, 160);
+        };
       })();
       window.stopBackgroundJob = function (caseId) {
-        if (confirm("Are you sure you want to stop auto extraction?")) {
+        showAppAlert(
+          "Stop Operation",
+          "Are you sure you want to stop development extraction? This will terminate the currently running background process.",
+          {
+            isConfirm: true,
+            onConfirm: function () {
+              executeStop();
+            },
+          },
+        );
+
+        function executeStop() {
           var resultDiv = document.getElementById("result-" + caseId);
           var tbody = document.getElementById("rows");
           var caseRow = tbody
@@ -6020,7 +6290,11 @@
             })
             .then(function (data) {
               if (data.error) {
-                alert("Error stopping auto extraction: " + data.error);
+                showAppAlert(
+                  "Stop Error",
+                  "Error stopping auto extraction: " + data.error,
+                  true,
+                );
                 if (resetBtn) {
                   resetBtn.disabled = false;
                   resetBtn.innerHTML =
@@ -6049,7 +6323,11 @@
               }
             })
             .catch(function (e) {
-              alert("Network error: " + e.message);
+              showAppAlert(
+                "Network Error",
+                "Network error: " + e.message,
+                true,
+              );
               if (resetBtn) {
                 resetBtn.disabled = false;
                 resetBtn.innerHTML =

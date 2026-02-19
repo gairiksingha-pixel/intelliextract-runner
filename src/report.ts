@@ -770,6 +770,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   const successBadge = `<span class="badge-status success">${displaySuccess} SUCCESS</span>`;
   const apiFailBadge = `<span class="badge-status secondary">${displayApiFailed} API FAIL</span>`;
   const infraFailBadge = `<span class="badge-status fail">${displayInfraFailed} INFRA FAIL</span>`;
+  const itemCountBadge = `<span class="badge-status secondary" style="background: rgba(33, 108, 109, 0.1); color: var(--header-bg); border: 1px solid rgba(33, 108, 109, 0.2);">${processed} ITEMS</span>`;
 
   // Create full log rows from records
   const fullLogRows = entry.records
@@ -797,7 +798,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       <div style="padding: 1.5rem 0;">
         <div class="log-search-container">
           <input type="text" placeholder="Search files, patterns, or status..." onkeyup="filterSectionLog(this)">
-          <span>Showing results for this mission</span>
+          <span>Showing results for this run</span>
         </div>
         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
           <table class="log-table">
@@ -858,16 +859,16 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       : "";
 
   return `
-  <details class="${sectionClass}" data-brand="${entry.brand || ""}" data-purchaser="${entry.purchaser || ""}">
+  <details class="${sectionClass}" data-brand="${entry.brand || ""}" data-purchaser="${entry.purchaser || ""}" data-items="${processed}">
   <summary class="run-section-summary">
     <div class="summary-content">
-      <div class="mission-pointer">
+      <div class="operation-pointer">
         ${runBadge}
         ${brandLabel}${purchaserBadge}
         <span class="run-time">${escapeHtml(runLabel)}</span>
       </div>
       <div class="summary-badges">
-        ${successBadge} ${apiFailBadge} ${infraFailBadge}
+        ${itemCountBadge} ${successBadge} ${apiFailBadge} ${infraFailBadge}
       </div>
     </div>
   </summary>
@@ -1133,7 +1134,7 @@ function htmlReportFromHistory(
     
     .summary-content { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
     
-    .mission-pointer {
+    .operation-pointer {
       display: flex;
       align-items: center;
       gap: 0.75rem;
@@ -1146,6 +1147,99 @@ function htmlReportFromHistory(
       text-transform: uppercase;
       letter-spacing: 0.05em;
       filter: drop-shadow(0 0 1.5px rgba(0,0,0,0.4));
+    }
+
+    /* Custom Alert Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 18, 32, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 5000;
+      animation: fadeIn 0.15s ease-out forwards;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-overlay.closing { animation: fadeOut 0.15s ease-in forwards; }
+    
+    .modal {
+      background: var(--surface);
+      border-radius: calc(var(--radius) * 1.5);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0,0,0,0.05);
+      width: 420px;
+      max-width: 90vw;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      animation: modalSlideUp 0.18s cubic-bezier(0.2, 0, 0, 1) forwards;
+      overflow: hidden;
+    }
+    .modal-overlay.closing .modal { animation: modalSlideDown 0.15s ease-in forwards; }
+
+    .modal-header {
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .modal-title { display: flex; align-items: center; gap: 0.75rem; }
+    .title-badge {
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: white;
+      text-transform: uppercase;
+    }
+    .modal-body { padding: 2rem 1.5rem; text-align: center; }
+    .modal-message { 
+      margin-bottom: 1.5rem; 
+      font-size: 1rem; 
+      line-height: 1.6; 
+      color: var(--text-secondary); 
+      font-weight: 500; 
+    }
+    .modal-footer { display: flex; justify-content: center; gap: 1rem; }
+
+    .btn-alert-confirm {
+      background: var(--header-bg);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      height: 42px;
+      padding: 0 1.5rem;
+      font-weight: 700;
+      cursor: pointer;
+      min-width: 120px;
+      transition: all 0.2s;
+    }
+    .btn-alert-confirm:hover { background: var(--primary); transform: translateY(-1px); }
+    .btn-alert-cancel {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      height: 42px;
+      padding: 0 1.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-width: 110px;
+      transition: all 0.2s;
+    }
+    .btn-alert-cancel:hover { background: #e2e8f0; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes modalSlideUp { 
+      from { opacity: 0; transform: translateY(16px); } 
+      to { opacity: 1; transform: translateY(0); } 
+    }
+    @keyframes modalSlideDown { 
+      from { opacity: 1; transform: translateY(0); } 
+      to { opacity: 0; transform: translateY(16px); } 
     }
     
     .batch-id { background: rgba(255,255,255,0.2) !important; color: white !important; border: 1px solid rgba(255,255,255,0.3) !important; padding: 0.1rem 0.4rem !important; font-family: monospace; }
@@ -1386,6 +1480,28 @@ function htmlReportFromHistory(
 
     @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
   </style>
+  <!-- Custom Alert Modal -->
+  <div id="app-alert-modal-overlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="app-alert-title">
+      <div class="modal-header">
+        <div class="modal-title" id="app-alert-title">
+          <span class="title-badge" id="app-alert-badge">INFO</span>
+          <span id="app-alert-header-text" style="font-weight: 700">Notification</span>
+        </div>
+        <button type="button" style="background:transparent; border:none; cursor:pointer; font-size:1.2rem;" onclick="closeAppAlert()">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div id="app-alert-message" class="modal-message"></div>
+        <div class="modal-footer">
+           <button type="button" class="btn-alert-cancel" id="app-alert-cancel-btn" onclick="closeAppAlert()">Cancel</button>
+           <button type="button" class="btn-alert-confirm" id="app-alert-confirm-btn">
+             <span id="app-alert-confirm-text">Dismiss</span>
+           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
     function triggerRetry(brand, purchaser) {
@@ -1398,15 +1514,83 @@ function htmlReportFromHistory(
       url.searchParams.set('autoRun', 'true');
       
       const confirmMsg = "This will open the runner and automatically start retrying failures for: " + (purchaser || brand || "all") + ". Proceed?";
-      if (window.confirm(confirmMsg)) {
-        try {
-          if (window.parent && window.parent !== window) {
-            window.parent.location.href = url.toString();
-            return;
-          }
-        } catch (e) {}
-        window.open(url.toString(), '_blank');
+      
+      showAppAlert("Retry Failures", confirmMsg, {
+        isConfirm: true,
+        confirmText: "Proceed",
+        onConfirm: function() {
+          try {
+            if (window.parent && window.parent !== window) {
+              window.parent.location.href = url.toString();
+              return;
+            }
+          } catch (e) {}
+          window.open(url.toString(), '_blank');
+        }
+      });
+    }
+
+    // Modal Helpers
+    let currentConfirmCallback = null;
+    function showAppAlert(title, message, options) {
+      // Proxy to parent if possible for better experience
+      try {
+        if (window.parent && typeof window.parent.showAppAlert === 'function') {
+          window.parent.showAppAlert(title, message, options);
+          return;
+        }
+      } catch (e) {}
+
+      const overlay = document.getElementById("app-alert-modal-overlay");
+      const headerText = document.getElementById("app-alert-header-text");
+      const msgEl = document.getElementById("app-alert-message");
+      const badge = document.getElementById("app-alert-badge");
+      const cancelBtn = document.getElementById("app-alert-cancel-btn");
+      const confirmBtn = document.getElementById("app-alert-confirm-btn");
+      const confirmText = document.getElementById("app-alert-confirm-text");
+
+      if (!overlay || !msgEl) return;
+
+      if (typeof options === "boolean") options = { isError: options };
+      options = options || {};
+
+      headerText.textContent = title || "Notification";
+      msgEl.textContent = message || "";
+      
+      if (badge) {
+        badge.textContent = options.isError ? "ERROR" : (options.isConfirm ? "CONFIRM" : "INFO");
+        badge.style.background = options.isError ? "#ef4444" : "var(--header-bg)";
       }
+
+      if (options.isConfirm) {
+        cancelBtn.style.display = "block";
+        cancelBtn.textContent = options.cancelText || "Cancel";
+        confirmText.textContent = options.confirmText || "Confirm";
+        currentConfirmCallback = options.onConfirm || null;
+      } else {
+        cancelBtn.style.display = "none";
+        confirmText.textContent = "Dismiss";
+        currentConfirmCallback = null;
+      }
+
+      confirmBtn.onclick = function() {
+        if (currentConfirmCallback) currentConfirmCallback();
+        closeAppAlert();
+      };
+
+      overlay.classList.add("open");
+      overlay.setAttribute("aria-hidden", "false");
+    }
+
+    function closeAppAlert() {
+      const overlay = document.getElementById("app-alert-modal-overlay");
+      if (!overlay) return;
+      overlay.classList.add("closing");
+      overlay.setAttribute("aria-hidden", "true");
+      setTimeout(function () {
+        overlay.classList.remove("open");
+        overlay.classList.remove("closing");
+      }, 160);
     }
 
     function goToHome() { 
@@ -1496,7 +1680,7 @@ function htmlReportFromHistory(
     <div id="dashboard" class="tab-content active">
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-label">Total Processed</div>
+          <div class="stat-label">Total Items Processed</div>
           <div class="stat-value">${historicalSummaries.reduce((a, b) => a + b.metrics.success + b.metrics.failed, 0)}</div>
         </div>
         <div class="stat-card success">
@@ -2067,6 +2251,7 @@ export function writeReports(config: Config, summary: ExecutiveSummary): void {
             response: e.response,
             extractionSuccess: e.extractionSuccess,
           })),
+          itemCount: processed,
         };
       });
       const jsonPayload = {
