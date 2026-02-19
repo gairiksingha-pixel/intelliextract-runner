@@ -517,33 +517,46 @@ function buildExtractionDataPageHtml() {
     * { box-sizing: border-box; }
     body {
       font-family: 'JetBrains Mono', 'Consolas', monospace;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 1rem;
       background: var(--bg);
       color: var(--text);
-      margin: 0;
-      padding: 0;
       font-size: 13px;
     }
-    .page-header {
+    .report-header {
       background: var(--surface);
-      border-bottom: 1px solid var(--border-light);
-      padding: 1.25rem 2rem;
+      color: var(--header-bg);
+      padding: 1.5rem 2rem;
+      border-radius: 0 0 var(--radius) var(--radius);
+      margin-bottom: 0.75rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border: 1px solid var(--border-light);
+      min-height: 72px;
     }
-    .page-header-left { display: flex; align-items: center; gap: 1.25rem; }
-    .page-header-logo { height: 28px; width: auto; object-fit: contain; }
-    .page-title-wrap { display: flex; flex-direction: column; gap: 0.1rem; }
-    .page-title { font-size: 1.1rem; font-weight: 800; color: var(--header-bg); margin: 0; text-transform: uppercase; letter-spacing: 0.08em; }
-    .page-subtitle { font-size: 0.7rem; color: var(--muted); font-weight: 500; }
-    .page-meta { font-size: 0.7rem; color: var(--muted); text-align: right; }
-    .page-meta strong { color: var(--header-bg); }
+    .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
+    .report-header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
+    .report-header-title {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #ffffff;
+      background: var(--header-bg);
+      padding: 0.45rem 1.1rem;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      line-height: 1.3;
+    }
+    .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
+    .meta p { margin: 2px 0; }
 
-    .page-body { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .page-body { padding: 0.75rem 0; }
 
     .stats-grid {
       display: grid;
@@ -829,17 +842,16 @@ function buildExtractionDataPageHtml() {
   </style>
 </head>
 <body>
-  <div class="page-header">
-    <div class="page-header-left">
-      ${REPORT_LOGO_DATA_URI ? `<img src="${REPORT_LOGO_DATA_URI}" alt="logo" class="page-header-logo">` : ""}
-      <div class="page-title-wrap">
-        <div class="page-title">Operation Data Explorer</div>
-        <div class="page-subtitle">Extraction results — click any row to expand full JSON response</div>
-      </div>
+  <div class="report-header">
+    <div class="report-header-left">
+      <a href="/" title="Go to Home" style="display: flex; align-items: center;">
+        <img src="${REPORT_LOGO_DATA_URI}" alt="logo" class="logo">
+      </a>
+      <h1 class="report-header-title">Operation Data Explorer</h1>
     </div>
-    <div class="page-meta">
-      <p>Generated: <strong>${escHtml(now)}</strong></p>
-      <p>Total records: <strong>${totalAll}</strong></p>
+    <div class="meta">
+      <p>Generated: ${now}</p>
+      <p>Total Operations: ${totalAll}</p>
     </div>
   </div>
 
@@ -1176,11 +1188,12 @@ function buildSyncReportHtml() {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staging Inventory Report</title>
   ${REPORT_FAVICON_DATA_URI ? `<link rel="icon" href="${REPORT_FAVICON_DATA_URI}" type="image/x-icon">` : ""}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -1198,28 +1211,51 @@ function buildSyncReportHtml() {
       --radius: 12px;
       --radius-sm: 8px;
     }
-    body { font-family: 'JetBrains Mono', 'Consolas', monospace; max-width: 1250px; margin: 0 auto; padding: 0 1rem; color: var(--text); background: var(--bg); }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', 'Consolas', monospace;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 1rem;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+    }
     
     .report-header {
       background: var(--surface);
       color: var(--header-bg);
       padding: 1.5rem 2rem;
       border-radius: 0 0 var(--radius) var(--radius);
-      margin-bottom: 2rem;
+      margin-bottom: 0.75rem;
       box-shadow: 0 4px 15px rgba(0,0,0,0.05);
       display: flex;
       align-items: center;
       justify-content: space-between;
       border: 1px solid var(--border-light);
+      min-height: 72px;
     }
-    .report-header-left { display: flex; align-items: center; gap: 1.5rem; }
+    .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
     .report-header .logo { height: 32px; width: auto; object-fit: contain; }
-    .report-header-title { margin: 0; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+    .report-header-title {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #ffffff;
+      background: var(--header-bg);
+      padding: 0.45rem 1.1rem;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      line-height: 1.3;
+    }
     
     .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
     .meta p { margin: 2px 0; }
     
-    .dashboard-grid { margin-bottom: 2rem; }
+    .page-body { padding: 0.75rem 0; }
     .chart-card { 
       background: var(--surface);
       border: 1px solid var(--border-light);
@@ -1286,7 +1322,9 @@ function buildSyncReportHtml() {
 <body>
   <div class="report-header">
     <div class="report-header-left">
-      <img src="${REPORT_LOGO_DATA_URI}" alt="logo" class="logo">
+      <a href="/" title="Go to Home" style="display: flex; align-items: center;">
+        <img src="${REPORT_LOGO_DATA_URI}" alt="logo" class="logo">
+      </a>
       <h1 class="report-header-title">Staging Inventory Report</h1>
     </div>
     <div class="meta">
@@ -1295,21 +1333,23 @@ function buildSyncReportHtml() {
     </div>
   </div>
 
-  <div class="dashboard-grid">
-    <div class="chart-card">
-      <h4>Download History (Last 30 Batches)</h4>
-      <div class="chart-container">
-        <canvas id="historyChart"></canvas>
+  <div class="page-body">
+    <div class="dashboard-grid">
+      <div class="chart-card">
+        <h4>Download History (Last 30 Batches)</h4>
+        <div class="chart-container">
+          <canvas id="historyChart"></canvas>
+        </div>
       </div>
     </div>
-  </div>
 
-  <h3 id="files-title">Current Staging Files</h3>
-  <table id="files-table">
-    <thead><tr><th>Path (staging)</th><th>Size (bytes)</th><th>Modified</th></tr></thead>
-    <tbody id="files-body"></tbody>
-  </table>
-  <div id="pagination" class="pagination"></div>
+    <h3 id="files-title">Current Staging Files</h3>
+    <table id="files-table">
+      <thead><tr><th>Path (staging)</th><th>Size (bytes)</th><th>Modified</th></tr></thead>
+      <tbody id="files-body"></tbody>
+    </table>
+    <div id="pagination" class="pagination"></div>
+  </div>
 
   <script>
     const historyData = ${historyData};

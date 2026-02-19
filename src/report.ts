@@ -973,11 +973,12 @@ function htmlReportFromHistory(
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(REPORT_TITLE)}</title>
   ${faviconDataUri ? `<link rel="icon" href="${faviconDataUri}" type="image/x-icon">` : ""}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #f5f7f9;
@@ -995,29 +996,54 @@ function htmlReportFromHistory(
       --radius: 12px;
       --radius-sm: 8px;
     }
-    body { font-family: 'JetBrains Mono', 'Consolas', monospace; max-width: 1250px; margin: 0 auto; padding: 0 1rem; color: var(--text); background: var(--bg); }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', 'Consolas', monospace;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 1rem;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+    }
+    .page-body { padding: 0.75rem 0; }
     
     .report-header {
       background: var(--surface);
       color: var(--header-bg);
       padding: 1.5rem 2rem;
       border-radius: 0 0 var(--radius) var(--radius);
-      margin-bottom: 2rem;
+      margin-bottom: 0.75rem;
       box-shadow: 0 4px 15px rgba(0,0,0,0.05);
       display: flex;
       align-items: center;
       justify-content: space-between;
       border: 1px solid var(--border-light);
+      min-height: 72px;
     }
-    .report-header-left { display: flex; align-items: center; gap: 1.5rem; }
+    .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
     .report-header .logo { height: 32px; width: auto; object-fit: contain; }
-    .report-header-title { margin: 0; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+    .report-header-title {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #ffffff;
+      background: var(--header-bg);
+      padding: 0.45rem 1.1rem;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      line-height: 1.3;
+    }
     
-    h1 { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
+    h1:not(.report-header-title) { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
     h2 { color: var(--text-secondary); font-size: 1.1rem; font-weight: 500; margin-bottom: 1.5rem; text-align: center; }
-    h3 { color: var(--header-bg); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 1.5rem 0 0.75rem; border-bottom: 2px solid var(--border-light); padding-bottom: 0.4rem; }
+    h3 { color: var(--header-bg); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 2rem 0 1rem; border-bottom: 2px solid var(--border-light); padding-bottom: 0.4rem; }
     
-    .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
+    .meta p { margin: 2px 0; }
     
     .table-responsive { width: 100%; overflow-x: auto; margin-bottom: 1.5rem; border-radius: var(--radius-sm); box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); background: var(--surface); }
     table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: auto; min-width: 800px; }
@@ -1077,26 +1103,29 @@ function htmlReportFromHistory(
     .chip.fail { background: #fee2e2; color: #b91c1c; border-color: rgba(185, 28, 28, 0.2); }
     .chip.secondary { background: #f8fafc; color: var(--header-bg); font-weight: 700; border-color: var(--border-light); }
     
-    .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; background: rgba(176, 191, 201, 0.15); padding: 5px; border-radius: var(--radius); border: 1px solid var(--border-light); }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; background: rgba(176, 191, 201, 0.15); padding: 5px; border-radius: var(--radius); border: 1px solid var(--border-light); }
     .tab-btn { flex: 1; background: none; border: none; padding: 0.65rem 1.5rem; font-family: inherit; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; color: var(--text-secondary); border-radius: calc(var(--radius) - 4px); transition: all 0.25s ease; }
     .tab-btn.active { background: var(--header-bg); color: white; box-shadow: 0 4px 12px rgba(33, 108, 109, 0.25); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
-    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .dashboard-grid { 
+      display: grid; 
+      grid-template-columns: repeat(2, 1fr); 
+      gap: 1rem; 
+      margin-bottom: 2rem; 
+    }
+    @media (max-width: 1000px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+    }
     .chart-card { 
-      background: linear-gradient(145deg, #ffffff, #f1f5f9); 
-      border: 1px solid rgba(171, 185, 200, 0.3); 
-      border-radius: 16px; 
+      background: var(--surface); 
+      border: 1px solid var(--border-light); 
+      border-radius: var(--radius); 
       padding: 1.6rem; 
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
-    .chart-card:hover {
-      transform: translateY(-6px) scale(1.01);
-      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
-    }
-    .chart-card h4 { margin: 0 0 1rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--header-bg); border-bottom: 2px solid rgba(33, 108, 109, 0.1); padding-bottom: 0.6rem; font-weight: 800; }
+    .chart-card h4 { margin: 0 0 1rem; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--header-bg); border-bottom: 2px solid rgba(33, 108, 109, 0.1); padding-bottom: 0.6rem; font-weight: 800; }
     .chart-scroll-wrapper { 
       overflow-x: auto; 
       overflow-y: hidden; 
@@ -1105,19 +1134,29 @@ function htmlReportFromHistory(
 
     .chart-container { position: relative; height: 300px; width: 100%; min-width: 100%; }
     
-    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
-    .stat-card { 
-      background: #f8fafc; 
-      border: 1px solid rgba(171, 185, 200, 0.4); 
-      border-radius: 14px; 
-      padding: 1.4rem; 
-      text-align: center;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-      transition: transform 0.2s ease;
+    .stats-grid { 
+      display: grid; 
+      grid-template-columns: repeat(4, 1fr); 
+      gap: 1rem; 
+      margin-bottom: 2rem; 
     }
-    .stat-card:hover { transform: scale(1.03); }
-    .stat-value { display: block; font-size: 1.7rem; font-weight: 800; color: var(--header-bg); text-shadow: 1px 1px 0px rgba(255,255,255,0.8); }
-    .stat-label { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-top: 0.4rem; letter-spacing: 0.05em; }
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .stat-card { 
+      background: var(--surface); 
+      border: 1px solid var(--border-light); 
+      border-radius: var(--radius); 
+      padding: 1.25rem 1.5rem; 
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .stat-card .stat-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; font-weight: 800; letter-spacing: 0.07em; }
+    .stat-card .stat-value { font-size: 2rem; font-weight: 700; color: var(--header-bg); line-height: 1; }
+    .stat-card.success .stat-value { color: var(--pass); }
+    .stat-card.failed .stat-value { color: var(--fail); }
 
     .agent-style-summary, .anomalies-container {
       background: #f8fafc;
@@ -1238,89 +1277,106 @@ function htmlReportFromHistory(
         window.open(url.toString(), '_blank');
       }
     }
+
+    function goToHome() {
+      const baseUrl = window.location.protocol === 'file:' ? 'http://localhost:8765' : window.location.origin;
+      window.location.href = baseUrl;
+    }
   </script>
+  <style>
+    .report-header-left .logo { cursor: pointer; }
+  </style>
 </head>
 <body>
   <div class="report-header">
     <div class="report-header-left">
-      <img src="${logoDataUri}" alt="intellirevenue" class="logo">
+      <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center;">
+        <img src="${logoDataUri}" alt="intellirevenue" class="logo">
+      </a>
       <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
     </div>
-    <div class="meta">Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))} — ${historicalSummaries.length} operation(s)</div>
+    <div class="meta">
+      <p>Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))}</p>
+      <p>${historicalSummaries.length} operation(s)</p>
+    </div>
   </div>
 
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('dashboard')">Analytics Dashboard</button>
-    <button class="tab-btn" onclick="switchTab('history')">Operation History</button>
-  </div>
+  <div class="page-body">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('dashboard')">Analytics Dashboard</button>
+      <button class="tab-btn" onclick="switchTab('history')">Operation History</button>
+    </div>
 
-  <div id="dashboard" class="tab-content active">
-    <div class="stats-row">
-      <div class="stat-card">
-        <span class="stat-value">${historicalSummaries.reduce((a, b) => a + b.metrics.success + b.metrics.failed, 0)}</span>
-        <span class="stat-label">Total Processed</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">${(
-          (historicalSummaries.reduce((a, b) => a + b.metrics.success, 0) /
-            (historicalSummaries.reduce(
-              (a, b) => a + b.metrics.success + b.metrics.failed,
+    <div id="dashboard" class="tab-content active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Processed</div>
+          <div class="stat-value">${historicalSummaries.reduce((a, b) => a + b.metrics.success + b.metrics.failed, 0)}</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-label">Success Rate</div>
+          <div class="stat-value">${(
+            (historicalSummaries.reduce((a, b) => a + b.metrics.success, 0) /
+              (historicalSummaries.reduce(
+                (a, b) => a + b.metrics.success + b.metrics.failed,
+                0,
+              ) || 1)) *
+            100
+          ).toFixed(1)}%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Latency</div>
+          <div class="stat-value">${Math.round(
+            historicalSummaries.reduce(
+              (a, b) => a + b.metrics.avgLatencyMs,
               0,
-            ) || 1)) *
-          100
-        ).toFixed(1)}%</span>
-        <span class="stat-label">Success Rate</span>
+            ) / (historicalSummaries.length || 1),
+          )}ms</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Operations</div>
+          <div class="stat-value">${historicalSummaries.length}</div>
+        </div>
       </div>
-      <div class="stat-card">
-        <span class="stat-value">${Math.round(
-          historicalSummaries.reduce((a, b) => a + b.metrics.avgLatencyMs, 0) /
-            (historicalSummaries.length || 1),
-        )}ms</span>
-        <span class="stat-label">Avg Latency</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value">${historicalSummaries.length}</span>
-        <span class="stat-label">Total Operations</span>
+
+      <div class="dashboard-grid">
+        <div class="chart-card">
+          <h4>Extraction Volume Trend</h4>
+          <div class="chart-scroll-wrapper">
+            <div class="chart-container" id="volChartContainer">
+              <canvas id="volChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>Latency Performance (P50/P95)</h4>
+          <div class="chart-scroll-wrapper">
+            <div class="chart-container" id="latencyChartContainer">
+              <canvas id="latencyChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>System Throughput</h4>
+          <div class="chart-scroll-wrapper">
+            <div class="chart-container" id="throughputChartContainer">
+              <canvas id="throughputChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h4>Error Distribution (Infra)</h4>
+          <div class="chart-container">
+            <canvas id="errorChart"></canvas>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="dashboard-grid">
-      <div class="chart-card">
-        <h4>Extraction Volume Trend</h4>
-        <div class="chart-scroll-wrapper">
-          <div class="chart-container" id="volChartContainer">
-            <canvas id="volChart"></canvas>
-          </div>
-        </div>
+    <div id="history" class="tab-content">
+      <div id="history-items-container">
+        ${runsHtml}
       </div>
-      <div class="chart-card">
-        <h4>Latency Performance (P50/P95)</h4>
-        <div class="chart-scroll-wrapper">
-          <div class="chart-container" id="latencyChartContainer">
-            <canvas id="latencyChart"></canvas>
-          </div>
-        </div>
-      </div>
-      <div class="chart-card">
-        <h4>System Throughput</h4>
-        <div class="chart-scroll-wrapper">
-          <div class="chart-container" id="throughputChartContainer">
-            <canvas id="throughputChart"></canvas>
-          </div>
-        </div>
-      </div>
-      <div class="chart-card">
-        <h4>Error Distribution (Infra)</h4>
-        <div class="chart-container">
-          <canvas id="errorChart"></canvas>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="history" class="tab-content">
-    <div id="history-items-container">
-      ${runsHtml}
     </div>
     <div id="history-pagination" class="history-pagination"></div>
   </div>
