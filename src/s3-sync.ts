@@ -201,6 +201,7 @@ export async function syncBucket(
   },
 ): Promise<{
   brand: string;
+  purchaser: string;
   stagingPath: string;
   synced: number;
   skipped: number;
@@ -302,7 +303,14 @@ export async function syncBucket(
   }
 
   reportProgress();
-  return { brand, stagingPath: stagingPathForResult, synced, skipped, errors };
+  return {
+    brand,
+    purchaser: purchaser || "",
+    stagingPath: stagingPathForResult,
+    synced,
+    skipped,
+    errors,
+  };
 }
 
 /**
@@ -375,6 +383,7 @@ export async function syncAllBuckets(
         skipped: totalSkipped,
         errors: totalErrors,
         brands: results.map((r) => r.brand),
+        purchasers: results.map((r) => r.purchaser || ""),
       });
     }
   } catch (e) {
@@ -386,6 +395,7 @@ export async function syncAllBuckets(
 
 export interface SyncResult {
   brand: string;
+  purchaser: string;
   stagingPath: string;
   synced: number;
   skipped: number;

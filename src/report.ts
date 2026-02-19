@@ -527,19 +527,29 @@ function formatDateHuman(d: Date): string {
 }
 
 function formatBrandDisplayName(brandId?: string): string {
-  if (!brandId) return "";
-  if (brandId.includes("no-cow")) return "No Cow";
-  if (brandId.includes("sundia")) return "Sundia";
-  if (brandId.includes("tractor-beverage")) return "Tractor";
+  if (!brandId) return "N/A";
+  const b = brandId.toLowerCase();
+  if (b.includes("no-cow")) return "No Cow";
+  if (b.includes("sundia")) return "Sundia";
+  if (b.includes("tractor-beverage")) return "Tractor";
+  if (b === "p3" || b === "pipe") return "PIPE";
   return brandId;
 }
 
 function formatPurchaserDisplayName(purchaserId?: string): string {
-  if (!purchaserId) return "";
-  if (purchaserId.includes("8c03bc63-a173-49d2-9ef4-d3f4c540fae8"))
-    return "Temp 1";
-  if (purchaserId.includes("a451e439-c9d1-41c5-b107-868b65b596b8"))
-    return "Temp 2";
+  if (!purchaserId) return "N/A";
+  const p = purchaserId.toLowerCase();
+  if (p.includes("8c03bc63-a173-49d2-9ef4-d3f4c540fae8")) return "Temp 1";
+  if (p.includes("a451e439-c9d1-41c5-b107-868b65b596b8")) return "Temp 2";
+  if (p.includes("dot_foods")) return "DOT Foods";
+  if (p === "640" || p === "641" || p.includes("640") || p.includes("641"))
+    return "DMC";
+  if (p === "843") return "HPI";
+  if (p === "895") return "HPD";
+  if (p === "897") return "HPM";
+  if (p === "991") return "HPT";
+  if (p.includes("kehe")) return "KeHE";
+  if (p.includes("unfi")) return "UNFI";
   return purchaserId;
 }
 
@@ -740,13 +750,9 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       : entry.runId;
   const runLabel = formatRunDateTime(m.startedAt);
 
-  const brandDisplay = entry.brand
-    ? formatBrandDisplayName(entry.brand).toUpperCase()
-    : "";
+  const brandDisplay = entry.brand ? formatBrandDisplayName(entry.brand) : "";
   const purchaserDisplay = entry.purchaser
-    ? formatPurchaserDisplayName(entry.purchaser)
-        .toUpperCase()
-        .replace(/_/g, "-")
+    ? formatPurchaserDisplayName(entry.purchaser).replace(/_/g, "-")
     : "";
 
   let sectionClass = "run-section history-item";
@@ -852,7 +858,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       : "";
 
   return `
-  <details class="${sectionClass}">
+  <details class="${sectionClass}" data-brand="${entry.brand || ""}" data-purchaser="${entry.purchaser || ""}">
   <summary class="run-section-summary">
     <div class="summary-content">
       <div class="mission-pointer">
@@ -944,6 +950,32 @@ function htmlReportFromHistory(
   historicalSummaries: HistoricalRunSummary[],
   generatedAt: string,
 ): string {
+  const allBrands = Array.from(
+    new Set(historicalSummaries.map((s) => s.brand).filter(Boolean)),
+  );
+  const allPurchasers = Array.from(
+    new Set(historicalSummaries.map((s) => s.purchaser).filter(Boolean)),
+  );
+
+  const brandNamesMap: Record<string, string> = {};
+  allBrands.forEach((id) => (brandNamesMap[id!] = formatBrandDisplayName(id!)));
+  const purchaserNamesMap: Record<string, string> = {};
+  allPurchasers.forEach(
+    (id) => (purchaserNamesMap[id!] = formatPurchaserDisplayName(id!)),
+  );
+
+  const brandPurchaserMap: Record<string, string[]> = {};
+  historicalSummaries.forEach((s) => {
+    if (s.brand && s.purchaser) {
+      if (!brandPurchaserMap[s.brand]) {
+        brandPurchaserMap[s.brand] = [];
+      }
+      if (!brandPurchaserMap[s.brand].includes(s.purchaser)) {
+        brandPurchaserMap[s.brand].push(s.purchaser);
+      }
+    }
+  });
+
   const runsHtml = historicalSummaries
     .map((entry) => sectionForRun(entry))
     .join("");
@@ -1025,24 +1057,26 @@ function htmlReportFromHistory(
     .report-header .logo { height: 32px; width: auto; object-fit: contain; }
     .report-header-title {
       margin: 0;
+      height: 34px;
       font-size: 0.82rem;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: #ffffff;
       background: var(--header-bg);
-      padding: 0.45rem 1.1rem;
+      padding: 0 1.1rem;
       border-radius: 6px;
       display: inline-flex;
       align-items: center;
-      line-height: 1.3;
+      line-height: 1;
+      font-family: inherit;
     }
     
     h1:not(.report-header-title) { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
     h2 { color: var(--text-secondary); font-size: 1.1rem; font-weight: 500; margin-bottom: 1.5rem; text-align: center; }
     h3 { color: var(--header-bg); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 2rem 0 1rem; border-bottom: 2px solid var(--border-light); padding-bottom: 0.4rem; }
     
-    .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
+    .meta { color: var(--text-secondary); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
     .meta p { margin: 2px 0; }
     
     .table-responsive { width: 100%; overflow-x: auto; margin-bottom: 1.5rem; border-radius: var(--radius-sm); box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); background: var(--surface); }
@@ -1260,6 +1294,68 @@ function htmlReportFromHistory(
       flex-shrink: 0;
       margin-left: 2rem;
     }
+    
+    /* Filtering Styles */
+    .report-header-right { display: flex; align-items: center; justify-content: flex-end; }
+    .header-filter-row { display: flex; align-items: center; gap: 0.75rem; }
+    .header-field-wrap { display: flex; flex-direction: column; align-items: center; }
+    .filter-dropdown { position: relative; }
+    .filter-chip { 
+      display: flex; align-items: center; height: 34px; background: #fff; 
+      border: 1px solid rgba(176,191,201,0.6); border-radius: 8px; overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .filter-chip .header-label {
+      font-size: 0.7rem; color: var(--primary); font-weight: 800; background: var(--accent-light);
+      padding: 0 0.75rem; height: 100%; display: flex; align-items: center;
+      border-right: 1px solid rgba(45,157,95,0.2); text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .filter-dropdown-trigger {
+      border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
+      font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
+      min-width: 150px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+    }
+    .filter-dropdown-panel {
+      display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
+      min-width: 220px; max-height: 400px; overflow-y: auto; background: white;
+      border: 1px solid var(--border-light); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      z-index: 1100; padding: 0.5rem 0;
+    }
+    .filter-dropdown-panel.open { display: block; animation: slideDown 0.2s ease-out; }
+    .filter-dropdown-option {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
+      font-size: 0.85rem; cursor: pointer; transition: background 0.1s;
+    }
+    .filter-dropdown-option:hover { background: #f8fafc; }
+    .filter-dropdown-option input { margin: 0; cursor: pointer; }
+    
+    .header-btn-reset {
+      height: 34px; 
+      padding: 0 1.1rem; 
+      background: var(--header-bg); 
+      color: #fff;
+      border: none; 
+      border-radius: 6px; 
+      font-size: 0.82rem; 
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer; 
+      box-shadow: 0 2px 5px rgba(33,108,109,0.2); 
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .header-btn-reset:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    
+    .filtered-out { display: none !important; }
+
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
@@ -1289,15 +1385,50 @@ function htmlReportFromHistory(
 </head>
 <body>
   <div class="report-header">
-    <div class="report-header-left">
-      <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center;">
+    <div style="display: flex; align-items: flex-start; gap: 1.5rem; width: 100%;">
+      <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center; height: 34px;">
         <img src="${logoDataUri}" alt="intellirevenue" class="logo">
       </a>
-      <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
-    </div>
-    <div class="meta">
-      <p>Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))}</p>
-      <p>${historicalSummaries.length} operation(s)</p>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
+          <div class="report-header-right">
+             <div class="header-filter-row">
+                  <div class="header-field-wrap brand-field-wrap">
+                    <div id="brand-dropdown" class="filter-dropdown">
+                      <div class="filter-chip">
+                        <label class="header-label" for="brand-dropdown-trigger">Brand</label>
+                        <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
+                          Select brand
+                        </button>
+                      </div>
+                      <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+                    </div>
+                  </div>
+                  <div class="header-field-wrap purchaser-field-wrap">
+                    <div id="purchaser-dropdown" class="filter-dropdown">
+                      <div class="filter-chip">
+                        <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
+                        <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
+                          Select purchaser
+                        </button>
+                      </div>
+                      <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+                    </div>
+                  </div>
+                  <div class="header-field-wrap header-filter-reset-wrap">
+                    <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">
+                      Reset Filter
+                    </button>
+                  </div>
+                </div>
+          </div>
+        </div>
+        <div class="meta" style="display: flex; gap: 1.25rem; opacity: 0.85;">
+          <span>Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))}</span>
+          <span id="operation-count-label">${historicalSummaries.length} operation(s)</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1391,6 +1522,8 @@ function htmlReportFromHistory(
       }
       if (tabId === 'history') {
         renderHistory();
+      } else if (tabId === 'dashboard') {
+        applyFilteringToUI();
       }
     }
 
@@ -1398,18 +1531,22 @@ function htmlReportFromHistory(
     const historyPageSize = 20;
 
     function renderHistory() {
-      const items = document.querySelectorAll('.history-item');
-      if (items.length === 0) return;
-      const total = items.length;
+      const allItems = Array.from(document.querySelectorAll('.history-item'));
+      const visibleItems = allItems.filter(i => !i.classList.contains('filtered-out'));
+      
+      const total = visibleItems.length;
       const pages = Math.ceil(total / historyPageSize);
       
       if (historyPage > pages) historyPage = pages;
       if (historyPage < 1) historyPage = 1;
 
-      items.forEach((item, idx) => {
+      allItems.forEach(i => i.style.display = 'none');
+      visibleItems.forEach((item, idx) => {
         const start = (historyPage - 1) * historyPageSize;
         const end = start + historyPageSize;
-        item.style.display = (idx >= start && idx < end) ? 'block' : 'none';
+        if (idx >= start && idx < end) {
+          item.style.display = 'block';
+        }
       });
 
       // Render pagination buttons
@@ -1440,6 +1577,149 @@ function htmlReportFromHistory(
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    /* Filter Data */
+    const CONFIG = {
+      brands: ${JSON.stringify(allBrands)},
+      purchasers: ${JSON.stringify(allPurchasers)},
+      brandPurchaserMap: ${JSON.stringify(brandPurchaserMap)},
+      brandNames: ${JSON.stringify(brandNamesMap)},
+      purchaserNames: ${JSON.stringify(purchaserNamesMap)}
+    };
+
+    let selectedBrands = [];
+    let selectedPurchasers = [];
+
+    function initFilters() {
+      // Populate Brand Dropdown
+      const brandPanel = document.getElementById('brand-dropdown-panel');
+      CONFIG.brands.forEach(b => {
+        const div = document.createElement('div');
+        div.className = 'filter-dropdown-option';
+        const displayName = CONFIG.brandNames[b] || b;
+        div.innerHTML = '<input type="checkbox" value="' + b + '"> <span>' + displayName + '</span>';
+        div.onclick = (e) => {
+          if (e.target.tagName !== 'INPUT') {
+            const cb = div.querySelector('input');
+            cb.checked = !cb.checked;
+          }
+          updateFilters();
+        };
+        brandPanel.appendChild(div);
+      });
+
+      // Populate Purchaser Dropdown
+      const purchaserPanel = document.getElementById('purchaser-dropdown-panel');
+      CONFIG.purchasers.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'filter-dropdown-option';
+        const displayName = CONFIG.purchaserNames[p] || p;
+        div.innerHTML = '<input type="checkbox" value="' + p + '"> <span>' + displayName + '</span>';
+        div.onclick = (e) => {
+          if (e.target.tagName !== 'INPUT') {
+            const cb = div.querySelector('input');
+            cb.checked = !cb.checked;
+          }
+          updateFilters();
+        };
+        purchaserPanel.appendChild(div);
+      });
+
+      // Dropdown toggle logic
+      document.querySelectorAll('.filter-dropdown-trigger').forEach(trigger => {
+        trigger.onclick = (e) => {
+          e.stopPropagation();
+          const panel = trigger.parentElement.nextElementSibling;
+          const isOpen = panel.classList.contains('open');
+          closeAllPanels();
+          if (!isOpen) panel.classList.add('open');
+        };
+      });
+
+      document.addEventListener('click', closeAllPanels);
+    }
+
+    function closeAllPanels() {
+      document.querySelectorAll('.filter-dropdown-panel').forEach(p => p.classList.remove('open'));
+    }
+
+    function updateFilters() {
+      // Update selected brands
+      selectedBrands = Array.from(document.querySelectorAll('#brand-dropdown-panel input:checked')).map(i => i.value);
+      selectedPurchasers = Array.from(document.querySelectorAll('#purchaser-dropdown-panel input:checked')).map(i => i.value);
+
+      // Update triggers text
+      const bTrigger = document.getElementById('brand-dropdown-trigger');
+      bTrigger.innerText = selectedBrands.length === 0 ? 'Select Brand' : 
+                           (selectedBrands.length === 1 ? (CONFIG.brandNames[selectedBrands[0]] || selectedBrands[0]) : selectedBrands.length + ' Brands');
+      
+      const pTrigger = document.getElementById('purchaser-dropdown-trigger');
+      pTrigger.innerText = selectedPurchasers.length === 0 ? 'Select Purchaser' : 
+                               (selectedPurchasers.length === 1 ? (CONFIG.purchaserNames[selectedPurchasers[0]] || selectedPurchasers[0]) : selectedPurchasers.length + ' Purchasers');
+
+      // Cascading logic: disable purchasers not belonging to selected brands
+      const purchaserInputs = document.querySelectorAll('#purchaser-dropdown-panel .filter-dropdown-option');
+      purchaserInputs.forEach(div => {
+        const input = div.querySelector('input');
+        const p = input.value;
+        let possible = true;
+        if (selectedBrands.length > 0) {
+          possible = selectedBrands.some(b => CONFIG.brandPurchaserMap[b] && CONFIG.brandPurchaserMap[b].includes(p));
+        }
+        if (!possible) {
+          div.style.opacity = '0.4';
+          div.style.pointerEvents = 'none';
+          input.checked = false;
+        } else {
+          div.style.opacity = '1';
+          div.style.pointerEvents = 'auto';
+        }
+      });
+
+      applyFilteringToUI();
+    }
+
+    function resetFilters() {
+      document.querySelectorAll('.filter-dropdown-panel input').forEach(i => i.checked = false);
+      selectedBrands = [];
+      selectedPurchasers = [];
+      updateFilters();
+    }
+
+    function applyFilteringToUI() {
+      const items = document.querySelectorAll('.history-item');
+      let visibleCount = 0;
+
+      const filteredRunData = runData.filter(d => {
+        let match = true;
+        if (selectedBrands.length > 0 && !selectedBrands.includes(d.brand)) match = false;
+        if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(d.purchaser)) match = false;
+        return match;
+      });
+
+      updateDashboardStats(filteredRunData);
+      initCharts(filteredRunData);
+
+      items.forEach(item => {
+        const b = item.getAttribute('data-brand');
+        const p = item.getAttribute('data-purchaser');
+
+        let match = true;
+        if (selectedBrands.length > 0 && !selectedBrands.includes(b)) match = false;
+        if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(p)) match = false;
+
+        item.classList.toggle('filtered-out', !match);
+        if (match) visibleCount++;
+      });
+
+      // We need to re-render history because of pagination
+      historyPage = 1;
+      renderHistory();
+      
+      document.getElementById('operation-count-label').innerText = visibleCount + ' operation(s)';
+    }
+
+    initFilters();
+
     // Dashboard Data
     const runData = ${JSON.stringify(
       historicalSummaries.map((s) => ({
@@ -1450,6 +1730,8 @@ function htmlReportFromHistory(
         skipped: s.metrics.skipped,
         p50: s.metrics.p50LatencyMs,
         p95: s.metrics.p95LatencyMs,
+        brand: s.brand || "",
+        purchaser: s.purchaser || "",
         throughput:
           ((s.metrics.success + s.metrics.failed) /
             (s.runDurationSeconds || 1)) *
@@ -1458,15 +1740,34 @@ function htmlReportFromHistory(
       })),
     )};
 
+    let chartInstances = {};
+
     window.onload = () => {
-      initCharts();
+      initCharts(runData);
       renderHistory();
     };
 
-    function initCharts() {
-      // Scale to last 100 runs. Beyond that, the history tab handles full audit. 
-      // Individual charts will auto-expand horizontally with scrollbars to prevent label overlap.
-      const sortedData = [...runData].sort((a, b) => new Date(a.time) - new Date(b.time)).slice(-100);
+    function updateDashboardStats(data) {
+      const totalProcessed = data.reduce((a, b) => a + b.success + b.failed, 0);
+      const totalSuccess = data.reduce((a, b) => a + b.success, 0);
+      const successRate = totalProcessed > 0 ? (totalSuccess / totalProcessed * 100).toFixed(1) : "0.0";
+      const avgLatency = data.length > 0 ? Math.round(data.reduce((a, b) => a + (b.p50 || 0), 0) / data.length) : 0;
+      
+      const dashboard = document.getElementById('dashboard');
+      if (dashboard) {
+        const values = dashboard.querySelectorAll('.stat-value');
+        if (values.length >= 4) {
+          values[0].innerText = totalProcessed;
+          values[1].innerText = successRate + '%';
+          values[2].innerText = avgLatency + 'ms';
+          values[3].innerText = data.length;
+        }
+      }
+    }
+
+    function initCharts(dataToUse) {
+      // Scale to last 100 runs.
+      const sortedData = [...dataToUse].sort((a, b) => new Date(a.time) - new Date(b.time)).slice(-100);
       
       const chartWidth = Math.max(100, sortedData.length * 60) + "px";
       ['volChartContainer', 'latencyChartContainer', 'throughputChartContainer'].forEach(id => {
@@ -1480,71 +1781,68 @@ function htmlReportFromHistory(
                d_obj.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
       });
 
-      // Volume Trend
-      new Chart(document.getElementById('volChart'), {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [
-            { label: 'Success', data: sortedData.map(d => d.success), backgroundColor: '#2d9d5f', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
-            { label: 'Failed', data: sortedData.map(d => d.failed), backgroundColor: '#ef4444', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
-            { label: 'Skipped', data: sortedData.map(d => d.skipped), backgroundColor: '#94a3b8', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' }
-          ]
+      const chartConfigs = {
+        volChart: {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Success', data: sortedData.map(d => d.success), backgroundColor: '#2d9d5f', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
+              { label: 'Failed', data: sortedData.map(d => d.failed), backgroundColor: '#ef4444', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
+              { label: 'Skipped', data: sortedData.map(d => d.skipped), backgroundColor: '#94a3b8', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+            plugins: { legend: { position: 'bottom' } }
+          }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-          plugins: { legend: { position: 'bottom' } }
-        }
-      });
-
-      // Latency Trend
-      new Chart(document.getElementById('latencyChart'), {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            { label: 'P50 Latency (ms)', data: sortedData.map(d => d.p50), borderColor: '#216c6d', tension: 0.3, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6 },
-            { label: 'P95 Latency (ms)', data: sortedData.map(d => d.p95), borderColor: '#f59e0b', tension: 0.3, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6 }
-          ]
+        latencyChart: {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'P50 Latency (ms)', data: sortedData.map(d => d.p50), borderColor: '#216c6d', tension: 0.3, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6 },
+              { label: 'P95 Latency (ms)', data: sortedData.map(d => d.p95), borderColor: '#f59e0b', tension: 0.3, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } },
+            plugins: { legend: { position: 'bottom' } }
+          }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true } },
-          plugins: { legend: { position: 'bottom' } }
+        throughputChart: {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Throughput (files/min)', data: sortedData.map(d => d.throughput), borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)', fill: true, tension: 0.1 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } },
+            plugins: { legend: { position: 'bottom' } }
+          }
         }
-      });
-
-      // Throughput compare
-      new Chart(document.getElementById('throughputChart'), {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            { label: 'Throughput (files/min)', data: sortedData.map(d => d.throughput), borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)', fill: true, tension: 0.1 }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true } },
-          plugins: { legend: { position: 'bottom' } }
-        }
-      });
+      };
 
       // Error Distribution
-      const errs = runData.reduce((acc, d) => {
-        acc.timeout += d.errors.timeout;
-        acc.client += d.errors.clientError;
-        acc.server += d.errors.serverError;
-        acc.read += d.errors.readError;
-        acc.other += d.errors.other;
+      const errs = dataToUse.reduce((acc, d) => {
+        acc.timeout += (d.errors.timeout || 0);
+        acc.client += (d.errors.clientError || 0);
+        acc.server += (d.errors.serverError || 0);
+        acc.read += (d.errors.readError || 0);
+        acc.other += (d.errors.other || 0);
         return acc;
       }, { timeout: 0, client: 0, server: 0, read: 0, other: 0 });
 
-      new Chart(document.getElementById('errorChart'), {
+      chartConfigs.errorChart = {
         type: 'doughnut',
         data: {
           labels: ['Timeout', 'Client (4xx)', 'Server (5xx)', 'Read Error', 'Other'],
@@ -1558,6 +1856,13 @@ function htmlReportFromHistory(
           maintainAspectRatio: false,
           plugins: { legend: { position: 'bottom' } }
         }
+      };
+
+      Object.keys(chartConfigs).forEach(id => {
+        const canvas = document.getElementById(id);
+        if (!canvas) return;
+        if (chartInstances[id]) chartInstances[id].destroy();
+        chartInstances[id] = new Chart(canvas, chartConfigs[id]);
       });
     }
 

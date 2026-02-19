@@ -7,6 +7,8 @@ export interface SyncHistoryEntry {
   skipped: number;
   errors: number;
   brands: string[];
+  /** Purchaser folder names involved in this sync entry, parallel to brands. */
+  purchasers?: string[];
 }
 
 const HISTORY_FILE = "sync-history.json";

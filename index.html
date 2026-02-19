@@ -1221,6 +1221,7 @@
       }
       .result-table-wrap {
         width: 100%;
+        height: 100%;
         border-collapse: separate;
         border-spacing: 0;
         font-size: 0.8rem;
@@ -1231,24 +1232,31 @@
       }
       .result-table-wrap th,
       .result-table-wrap td {
-        padding: 0.34rem 0.51rem;
+        padding: 0.425rem 0.51rem;
         text-align: left;
-        vertical-align: top;
+        vertical-align: middle;
         border: 1px solid rgba(203, 213, 225, 0.2);
       }
       .result-table-wrap th {
         background: var(--header-bg) !important;
         color: #ffffff !important;
-        font-weight: 600;
+        font-weight: 800;
         width: 195.5px;
         min-width: 195.5px;
         border-bottom: none;
+        text-transform: uppercase;
+        font-size: 0.725rem;
+        letter-spacing: 0.05em;
       }
       .result-table-wrap td {
         background: var(--surface);
         color: var(--text-secondary);
         word-break: break-word;
         white-space: pre-wrap;
+        font-weight: 500;
+      }
+      .result-table-wrap tr.metric-row {
+        height: 1px;
       }
       .result-table-wrap tr:nth-child(even) td {
         background: var(--row-alt);
@@ -1293,7 +1301,8 @@
         border-top: none;
       }
       .result-table-wrap tr.status-row td {
-        font-weight: 600;
+        font-weight: 700;
+        font-size: 0.85rem;
       }
       .result.pass .result-table-wrap tr.status-row td {
         color: var(--pass);
@@ -2929,18 +2938,30 @@
               (stderrFiltered.length > 5000 ? "…" : ""),
           ]);
         var tableRows = rows.map(function (r) {
+          var label = r[0];
+          var metrics = [
+            "Status",
+            "Download overview",
+            "Extraction overview",
+            "Overall status",
+            "Operation report",
+          ];
+          var isMetric = metrics.indexOf(label) !== -1;
+          var cls =
+            (label === "Status" ? "status-row " : "") +
+            (isMetric ? "metric-row " : "");
           return (
             "<tr" +
-            (r[0] === "Status" ? ' class="status-row"' : "") +
+            (cls ? ' class="' + cls.trim() + '"' : "") +
             "><th>" +
-            escapeHtml(r[0]) +
+            escapeHtml(label) +
             "</th><td>" +
-            (r[0] === "Standard error" ||
-            r[0] === "Output" ||
-            r[0] === "Download overview" ||
-            r[0] === "Extraction overview" ||
-            r[0] === "Overall status" ||
-            r[0] === "Operation report"
+            (label === "Standard error" ||
+            label === "Output" ||
+            label === "Download overview" ||
+            label === "Extraction overview" ||
+            label === "Overall status" ||
+            label === "Operation report"
               ? r[1]
               : escapeHtml(r[1]).replace(/\n/g, "<br>")) +
             "</td></tr>"
@@ -4266,19 +4287,33 @@
       var ALL_SCHEDULES = [];
       function formatBrandName(brandId) {
         if (!brandId) return "";
-        if (brandId.includes("no-cow")) return "No Cow";
-        if (brandId.includes("sundia")) return "Sundia";
-        if (brandId.includes("tractor-beverage")) return "Tractor";
+        var b = brandId.toLowerCase();
+        if (b.includes("no-cow")) return "No Cow";
+        if (b.includes("sundia")) return "Sundia";
+        if (b.includes("tractor-beverage")) return "Tractor";
+        if (b === "p3" || b === "pipe") return "PIPE";
         return brandId;
       }
 
       function formatPurchaserName(purchaserId) {
         if (!purchaserId) return "";
-        if (purchaserId.includes("8c03bc63-a173-49d2-9ef4-d3f4c540fae8"))
-          return "Temp 1";
-        if (purchaserId.includes("a451e439-c9d1-41c5-b107-868b65b596b8"))
-          return "Temp 2";
-        if (purchaserId.includes("DOT_FOODS")) return "DOT Foods";
+        var p = purchaserId.toLowerCase();
+        if (p.includes("8c03bc63-a173-49d2-9ef4-d3f4c540fae8")) return "Temp 1";
+        if (p.includes("a451e439-c9d1-41c5-b107-868b65b596b8")) return "Temp 2";
+        if (p.includes("dot_foods")) return "DOT Foods";
+        if (
+          p === "640" ||
+          p === "641" ||
+          p.includes("640") ||
+          p.includes("641")
+        )
+          return "DMC";
+        if (p === "843") return "HPI";
+        if (p === "895") return "HPD";
+        if (p === "897") return "HPM";
+        if (p === "991") return "HPT";
+        if (p.includes("kehe")) return "KeHE";
+        if (p.includes("unfi")) return "UNFI";
         return purchaserId;
       }
 
@@ -5514,7 +5549,7 @@
             : "Select one or more purchasers";
         if (selected.length === 0) {
           trigger.textContent =
-            which === "brand" ? "Select brand" : "Select purchaser";
+            which === "brand" ? "Select Brand" : "Select Purchaser";
           trigger.title = defaultTitle;
         } else if (selected.length === 1) {
           var label =

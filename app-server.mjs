@@ -140,6 +140,33 @@ function saveSchedules(list) {
   } catch (_) {}
 }
 
+function formatBrandDisplayName(brandId) {
+  if (!brandId) return "N/A";
+  var b = brandId.toLowerCase();
+  if (b.includes("no-cow")) return "No Cow";
+  if (b.includes("sundia")) return "Sundia";
+  if (b.includes("tractor-beverage")) return "Tractor";
+  if (b === "p3" || b === "pipe") return "PIPE";
+  return brandId;
+}
+
+function formatPurchaserDisplayName(purchaserId) {
+  if (!purchaserId) return "N/A";
+  var p = purchaserId.toLowerCase();
+  if (p.includes("8c03bc63-a173-49d2-9ef4-d3f4c540fae8")) return "Temp 1";
+  if (p.includes("a451e439-c9d1-41c5-b107-868b65b596b8")) return "Temp 2";
+  if (p.includes("dot_foods")) return "DOT Foods";
+  if (p === "640" || p === "641" || p.includes("640") || p.includes("641"))
+    return "DMC";
+  if (p === "843") return "HPI";
+  if (p === "895") return "HPD";
+  if (p === "897") return "HPM";
+  if (p === "991") return "HPT";
+  if (p.includes("kehe")) return "KeHE";
+  if (p.includes("unfi")) return "UNFI";
+  return purchaserId;
+}
+
 function scheduleId() {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -465,6 +492,37 @@ function buildExtractionDataPageHtml() {
   else if (day % 10 === 3 && day !== 13) suffix = "rd";
   const now = `${day}${suffix} ${month} ${year}`;
 
+  const allBrands = Array.from(
+    new Set(
+      allFiles.map((f) => f.filename.split("_")[0] || "").filter(Boolean),
+    ),
+  );
+  const allPurchasers = Array.from(
+    new Set(
+      allFiles
+        .map((f) => f.content?.pattern?.purchaser_key || "")
+        .filter(Boolean),
+    ),
+  );
+
+  const brandNamesMap = {};
+  allBrands.forEach((id) => (brandNamesMap[id] = formatBrandDisplayName(id)));
+  const purchaserNamesMap = {};
+  allPurchasers.forEach(
+    (id) => (purchaserNamesMap[id] = formatPurchaserDisplayName(id)),
+  );
+
+  const brandPurchaserMap = {};
+  allFiles.forEach((f) => {
+    const brand = f.filename.split("_")[0];
+    const purchaser = f.content?.pattern?.purchaser_key;
+    if (brand && purchaser) {
+      if (!brandPurchaserMap[brand]) brandPurchaserMap[brand] = [];
+      if (!brandPurchaserMap[brand].includes(purchaser))
+        brandPurchaserMap[brand].push(purchaser);
+    }
+  });
+
   const escHtml = (s) =>
     String(s ?? "")
       .replace(/&/g, "&amp;")
@@ -475,6 +533,8 @@ function buildExtractionDataPageHtml() {
   const rowsJson = JSON.stringify(
     allFiles.map((f) => ({
       filename: f.filename,
+      brand: f.filename.split("_")[0] || "",
+      purchaser: f.content?.pattern?.purchaser_key || "",
       status: f.status,
       mtime: f.mtime,
       patternKey: f.content?.pattern?.pattern_key ?? null,
@@ -541,20 +601,81 @@ function buildExtractionDataPageHtml() {
     .report-header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
     .report-header-title {
       margin: 0;
+      height: 34px;
       font-size: 0.82rem;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: #ffffff;
       background: var(--header-bg);
-      padding: 0.45rem 1.1rem;
+      padding: 0 1.1rem;
       border-radius: 6px;
       display: inline-flex;
       align-items: center;
-      line-height: 1.3;
+      line-height: 1;
+      font-family: inherit;
     }
-    .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
+    .meta { color: var(--text-secondary); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
     .meta p { margin: 2px 0; }
+
+    /* Filtering Styles */
+    .report-header-right { display: flex; align-items: center; justify-content: flex-end; }
+    .header-filter-row { display: flex; align-items: center; gap: 0.75rem; }
+    .header-field-wrap { display: flex; flex-direction: column; align-items: center; }
+    .filter-dropdown { position: relative; }
+    .filter-chip { 
+      display: flex; align-items: center; height: 34px; background: #fff; 
+      border: 1px solid rgba(176,191,201,0.6); border-radius: 8px; overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .filter-chip .header-label {
+      font-size: 0.7rem; color: var(--primary); font-weight: 800; background: var(--accent-light);
+      padding: 0 0.75rem; height: 100%; display: flex; align-items: center;
+      border-right: 1px solid rgba(45,157,95,0.2); text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .filter-dropdown-trigger {
+      border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
+      font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
+      min-width: 180px; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+    }
+    .filter-dropdown-panel {
+      display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
+      min-width: 220px; max-height: 400px; overflow-y: auto; background: white;
+      border: 1px solid var(--border-light); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      z-index: 1100; padding: 0.5rem 0;
+    }
+    .filter-dropdown-panel.open { display: block; animation: slideDownPanel 0.2s ease-out; }
+    .filter-dropdown-option {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
+      font-size: 0.85rem; cursor: pointer; transition: background 0.1s;
+    }
+    .filter-dropdown-option:hover { background: #f8fafc; }
+    .filter-dropdown-option input { margin: 0; cursor: pointer; }
+    
+    .header-btn-reset {
+      height: 34px; 
+      padding: 0 1.1rem; 
+      background: var(--header-bg); 
+      color: #fff;
+      border: none; 
+      border-radius: 6px; 
+      font-size: 0.82rem; 
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer; 
+      box-shadow: 0 2px 5px rgba(33,108,109,0.2); 
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .header-btn-reset:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    @keyframes slideDownPanel { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
     .page-body { padding: 0.75rem 0; }
 
@@ -843,15 +964,50 @@ function buildExtractionDataPageHtml() {
 </head>
 <body>
   <div class="report-header">
-    <div class="report-header-left">
-      <a href="/" title="Go to Home" style="display: flex; align-items: center;">
-        <img src="${REPORT_LOGO_DATA_URI}" alt="logo" class="logo">
+    <div style="display: flex; align-items: center; gap: 1.5rem; width: 100%;">
+      <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center; height: 34px;">
+        <img src="${REPORT_LOGO_DATA_URI}" alt="intellirevenue" class="logo">
       </a>
-      <h1 class="report-header-title">Operation Data Explorer</h1>
-    </div>
-    <div class="meta">
-      <p>Generated: ${now}</p>
-      <p>Total Operations: ${totalAll}</p>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <h1 class="report-header-title">Operation Data Explorer</h1>
+          <div class="report-header-right">
+             <div class="header-filter-row">
+                  <div class="header-field-wrap brand-field-wrap">
+                    <div id="brand-dropdown" class="filter-dropdown">
+                      <div class="filter-chip">
+                        <label class="header-label" for="brand-dropdown-trigger">Brand</label>
+                        <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
+                          Select brand
+                        </button>
+                      </div>
+                      <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+                    </div>
+                  </div>
+                  <div class="header-field-wrap purchaser-field-wrap">
+                    <div id="purchaser-dropdown" class="filter-dropdown">
+                      <div class="filter-chip">
+                        <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
+                        <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
+                          Select purchaser
+                        </button>
+                      </div>
+                      <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+                    </div>
+                  </div>
+                  <div class="header-field-wrap header-filter-reset-wrap">
+                    <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">
+                      Reset Filter
+                    </button>
+                  </div>
+                </div>
+          </div>
+        </div>
+        <div class="meta" style="display: flex; gap: 1.25rem; opacity: 0.85;">
+          <span>Generated: ${now}</span>
+          <span id="operation-count-label">${totalAll} operation(s)</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -859,31 +1015,31 @@ function buildExtractionDataPageHtml() {
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">Total Extractions</div>
-        <div class="stat-value">${totalAll}</div>
+        <div class="stat-value" id="tot-val">${totalAll}</div>
         <div class="stat-sub">All time</div>
       </div>
       <div class="stat-card success">
         <div class="stat-label">Succeeded</div>
-        <div class="stat-value">${totalSuccess}</div>
+        <div class="stat-value" id="succ-val">${totalSuccess}</div>
         <div class="stat-sub">Extraction success</div>
       </div>
       <div class="stat-card failed">
         <div class="stat-label">Failed</div>
-        <div class="stat-value">${totalFailed}</div>
+        <div class="stat-value" id="fail-val">${totalFailed}</div>
         <div class="stat-sub">Require attention</div>
       </div>
       <div class="stat-card rate">
         <div class="stat-label">Success Rate</div>
-        <div class="stat-value">${successRate}%</div>
-        <div class="stat-sub">${totalSuccess} of ${totalAll} succeeded</div>
+        <div class="stat-value" id="rate-val">${successRate}%</div>
+        <div class="stat-sub">Filter applied</div>
       </div>
     </div>
 
     <div class="controls-bar">
       <div class="tab-group">
-        <button class="tab-btn active" data-filter="all">All <span class="count">${totalAll}</span></button>
-        <button class="tab-btn" data-filter="success">Succeeded <span class="count">${totalSuccess}</span></button>
-        <button class="tab-btn" data-filter="failed">Failed <span class="count">${totalFailed}</span></button>
+        <button class="tab-btn active" data-filter="all">All <span class="count" id="c-all">${totalAll}</span></button>
+        <button class="tab-btn" data-filter="success">Succeeded <span class="count" id="c-succ">${totalSuccess}</span></button>
+        <button class="tab-btn" data-filter="failed">Failed <span class="count" id="c-fail">${totalFailed}</span></button>
       </div>
       <div class="search-wrap">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -914,11 +1070,23 @@ function buildExtractionDataPageHtml() {
 
   <script>
     var ALL_ROWS = ${rowsJson};
+    var CONFIG = {
+      brands: ${JSON.stringify(allBrands)},
+      purchasers: ${JSON.stringify(allPurchasers)},
+      brandPurchaserMap: ${JSON.stringify(brandPurchaserMap)},
+      brandNames: ${JSON.stringify(brandNamesMap)},
+      purchaserNames: ${JSON.stringify(purchaserNamesMap)}
+    };
+
     var PAGE_SIZE = 20;
     var currentPage = 1;
     var currentFilter = 'all';
     var currentSearch = '';
     var expandedRows = new Set();
+    var selectedBrands = [];
+    var selectedPurchasers = [];
+
+    function goToHome() { window.location.href = "/"; }
 
     function escHtml(s) {
       return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -929,28 +1097,112 @@ function buildExtractionDataPageHtml() {
       return new Date(ms).toLocaleString();
     }
 
+    function initFilters() {
+      // Brand Dropdown
+      const brandPanel = document.getElementById('brand-dropdown-panel');
+      const bTrigger = document.getElementById('brand-dropdown-trigger');
+      bTrigger.onclick = (e) => {
+        e.stopPropagation();
+        brandPanel.classList.toggle('open');
+        document.getElementById('purchaser-dropdown-panel').classList.remove('open');
+      };
+
+      CONFIG.brands.forEach(b => {
+        const div = document.createElement('div');
+        div.className = 'filter-dropdown-option';
+        const displayName = CONFIG.brandNames[b] || b;
+        div.innerHTML = '<input type="checkbox" value="' + b + '"> <span>' + displayName + '</span>';
+        div.onclick = (e) => {
+          e.stopPropagation();
+          const cb = div.querySelector('input');
+          if (e.target !== cb) cb.checked = !cb.checked;
+          updateFilters();
+        };
+        brandPanel.appendChild(div);
+      });
+
+      // Purchaser Dropdown
+      const purchaserPanel = document.getElementById('purchaser-dropdown-panel');
+      const pTrigger = document.getElementById('purchaser-dropdown-trigger');
+      pTrigger.onclick = (e) => {
+        e.stopPropagation();
+        purchaserPanel.classList.toggle('open');
+        document.getElementById('brand-dropdown-panel').classList.remove('open');
+      };
+
+      CONFIG.purchasers.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'filter-dropdown-option';
+        const displayName = CONFIG.purchaserNames[p] || p;
+        div.innerHTML = '<input type="checkbox" value="' + p + '"> <span>' + displayName + '</span>';
+        div.onclick = (e) => {
+          e.stopPropagation();
+          const cb = div.querySelector('input');
+          if (e.target !== cb) cb.checked = !cb.checked;
+          updateFilters();
+        };
+        purchaserPanel.appendChild(div);
+      });
+
+      window.onclick = () => {
+        brandPanel.classList.remove('open');
+        purchaserPanel.classList.remove('open');
+      };
+    }
+
+    function updateFilters() {
+      selectedBrands = Array.from(document.querySelectorAll('#brand-dropdown-panel input:checked')).map(i => i.value);
+      selectedPurchasers = Array.from(document.querySelectorAll('#purchaser-dropdown-panel input:checked')).map(i => i.value);
+
+      // Cascading: disable purchasers not belonging to selected brands
+      const pOptions = document.querySelectorAll('#purchaser-dropdown-panel .filter-dropdown-option');
+      pOptions.forEach(opt => {
+        const val = opt.querySelector('input').value;
+        let visible = selectedBrands.length === 0;
+        if (!visible) {
+           for (const b of selectedBrands) {
+             if (CONFIG.brandPurchaserMap[b] && CONFIG.brandPurchaserMap[b].includes(val)) {
+               visible = true;
+               break;
+             }
+           }
+        }
+        opt.style.display = visible ? 'flex' : 'none';
+        if (!visible) opt.querySelector('input').checked = false;
+      });
+      selectedPurchasers = Array.from(document.querySelectorAll('#purchaser-dropdown-panel input:checked')).map(i => i.value);
+
+      // Header Text
+      const bTrigger = document.getElementById('brand-dropdown-trigger');
+      bTrigger.innerText = selectedBrands.length === 0 ? 'Select Brand' : 
+                           (selectedBrands.length === 1 ? (CONFIG.brandNames[selectedBrands[0]] || selectedBrands[0]) : selectedBrands.length + ' Brands');
+      
+      const pTrigger = document.getElementById('purchaser-dropdown-trigger');
+      pTrigger.innerText = selectedPurchasers.length === 0 ? 'Select Purchaser' : 
+                               (selectedPurchasers.length === 1 ? (CONFIG.purchaserNames[selectedPurchasers[0]] || selectedPurchasers[0]) : selectedPurchasers.length + ' Purchasers');
+
+      currentPage = 1;
+      render();
+    }
+
+    function resetFilters() {
+      document.querySelectorAll('.filter-dropdown-panel input').forEach(i => i.checked = false);
+      selectedBrands = [];
+      selectedPurchasers = [];
+      updateFilters();
+    }
+
     function syntaxHighlight(json) {
       var str = JSON.stringify(json, null, 2);
-      // PERFORMANCE FIX: Skip complex syntax highlighting for very large JSON (5k-10k+ lines)
-      // Browsers struggle with 100,000+ regex matches and DOM nodes.
-      if (str.length > 80000) {
-        return escHtml(str);
-      }
+      if (str.length > 80000) return escHtml(str);
       return str.replace(/("(\\\\u[a-zA-Z0-9]{4}|\\\\[^u]|[^\\\\"])*"(\\s*:)?|\\b(true|false|null)\\b|-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)/g, function(match) {
         var cls = 'json-number';
         if (/^"/.test(match)) {
-          if (/:$/.test(match)) {
-            cls = 'json-key';
-          } else {
-            cls = 'json-string';
-          }
-        } else if (/true/.test(match)) {
-          cls = 'json-bool-true';
-        } else if (/false/.test(match)) {
-          cls = 'json-bool-false';
-        } else if (/null/.test(match)) {
-          cls = 'json-null';
-        }
+          if (/:$/.test(match)) cls = 'json-key';
+          else cls = 'json-string';
+        } else if (/true/.test(match)) cls = 'json-bool-true';
+        else if (/false/.test(match)) cls = 'json-bool-false';
+        else if (/null/.test(match)) cls = 'json-null';
         return '<span class="' + cls + '">' + escHtml(match) + '</span>';
       });
     }
@@ -958,6 +1210,8 @@ function buildExtractionDataPageHtml() {
     function getFilteredRows() {
       return ALL_ROWS.filter(function(r) {
         if (currentFilter !== 'all' && r.status !== currentFilter) return false;
+        if (selectedBrands.length > 0 && !selectedBrands.includes(r.brand)) return false;
+        if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(r.purchaser)) return false;
         if (currentSearch) {
           var q = currentSearch.toLowerCase();
           var haystack = (r.filename + ' ' + (r.patternKey || '') + ' ' + (r.purchaserKey || '')).toLowerCase();
@@ -984,6 +1238,33 @@ function buildExtractionDataPageHtml() {
     function render() {
       var filtered = getFilteredRows();
       var total = filtered.length;
+      
+      // Update counts and stats based on current filters (excluding currentFilter itself for tab counts)
+      const baseFilter = ALL_ROWS.filter(r => {
+        if (selectedBrands.length > 0 && !selectedBrands.includes(r.brand)) return false;
+        if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(r.purchaser)) return false;
+        if (currentSearch) {
+          var q = currentSearch.toLowerCase();
+          var haystack = (r.filename + ' ' + (r.patternKey || '') + ' ' + (r.purchaserKey || '')).toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      });
+
+      const succCount = baseFilter.filter(r => r.status === 'success').length;
+      const failCount = baseFilter.filter(r => r.status === 'failed').length;
+      const allCount = baseFilter.length;
+      const rate = allCount > 0 ? Math.round((succCount / allCount) * 100) : 0;
+
+      document.getElementById('c-all').innerText = allCount;
+      document.getElementById('c-succ').innerText = succCount;
+      document.getElementById('c-fail').innerText = failCount;
+      document.getElementById('tot-val').innerText = allCount;
+      document.getElementById('succ-val').innerText = succCount;
+      document.getElementById('fail-val').innerText = failCount;
+      document.getElementById('rate-val').innerText = rate + '%';
+      document.getElementById('operation-count-label').innerText = allCount + ' operation(s)';
+
       var totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
       if (currentPage > totalPages) currentPage = totalPages;
       var start = (currentPage - 1) * PAGE_SIZE;
@@ -993,24 +1274,22 @@ function buildExtractionDataPageHtml() {
 
       var tbody = document.getElementById('table-body');
       if (page.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📂</div><p>No extraction results match your filter.</p></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📂</div><p>No extraction results match your filter.</p></div></td></tr>';
         document.getElementById('pagination-bar').innerHTML = '';
         return;
       }
 
       var html = '';
       page.forEach(function(r, idx) {
-        var globalIdx = start + idx;
-        var badge = r.status === 'success'
-          ? '<span class="badge badge-success">Success</span>'
-          : '<span class="badge badge-failed">Failed</span>';
+        var globalIdx = ALL_ROWS.indexOf(r);
+        var badge = r.status === 'success' ? '<span class="badge badge-success">Success</span>' : '<span class="badge badge-failed">Failed</span>';
         var expandIcon = '<span class="expand-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>';
-        html += '<tr data-idx="' + globalIdx + '" data-row-key="row-' + globalIdx + '">';
+        html += '<tr data-idx="' + globalIdx + '">';
         html += '<td class="toggle-cell">' + expandIcon + '</td>';
         html += '<td class="time-cell">' + escHtml(formatTime(r.mtime)) + '</td>';
         html += '<td class="filename-cell">' + escHtml(r.filename) + '</td>';
         html += '<td class="pattern-cell"><code>' + escHtml(r.patternKey || '—') + '</code></td>';
-        html += '<td style="font-size:0.75rem">' + escHtml(r.purchaserKey || '—') + '</td>';
+        html += '<td style="font-size:0.72rem; color:var(--text-secondary);">' + escHtml(CONFIG.purchaserNames[r.purchaserKey] || r.purchaserKey || '—') + '</td>';
         html += '<td>' + badge + '</td>';
         html += '<td class="action-cell"><button class="btn-download-row" onclick="event.stopPropagation(); downloadRow(' + globalIdx + ')">' +
                 '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> JSON</button></td>';
@@ -1018,107 +1297,74 @@ function buildExtractionDataPageHtml() {
       });
       tbody.innerHTML = html;
 
-      // Attach smooth in-place expand/collapse handlers
       tbody.querySelectorAll('tr[data-idx]').forEach(function(tr) {
-        tr.addEventListener('click', function() {
+        tr.onclick = function() {
           var idx = parseInt(this.getAttribute('data-idx'), 10);
           var existingExpand = tbody.querySelector('tr.expand-row[data-for="' + idx + '"]');
           if (existingExpand) {
-            // Collapse: animate out then remove
             var viewer = existingExpand.querySelector('.json-viewer');
             if (viewer) {
-              viewer.style.animation = 'slideUp 0.22s cubic-bezier(0.5, 0, 0.75, 0) forwards';
-              viewer.addEventListener('animationend', function() {
-                if (existingExpand.parentNode) existingExpand.parentNode.removeChild(existingExpand);
-              }, { once: true });
-            } else {
-              existingExpand.parentNode.removeChild(existingExpand);
-            }
+              viewer.style.animation = 'slideUp 0.15s forwards';
+              viewer.onanimationend = () => existingExpand.remove();
+            } else existingExpand.remove();
             this.classList.remove('expanded');
             expandedRows.delete(idx);
           } else {
-            // Expand: show spinner immediately, then render JSON async
-            var clickedTr = this;
-            var r = getFilteredRows()[idx];
-            if (!r) return;
-
-            // Insert row with spinner right away
+            var r = ALL_ROWS[idx];
             var expandTr = document.createElement('tr');
             expandTr.className = 'expand-row';
             expandTr.setAttribute('data-for', idx);
-            expandTr.innerHTML = '<td colspan="7"><div class="json-loader"><div class="json-spinner"></div><span>Loading JSON data…</span></div></td>';
-            clickedTr.parentNode.insertBefore(expandTr, clickedTr.nextSibling);
-            clickedTr.classList.add('expanded');
+            expandTr.innerHTML = '<td colspan="7"><div class="json-loader"><div class="json-spinner"></div><span>Loading...</span></div></td>';
+            this.parentNode.insertBefore(expandTr, this.nextSibling);
+            this.classList.add('expanded');
             expandedRows.add(idx);
-
-            // Yield to browser to paint spinner, then do heavy work
-            // Using 60ms to ensure the spinner is definitely rendered and visible across frames
-            setTimeout(function() {
-              var highlighted = syntaxHighlight(r.json);
-              var td = expandTr.querySelector('td');
-              if (td) {
-                var container = document.createElement('div');
-                container.className = 'json-viewer';
-                container.innerHTML = '<pre>' + highlighted + '</pre>';
-                td.innerHTML = '';
-                td.appendChild(container);
-              }
-            }, 60);
+            setTimeout(() => {
+              const highlighted = syntaxHighlight(r.json);
+              expandTr.querySelector('td').innerHTML = '<div class="json-viewer"><pre>' + highlighted + '</pre></div>';
+            }, 50);
           }
-        });
+        };
       });
-
       renderPagination(total, totalPages);
     }
 
     function renderPagination(total, totalPages) {
       var bar = document.getElementById('pagination-bar');
       if (totalPages <= 1) { bar.innerHTML = ''; return; }
-      var html = '';
-      html += '<button class="pg-btn" ' + (currentPage === 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')">&#8592; Prev</button>';
-      var s = Math.max(1, currentPage - 2);
-      var e = Math.min(totalPages, currentPage + 2);
-      if (s > 1) html += '<button class="pg-btn" onclick="goPage(1)">1</button><span style="color:var(--muted)">…</span>';
-      for (var i = s; i <= e; i++) {
-        html += '<button class="pg-btn ' + (i === currentPage ? 'active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
-      }
-      if (e < totalPages) html += '<span style="color:var(--muted)">…</span><button class="pg-btn" onclick="goPage(' + totalPages + ')">' + totalPages + '</button>';
+      var html = '<button class="pg-btn" ' + (currentPage === 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')">&#8592; Prev</button>';
+      var s = Math.max(1, currentPage - 2), e = Math.min(totalPages, currentPage + 2);
+      if (s > 1) html += '<button class="pg-btn" onclick="goPage(1)">1</button><span style="padding:0 5px">…</span>';
+      for (var i = s; i <= e; i++) html += '<button class="pg-btn ' + (i === currentPage ? 'active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+      if (e < totalPages) html += '<span style="padding:0 5px">…</span><button class="pg-btn" onclick="goPage(' + totalPages + ')">' + totalPages + '</button>';
       html += '<button class="pg-btn" ' + (currentPage === totalPages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')">Next &#8594;</button>';
       bar.innerHTML = html;
     }
 
-    function goPage(p) {
-      currentPage = p;
-      expandedRows.clear();
-      render();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    function goPage(p) { currentPage = p; expandedRows.clear(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
-    // Tab buttons
     document.querySelectorAll('.tab-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
+      btn.onclick = function() {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
         currentFilter = this.getAttribute('data-filter');
         currentPage = 1;
         expandedRows.clear();
         render();
-      });
+      };
     });
 
-    // Search
     var searchTimer;
-    document.getElementById('search-input').addEventListener('input', function() {
+    document.getElementById('search-input').oninput = function() {
       clearTimeout(searchTimer);
-      var val = this.value;
-      searchTimer = setTimeout(function() {
-        currentSearch = val;
+      searchTimer = setTimeout(() => {
+        currentSearch = this.value;
         currentPage = 1;
         expandedRows.clear();
         render();
       }, 250);
-    });
+    };
 
+    initFilters();
     render();
   </script>
 </body>
@@ -1128,6 +1374,37 @@ function buildExtractionDataPageHtml() {
 function buildSyncReportHtml() {
   const files = listStagingFiles(STAGING_DIR, STAGING_DIR, []);
   files.sort((a, b) => b.mtime - a.mtime);
+
+  const filesData = files.map((f) => {
+    const parts = f.path.split("/");
+    const brand = parts[0] || "";
+    const purchaser = parts[1] || "";
+    return { path: f.path, size: f.size, mtime: f.mtime, brand, purchaser };
+  });
+
+  const allBrands = Array.from(
+    new Set(filesData.map((f) => f.brand).filter(Boolean)),
+  );
+  const allPurchasers = Array.from(
+    new Set(filesData.map((f) => f.purchaser).filter(Boolean)),
+  );
+
+  const brandNamesMap = {};
+  allBrands.forEach((id) => (brandNamesMap[id] = formatBrandDisplayName(id)));
+  const purchaserNamesMap = {};
+  allPurchasers.forEach(
+    (id) => (purchaserNamesMap[id] = formatPurchaserDisplayName(id)),
+  );
+
+  const brandPurchaserMap = {};
+  filesData.forEach((f) => {
+    if (f.brand && f.purchaser) {
+      if (!brandPurchaserMap[f.brand]) brandPurchaserMap[f.brand] = [];
+      if (!brandPurchaserMap[f.brand].includes(f.purchaser))
+        brandPurchaserMap[f.brand].push(f.purchaser);
+    }
+  });
+
   let manifestEntries = 0;
   if (existsSync(SYNC_MANIFEST_PATH)) {
     try {
@@ -1174,15 +1451,8 @@ function buildSyncReportHtml() {
     return `${day}${suffix} ${month} ${year}`;
   };
 
-  const formatDate = (ms) => {
-    if (!ms) return "—";
-    const d = new Date(ms);
-    return d.toISOString();
-  };
   const historyData = JSON.stringify(history);
-  const filesJson = JSON.stringify(
-    files.map((f) => ({ path: f.path, size: f.size, mtime: f.mtime })),
-  );
+  const filesJson = JSON.stringify(filesData);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1239,17 +1509,19 @@ function buildSyncReportHtml() {
     .report-header .logo { height: 32px; width: auto; object-fit: contain; }
     .report-header-title {
       margin: 0;
+      height: 34px;
       font-size: 0.82rem;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: #ffffff;
       background: var(--header-bg);
-      padding: 0.45rem 1.1rem;
+      padding: 0 1.1rem;
       border-radius: 6px;
       display: inline-flex;
       align-items: center;
-      line-height: 1.3;
+      line-height: 1;
+      font-family: inherit;
     }
     
     .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
@@ -1317,19 +1589,113 @@ function buildSyncReportHtml() {
       cursor: not-allowed; 
       background: #f8fafc;
     }
+
+    /* Filtering Styles */
+    .report-header-right { display: flex; align-items: center; justify-content: flex-end; }
+    .header-filter-row { display: flex; align-items: center; gap: 0.75rem; }
+    .header-field-wrap { display: flex; flex-direction: column; align-items: center; }
+    .filter-dropdown { position: relative; }
+    .filter-chip { 
+      display: flex; align-items: center; height: 34px; background: #fff; 
+      border: 1px solid rgba(176,191,201,0.6); border-radius: 8px; overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .filter-chip .header-label {
+      font-size: 0.7rem; color: var(--primary); font-weight: 800; background: var(--accent-light);
+      padding: 0 0.75rem; height: 100%; display: flex; align-items: center;
+      border-right: 1px solid rgba(45,157,95,0.2); text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .filter-dropdown-trigger {
+      border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
+      font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
+      min-width: 180px; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+    }
+    .filter-dropdown-panel {
+      display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
+      min-width: 220px; max-height: 400px; overflow-y: auto; background: white;
+      border: 1px solid var(--border-light); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      z-index: 1100; padding: 0.5rem 0;
+    }
+    .filter-dropdown-panel.open { display: block; animation: slideDownPanel 0.2s ease-out; }
+    .filter-dropdown-option {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
+      font-size: 0.85rem; cursor: pointer; transition: background 0.1s;
+    }
+    .filter-dropdown-option:hover { background: #f8fafc; }
+    .filter-dropdown-option input { margin: 0; cursor: pointer; }
+    
+    .header-btn-reset {
+      height: 34px; 
+      padding: 0 1.1rem; 
+      background: var(--header-bg); 
+      color: #fff;
+      border: none; 
+      border-radius: 6px; 
+      font-size: 0.82rem; 
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer; 
+      box-shadow: 0 2px 5px rgba(33,108,109,0.2); 
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .header-btn-reset:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    @keyframes slideDownPanel { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
   <div class="report-header">
-    <div class="report-header-left">
-      <a href="/" title="Go to Home" style="display: flex; align-items: center;">
-        <img src="${REPORT_LOGO_DATA_URI}" alt="logo" class="logo">
+    <div style="display: flex; align-items: center; gap: 1.5rem; width: 100%;">
+      <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center; height: 34px;">
+        <img src="${REPORT_LOGO_DATA_URI}" alt="intellirevenue" class="logo">
       </a>
-      <h1 class="report-header-title">Staging Inventory Report</h1>
-    </div>
-    <div class="meta">
-      <p>Generated: ${formatDateHuman(new Date())}</p>
-      <p>Manifest entries: ${manifestEntries} | Files in staging: ${files.length}</p>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <h1 class="report-header-title">Staging Inventory Report</h1>
+          <div class="report-header-right">
+             <div class="header-filter-row">
+                  <div class="header-field-wrap brand-field-wrap">
+                    <div id="brand-dropdown" class="filter-dropdown">
+                      <div class="filter-chip">
+                        <label class="header-label" for="brand-dropdown-trigger">Brand</label>
+                        <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
+                          Select brand
+                        </button>
+                      </div>
+                      <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+                    </div>
+                  </div>
+                  <div class="header-field-wrap purchaser-field-wrap">
+                    <div id="purchaser-dropdown" class="filter-dropdown">
+                      <div class="filter-chip">
+                        <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
+                        <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
+                          Select purchaser
+                        </button>
+                      </div>
+                      <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+                    </div>
+                  </div>
+                  <div class="header-field-wrap header-filter-reset-wrap">
+                    <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">
+                      Reset Filter
+                    </button>
+                  </div>
+                </div>
+          </div>
+        </div>
+        <div class="meta" style="display: flex; gap: 1.25rem; opacity: 0.85;">
+          <span>Generated: ${formatDateHuman(new Date())}</span>
+          <span id="operation-count-label">Manifest: ${manifestEntries} | Staging: ${files.length} file(s)</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1354,25 +1720,154 @@ function buildSyncReportHtml() {
   <script>
     const historyData = ${historyData};
     const ALL_FILES = ${filesJson};
+    const CONFIG = {
+      brands: ${JSON.stringify(allBrands)},
+      purchasers: ${JSON.stringify(allPurchasers)},
+      brandPurchaserMap: ${JSON.stringify(brandPurchaserMap)},
+      brandNames: ${JSON.stringify(brandNamesMap)},
+      purchaserNames: ${JSON.stringify(purchaserNamesMap)}
+    };
+
     let currentPage = 1;
     const pageSize = 100;
+    let selectedBrands = [];
+    let selectedPurchasers = [];
+    let historyChartInstance = null;
+
+    function goToHome() { window.location.href = "/"; }
 
     function esc(s) {
       return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function initFilters() {
+      const brandPanel = document.getElementById('brand-dropdown-panel');
+      const bTrigger = document.getElementById('brand-dropdown-trigger');
+      if (bTrigger) {
+        bTrigger.onclick = (e) => {
+          e.stopPropagation();
+          brandPanel.classList.toggle('open');
+          document.getElementById('purchaser-dropdown-panel').classList.remove('open');
+        };
+      }
+
+      CONFIG.brands.forEach(b => {
+        const div = document.createElement('div');
+        div.className = 'filter-dropdown-option';
+        const displayName = CONFIG.brandNames[b] || b;
+        div.innerHTML = '<input type="checkbox" value="' + b + '"> <span>' + displayName + '</span>';
+        div.onclick = (e) => {
+          e.stopPropagation();
+          const cb = div.querySelector('input');
+          if (e.target !== cb) cb.checked = !cb.checked;
+          updateFilters();
+        };
+        brandPanel.appendChild(div);
+      });
+
+      const purchaserPanel = document.getElementById('purchaser-dropdown-panel');
+      const pTrigger = document.getElementById('purchaser-dropdown-trigger');
+      if (pTrigger) {
+        pTrigger.onclick = (e) => {
+          e.stopPropagation();
+          purchaserPanel.classList.toggle('open');
+          document.getElementById('brand-dropdown-panel').classList.remove('open');
+        };
+      }
+
+      CONFIG.purchasers.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'filter-dropdown-option';
+        const displayName = CONFIG.purchaserNames[p] || p;
+        div.innerHTML = '<input type="checkbox" value="' + p + '"> <span>' + displayName + '</span>';
+        div.onclick = (e) => {
+          e.stopPropagation();
+          const cb = div.querySelector('input');
+          if (e.target !== cb) cb.checked = !cb.checked;
+          updateFilters();
+        };
+        purchaserPanel.appendChild(div);
+      });
+
+      window.onclick = () => {
+        if (brandPanel) brandPanel.classList.remove('open');
+        if (purchaserPanel) purchaserPanel.classList.remove('open');
+      };
+    }
+
+    function updateFilters() {
+      selectedBrands = Array.from(document.querySelectorAll('#brand-dropdown-panel input:checked')).map(i => i.value);
+      selectedPurchasers = Array.from(document.querySelectorAll('#purchaser-dropdown-panel input:checked')).map(i => i.value);
+
+      const pOptions = document.querySelectorAll('#purchaser-dropdown-panel .filter-dropdown-option');
+      pOptions.forEach(opt => {
+        const val = opt.querySelector('input').value;
+        let visible = selectedBrands.length === 0;
+        if (!visible) {
+           for (const b of selectedBrands) {
+             if (CONFIG.brandPurchaserMap[b] && CONFIG.brandPurchaserMap[b].includes(val)) {
+               visible = true;
+               break;
+             }
+           }
+        }
+        opt.style.display = visible ? 'flex' : 'none';
+        if (!visible) opt.querySelector('input').checked = false;
+      });
+      selectedPurchasers = Array.from(document.querySelectorAll('#purchaser-dropdown-panel input:checked')).map(i => i.value);
+
+      const bTrigger = document.getElementById('brand-dropdown-trigger');
+      if (bTrigger) {
+        bTrigger.innerText = selectedBrands.length === 0 ? 'Select Brand' : 
+                                 (selectedBrands.length === 1 ? (CONFIG.brandNames[selectedBrands[0]] || selectedBrands[0]) : selectedBrands.length + ' Brands');
+      }
+      
+      const pTrigger = document.getElementById('purchaser-dropdown-trigger');
+      if (pTrigger) {
+        pTrigger.innerText = selectedPurchasers.length === 0 ? 'Select Purchaser' : 
+                                 (selectedPurchasers.length === 1 ? (CONFIG.purchaserNames[selectedPurchasers[0]] || selectedPurchasers[0]) : selectedPurchasers.length + ' Purchasers');
+      }
+
+      currentPage = 1;
+      renderTable();
+      updateCharts();
+    }
+
+    function resetFilters() {
+      document.querySelectorAll('.filter-dropdown-panel input').forEach(i => i.checked = false);
+      selectedBrands = [];
+      selectedPurchasers = [];
+      updateFilters();
+    }
+
+    function getFilteredFiles() {
+      return ALL_FILES.filter(f => {
+        if (selectedBrands.length > 0 && !selectedBrands.includes(f.brand)) return false;
+        if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(f.purchaser)) return false;
+        return true;
+      });
     }
 
     function renderTable() {
       const tbody = document.getElementById('files-body');
       if (!tbody) return;
       
-      if (ALL_FILES.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3">No synced files.</td></tr>';
+      const filtered = getFilteredFiles();
+      const label = document.getElementById('operation-count-label');
+      if (label) {
+        label.innerText = 'Manifest: ${manifestEntries} | Staging: ' + filtered.length + ' file(s)';
+      }
+
+      const pContainer = document.getElementById('pagination');
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3">No files found for selected filters.</td></tr>';
+        if (pContainer) pContainer.innerHTML = '';
         return;
       }
 
       const start = (currentPage - 1) * pageSize;
-      const end = Math.min(start + pageSize, ALL_FILES.length);
-      const page = ALL_FILES.slice(start, end);
+      const end = Math.min(start + pageSize, filtered.length);
+      const page = filtered.slice(start, end);
 
       tbody.innerHTML = page.map(f => \`
         <tr>
@@ -1382,12 +1877,13 @@ function buildSyncReportHtml() {
         </tr>
       \`).join('');
       
-      renderPagination();
+      renderPagination(filtered.length);
     }
 
-    function renderPagination() {
+    function renderPagination(totalCount) {
       const container = document.getElementById('pagination');
-      const totalPages = Math.ceil(ALL_FILES.length / pageSize);
+      if (!container) return;
+      const totalPages = Math.ceil(totalCount / pageSize);
       if (totalPages <= 1) { container.innerHTML = ''; return; }
       
       let html = '';
@@ -1412,55 +1908,98 @@ function buildSyncReportHtml() {
       if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    window.onload = () => {
-      renderTable();
-      if (historyData.length > 0) {
-        const ctx = document.getElementById('historyChart').getContext('2d');
-      const labels = historyData.map(d => {
+    function updateCharts() {
+      const canvas = document.getElementById('historyChart');
+      if (!canvas || historyData.length === 0) return;
+
+      const filteredHistory = historyData.filter(h => {
+        // No filter selected — show all entries
+        if (selectedBrands.length === 0 && selectedPurchasers.length === 0) return true;
+
+        // Each history entry has parallel brands[] and purchasers[] arrays.
+        // An entry matches if ANY of its (brand, purchaser) pairs satisfies the filters.
+        const brands = Array.isArray(h.brands) ? h.brands : [];
+        const purchasers = Array.isArray(h.purchasers) ? h.purchasers : brands.map(() => '');
+
+        for (let i = 0; i < brands.length; i++) {
+          const b = brands[i] || '';
+          const p = purchasers[i] || '';
+
+          const brandMatch = selectedBrands.length === 0 || selectedBrands.includes(b);
+          const purchaserMatch = selectedPurchasers.length === 0 || selectedPurchasers.includes(p);
+
+          if (brandMatch && purchaserMatch) return true;
+        }
+        return false;
+      });
+
+      const labels = filteredHistory.map(d => {
         const date = new Date(d.timestamp);
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       });
-      
-      new Chart(ctx, {
+
+      if (historyChartInstance) {
+        historyChartInstance.destroy();
+        historyChartInstance = null;
+      }
+
+      if (filteredHistory.length === 0) {
+        // Show an informative empty state instead of a blank canvas
+        const card = canvas.closest('.chart-card');
+        if (card) {
+          let msg = card.querySelector('.chart-empty-msg');
+          if (!msg) {
+            msg = document.createElement('p');
+            msg.className = 'chart-empty-msg';
+            msg.style.cssText = 'text-align:center;color:#94a3b8;font-size:0.85rem;padding:1rem 0;margin:0';
+            card.appendChild(msg);
+          }
+          msg.textContent = 'No download history for the selected filter.';
+        }
+        return;
+      }
+
+      // Remove empty-state message if present
+      const card = canvas.closest ? canvas.closest('.chart-card') : null;
+      if (card) {
+        const msg = card.querySelector('.chart-empty-msg');
+        if (msg) msg.remove();
+      }
+
+      const ctx = canvas.getContext('2d');
+      historyChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: labels,
           datasets: [
-            {
-              label: 'Downloaded (New)',
-              data: historyData.map(d => d.synced),
-              backgroundColor: '#2d9d5f',
-            },
-            {
-              label: 'Skipped (Unchanged)',
-              data: historyData.map(d => d.skipped),
-              backgroundColor: '#94a3b8',
-            },
-            {
-              label: 'Errors',
-              data: historyData.map(d => d.errors),
-              backgroundColor: '#ef4444',
-            }
+            { label: 'Downloaded (New)', data: filteredHistory.map(d => d.synced), backgroundColor: '#2d9d5f' },
+            { label: 'Skipped (Unchanged)', data: filteredHistory.map(d => d.skipped), backgroundColor: '#94a3b8' },
+            { label: 'Errors', data: filteredHistory.map(d => d.errors), backgroundColor: '#ef4444' }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          scales: {
-            x: { stacked: true },
-            y: { stacked: true, beginAtZero: true }
-          },
-          plugins: {
-            legend: { position: 'bottom' }
-          }
+          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+          plugins: { legend: { position: 'bottom' } }
         }
       });
-    } else {
-      document.querySelector('.chart-card').style.display = 'none';
-      const msg = document.createElement('p');
-      msg.textContent = 'No download history available yet.';
-      msg.style.textAlign = 'center';
-      document.querySelector('.dashboard-grid').appendChild(msg);
+    }
+
+    window.onload = () => {
+      initFilters();
+      renderTable();
+      updateCharts();
+      
+      const canvas = document.getElementById('historyChart');
+      if (!canvas || historyData.length === 0) {
+        const card = document.querySelector('.chart-card');
+        if (card) card.style.display = 'none';
+        const msg = document.createElement('p');
+        msg.textContent = 'No download history available yet.';
+        msg.style.textAlign = 'center';
+        const grid = document.querySelector('.dashboard-grid');
+        if (grid) grid.appendChild(msg);
       }
     };
   </script>
