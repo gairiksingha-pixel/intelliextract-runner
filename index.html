@@ -2371,6 +2371,7 @@
           </div>
           <button
             type="button"
+            id="app-alert-close-icon"
             class="modal-close-icon"
             onclick="closeAppAlert()"
             aria-label="Close dialog"
@@ -6272,6 +6273,16 @@
             }
             closeAppAlert();
           };
+
+          var closeIcon = document.getElementById("app-alert-close-icon");
+          if (closeIcon) {
+            closeIcon.onclick = function () {
+              if (options.isConfirm && options.onCancel) {
+                options.onCancel();
+              }
+              closeAppAlert();
+            };
+          }
 
           overlay.classList.add("open");
           overlay.setAttribute("aria-hidden", "false");
