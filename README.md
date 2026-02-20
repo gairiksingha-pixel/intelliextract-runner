@@ -4,16 +4,20 @@ TypeScript runner and browser app for the IntelliExtract spreadsheet extraction 
 
 ## Features & capabilities
 
+- **Unified Dashboard UI**: Standardized 33.333% row heights ensure all operations fit on one screen without scrolling, providing a clear "at-a-glance" overview.
+- **Accessible Interactions**: Keyboard shortcuts added to the UI—press **Enter** to confirm and **Escape** to cancel or dismiss alerts.
+- **Responsive Navigation**: Optimized for a wide range of devices, including standard **1024x768** desktop resolutions, with perfectly aligned and equally spaced header controls.
+- **Automated Notifications**: Built-in support for **consolidated failure emails**. Receive a professional HTML summary via Gmail/SMTP whenever extraction failures occur in a batch run.
+- **Scheduled runs**: Built-in cron-based scheduler to run sync+extract pipelines automatically. Configure recurring jobs (e.g., hourly/daily) directly from the browser UI.
 - **S3 sync to staging**: Syncs from a single S3 bucket with tenant/purchaser folders into a local `output/staging/...` tree, with optional sync limits and SHA-256 based skip-on-checksum.
-- **File-level checkpointing**: Stores status per file (`done`, `error`, `skipped`) in `checkpoint.json` so runs can be resumed without reprocessing completed files.
-- **Scheduled runs**: Built-in cron-based scheduler to run sync+extract pipelines automatically at configured times/intervals.
+- **File-level checkpointing**: Stores status per file (`done`, `error`, `skipped`) in a local JSON-based store (`checkpoint.json`) so runs can be resumed without reprocessing completed files.
 - **Process management**: View active runs, track progress, and stop/cancel running processes directly from the UI.
 - **Configurable load (RPS + concurrency)**: `run.concurrency` and `run.requestsPerSecond` let you simulate different load profiles against the IntelliExtract API.
 - **Full request/response logging**: Writes JSONL logs per run with request, response, headers, and timing for every API call.
-- **Extraction result classification**: For every file, the full extract API JSON response is stored and classified using the response body’s `success` flag (`"success": true` → successful response, `"success": false` → failed response). Upload/read failures are counted as **failed file uploads**.
-- **Executive summary reporting**: Generates Markdown, HTML, and JSON executive summaries with throughput, latency percentiles, error rate, anomaly detection, and per-file extraction results (linked to the stored JSON).
-- **Sync-extract pipeline mode**: Optional `sync-extract` command that syncs and extracts files in a single streaming pipeline (sync one → extract one), useful for incremental runs.
-- **Browser app**: Web UI to run sync, extract, and pipeline scenarios and view output inline.
+- **Extraction result classification**: For every file, the full extract API JSON response is stored and classified using the response body’s `success` flag.
+- **Consolidated Reporting**: Generates Markdown, HTML, and JSON executive summaries with throughput, latency percentiles, error rate, and per-file links to stored JSON responses.
+- **Stream Pipeline Mode**: The `sync-extract` command streams files—syncing and extracting each file as soon as it is downloaded, ideal for continuous incremental runs.
+- **Browser app**: Full-featured Web UI to manage schedules, view history, and execute runs with real-time progress indicators.
 
 ## Requirements
 
@@ -140,10 +144,12 @@ You can run commands in three equivalent ways (after `npm install`):
 - **Sync-extract pipeline** – stream pipeline: sync up to N files and extract each one as soon as it is downloaded:
 
   ```bash
-  node dist/index.js sync-extract --limit 50
+  npm run build
   node dist/index.js sync-extract --limit 50 --tenant <tenant> --purchaser <purchaser>
   node dist/index.js sync-extract --limit 50 --resume   # resume from a previous pipeline run
   ```
+
+  _Note: Options `--tenant`, `--purchaser`, and `--pairs` are supported across all core commands._
 
 - **Report** – generate the executive summary from the last run (or a given run ID):
 
@@ -159,9 +165,10 @@ You can run commands in three equivalent ways (after `npm install`):
 - **Sync manifest:** `output/checkpoints/sync-manifest.json` (or `s3.syncManifestPath`) – stores key → SHA-256 so already-downloaded unchanged files are skipped on the next sync.
 - **Checkpoints:** `output/checkpoints/checkpoint.json` – resumable run state; `last-run-id.txt` in the same directory stores the latest run ID for `report`.
 - **Logs:** `output/logs/request-response_<runId>.jsonl` – one JSON object per request/response for debugging.
-- **Reports:** `output/reports/report_<runId>_<ts>.md|.html|.json` – executive summary. Set `report.retainCount` in config to keep only the last N report sets and avoid unbounded disk use.
+- **Reports:** `output/reports/report_<runId>_<ts>.md|.html|.json` – executive summary.
+- **Notifications:** `output/checkpoints/notification-config.json` – stores recipient email settings configured via the UI.
 
-Note: Checkpoints are stored as `checkpoint.json` (same path as `checkpointPath` with `.sqlite` replaced by `.json`).
+Note: Checkpoints are stored in `checkpoint.json`. Even if configured as `.db` or `.sqlite` in YAML, the runner uses a robust, lock-protected JSON store for cross-platform compatibility without native dependencies.
 
 ### Sync limit and SHA-256 skip
 
@@ -245,7 +252,7 @@ Run sync, extract, and pipeline from a browser UI:
 3. **Open in browser:** [http://localhost:8765/](http://localhost:8765/)
 4. Use the dropdowns to pick **Brand** and **Purchaser**, optionally set limits, then click **Run** to execute a scenario and see the output inline.
 
-**Logo:** The app shows the intellirevenue logo if present. Place your logo at `assets/logo.png`, or any `.png` file in the `assets/` folder.
+**Logo & Layout:** The app shows the intellirevenue logo across all dashboards and reports. Standardized header layouts ensure that the Back button, Title, and Filter controls are equally spaced and perfectly aligned, even on smaller viewports.
 
 ### Quick verification script (optional)
 

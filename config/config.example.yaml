@@ -37,11 +37,12 @@ logging:
   requestResponseLog: request-response.jsonl
   maxResponseBodyLength: 50000
 
-# Reporting
+# Reporting - Automatically generates executive summaries following extraction
 report:
   outputDir: ./output/reports
   formats:
-    - html
-    - json
-  # Optional: keep only the last N report sets (each run = one .html + one .json). Older reports are deleted after each write. Omit or 0 = keep all.
+    - html # Standardized report with consolidated headers and 1024px optimizations
+    - json # Raw metrics and per-file result data
+  # Optional: keep only the last N report sets (each run = one .html + one .json).
+  # Older reports are deleted after each write to maintain a clean workspace.
   # retainCount: 10
