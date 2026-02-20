@@ -1085,7 +1085,7 @@ function htmlReportFromHistory(
     .btn-back-main svg { width: 16px; height: 16px; transition: transform 0.2s; }
     .btn-back-main:hover svg { transform: translateX(-2px); }
     .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
-    .report-header .logo { height: 32px; width: auto; object-fit: contain; }
+    .report-header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
     .report-header-title {
       margin: 0;
       height: 34px;
@@ -1617,7 +1617,7 @@ function htmlReportFromHistory(
 </head>
 <body>
   <div class="report-header">
-    <div style="display: flex; align-items: flex-start; gap: 1.5rem; width: 100%;">
+    <div style="display: flex; align-items: center; gap: 1.5rem; width: 100%;">
       <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center; height: 34px;">
         <img src="${logoDataUri}" alt="intellirevenue" class="logo">
       </a>
