@@ -874,15 +874,8 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   </summary>
   <div class="run-section-body">
     ${sessionsSection}
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
-      <div style="flex: 1;">
-        <h3 style="margin-top: 0;">Consolidated Overview</h3>
-      </div>
-      <div class="retry-action-wrap">
-        <button class="btn-retry-batch" onclick="triggerRetry('${entry.brand || ""}', '${entry.purchaser || ""}')">
-          <span>🔄 Retry failures from this operation</span>
-        </button>
-      </div>
+    <div style="margin-bottom: 2rem;">
+      <h3 style="margin-top: 0;">Consolidated Overview</h3>
     </div>
   <div class="table-responsive">
     <table>
@@ -1514,31 +1507,7 @@ function htmlReportFromHistory(
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
-    function triggerRetry(brand, purchaser) {
-      const baseUrl = window.location.protocol === 'file:' ? 'http://localhost:8765' : window.location.origin;
-      const url = new URL(baseUrl);
-      if (brand) url.searchParams.set('brand', brand);
-      if (purchaser) url.searchParams.set('purchaser', purchaser);
-      url.searchParams.set('caseId', 'P2');
-      url.searchParams.set('retryFailed', 'true');
-      url.searchParams.set('autoRun', 'true');
-      
-      const confirmMsg = "This will open the runner and automatically start retrying failures for: " + (purchaser || brand || "all") + ". Proceed?";
-      
-      showAppAlert("Retry Failures", confirmMsg, {
-        isConfirm: true,
-        confirmText: "Proceed",
-        onConfirm: function() {
-          try {
-            if (window.parent && window.parent !== window) {
-              window.parent.location.href = url.toString();
-              return;
-            }
-          } catch (e) {}
-          window.open(url.toString(), '_blank');
-        }
-      });
-    }
+
 
     // Modal Helpers
     let currentConfirmCallback = null;
@@ -1590,11 +1559,13 @@ function htmlReportFromHistory(
 
       overlay.classList.add("open");
       overlay.setAttribute("aria-hidden", "false");
+      window._alertIsOpen = true;
     }
 
     function closeAppAlert() {
       const overlay = document.getElementById("app-alert-modal-overlay");
       if (!overlay) return;
+      window._alertIsOpen = false;
       overlay.classList.add("closing");
       overlay.setAttribute("aria-hidden", "true");
       setTimeout(function () {
@@ -1602,6 +1573,24 @@ function htmlReportFromHistory(
         overlay.classList.remove("closing");
       }, 160);
     }
+
+    // Keyboard shortcuts for Alert Modal
+    window.addEventListener("keydown", function (e) {
+      if (!window._alertIsOpen) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = document.getElementById("app-alert-confirm-btn");
+        if (btn) btn.click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        const btn = document.getElementById("app-alert-cancel-btn");
+        if (btn && btn.style.display !== "none") {
+          btn.click();
+        } else {
+          closeAppAlert();
+        }
+      }
+    });
 
     function goToHome() { 
       try {
@@ -1992,6 +1981,11 @@ function htmlReportFromHistory(
     let chartInstances = {};
 
     window.onload = () => {
+      if (typeof Chart !== 'undefined') {
+        Chart.defaults.font.family = "'JetBrains Mono', 'Consolas', monospace";
+        Chart.defaults.font.size = 11;
+        Chart.defaults.color = "#5a5a5a";
+      }
       initCharts(runData);
       renderHistory();
     };

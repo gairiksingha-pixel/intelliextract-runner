@@ -6026,62 +6026,6 @@
           });
         fetchConfig().then(function () {
           updateHeaderStatus();
-
-          // Handle deep linking from reports
-          var urlParams = new URLSearchParams(window.location.search);
-          var brandParam = urlParams.get("brand");
-          var purchaserParam = urlParams.get("purchaser");
-          var caseIdParam = urlParams.get("caseId");
-          var autoRun = urlParams.get("autoRun") === "true";
-          var retryFailed = urlParams.get("retryFailed") === "true";
-
-          if (brandParam) {
-            var brandPanel = document.getElementById("brand-dropdown-panel");
-            if (brandPanel) {
-              var brandCb = brandPanel.querySelector(
-                'input[type=checkbox][value="' + brandParam + '"]',
-              );
-              if (brandCb) {
-                brandCb.checked = true;
-                refreshPurchaserOptions();
-              }
-            }
-          }
-          if (purchaserParam) {
-            var purchaserPanel = document.getElementById(
-              "purchaser-dropdown-panel",
-            );
-            if (purchaserPanel) {
-              var purchaserCb = purchaserPanel.querySelector(
-                'input[type=checkbox][value="' + purchaserParam + '"]',
-              );
-              if (purchaserCb) {
-                purchaserCb.checked = true;
-              }
-            }
-          }
-          if (brandParam || purchaserParam) {
-            updateFilterDropdownTrigger("brand");
-            updateFilterDropdownTrigger("purchaser");
-            updateHeaderStatus();
-          }
-
-          if (autoRun && caseIdParam) {
-            var caseRow = document.querySelector(
-              'tr[data-case-id="' + caseIdParam + '"]',
-            );
-            if (caseRow) {
-              var runBtn = caseRow.querySelector("button.run");
-              var resultDiv = caseRow.querySelector(".result");
-              var retryBtn = caseRow.querySelector(".retry-failed-btn");
-
-              if (retryFailed && retryBtn) {
-                retryBtn.click();
-              } else if (runBtn) {
-                runBtn.click();
-              }
-            }
-          }
         });
 
         // Initialize notification modal logic
@@ -6281,6 +6225,24 @@
             overlay.classList.remove("closing");
           }, 160);
         };
+
+        // Keyboard shortcuts for Alert Modal
+        window.addEventListener("keydown", function (e) {
+          if (!window._alertIsOpen) return;
+          if (e.key === "Enter") {
+            e.preventDefault();
+            var btn = document.getElementById("app-alert-confirm-btn");
+            if (btn) btn.click();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            var btn = document.getElementById("app-alert-cancel-btn");
+            if (btn && btn.style.display !== "none") {
+              btn.click();
+            } else {
+              window.closeAppAlert();
+            }
+          }
+        });
       })();
       window.stopBackgroundJob = function (caseId) {
         showAppAlert(

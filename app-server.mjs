@@ -2119,6 +2119,11 @@ function buildSyncReportHtml() {
     }
 
     window.onload = () => {
+      if (typeof Chart !== 'undefined') {
+        Chart.defaults.font.family = "'JetBrains Mono', 'Consolas', monospace";
+        Chart.defaults.font.size = 11;
+        Chart.defaults.color = "#5a5a5a";
+      }
       initFilters();
       renderTable();
       updateCharts();
