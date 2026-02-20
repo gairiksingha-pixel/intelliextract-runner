@@ -2539,8 +2539,8 @@
       const ROWS = [
         {
           id: "P1",
-          title: "Cloud Download",
-          description: "Download files to staging",
+          title: "Cloud Sync",
+          description: "Synchronize cloud files to local staging",
           limits: { sync: true, extract: false },
           iconHtml: ICON_DOWNLOAD,
         },
@@ -2588,10 +2588,20 @@
       }
 
       function getRunButtonLabel(caseId) {
-        if (caseId === "P1") return "Start Download";
+        if (caseId === "P1") return "Start Sync";
         if (caseId === "P2") return "Start Operation";
         if (caseId === "PIPE") return "Sync & Operation";
         return "Run";
+      }
+
+      function getPlaceholderText(caseId) {
+        if (caseId === "P1")
+          return "Ready for cloud synchronization. Select brands/purchasers and click Start Sync.";
+        if (caseId === "P2")
+          return "Ready for data extraction. Select brands/purchasers and click Start Operation.";
+        if (caseId === "PIPE")
+          return "Ready for full synchronization and extraction. Select brands/purchasers and click Sync & Operation.";
+        return "Ready to extract. Configure filters and click Run.";
       }
 
       function renderRow(c, sectionId) {
@@ -2602,7 +2612,9 @@
         resultDiv.className = "result result-placeholder";
         resultDiv.id = "result-" + c.id;
         resultDiv.innerHTML =
-          '<span class="result-placeholder-text">Ready to extract. Configure filters and click Run.</span>';
+          '<span class="result-placeholder-text">' +
+          getPlaceholderText(c.id) +
+          "</span>";
         resultCell.appendChild(resultDiv);
         const btn = document.createElement("button");
         btn.type = "button";
@@ -3141,7 +3153,9 @@
         }
         var clearLimits = !options || options.clearLimits !== false;
         resultDiv.innerHTML =
-          '<span class="result-placeholder-text">Ready to extract. Configure filters and click Run.</span>';
+          '<span class="result-placeholder-text">' +
+          getPlaceholderText(caseId) +
+          "</span>";
         resultDiv.className = "result result-placeholder";
         if (row) {
           var inputs = row.querySelectorAll(".limit-sync, .limit-extract");
@@ -3972,7 +3986,9 @@
                   if (resultDiv) {
                     resultDiv.className = "result result-placeholder";
                     resultDiv.innerHTML =
-                      '<span class="result-placeholder-text">Select at least one brand or purchaser in the filter above, then click Run.</span>';
+                      '<span class="result-placeholder-text">' +
+                      getPlaceholderText(caseId) +
+                      "</span>";
                   }
                 }
               })
@@ -5305,9 +5321,9 @@
           .join("");
         renderWithTransition(
           body,
-          '<div class="schedule-header-row"><div style="display:flex;align-items:center;gap:0.75rem;"><button type="button" id="schedule-form-back-btn" class="btn-secondary" style="padding: 0.4rem 0.6rem">' +
+          '<div class="schedule-header-row"><div style="display:flex;align-items:center;gap:0.75rem;"><button type="button" id="schedule-form-back-btn" class="btn-secondary" style="padding: 0.4rem 0.8rem">' +
             ICON_BACK +
-            '</button><div class="subtitle-chip">' +
+            '<span>BACK</span></button><div class="subtitle-chip">' +
             (schedule
               ? "Edit operation parameters"
               : "Launch a new operation schedule") +
@@ -5574,9 +5590,9 @@
         if (page === 1) {
           renderWithTransition(
             body,
-            '<div class="schedule-header-row"><div style="display:flex;align-items:center;gap:0.75rem;"><button type="button" id="schedule-log-back-btn" class="btn-secondary" style="padding: 0.4rem 0.6rem">' +
+            '<div class="schedule-header-row"><div style="display:flex;align-items:center;gap:0.75rem;"><button type="button" id="schedule-log-back-btn" class="btn-secondary" style="padding: 0.4rem 0.8rem">' +
               ICON_BACK +
-              '</button><div class="subtitle-chip">Schedule execution logs</div></div></div><div class="schedule-empty">Loading history logs…</div><div class="modal-footer" style="margin-top:0.85rem; border-top:none;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
+              '<span>BACK</span></button><div class="subtitle-chip">Schedule execution logs</div></div></div><div class="schedule-empty">Loading history logs…</div><div class="modal-footer" style="margin-top:0.85rem; border-top:none;"><button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Cancel</button></div>',
             direction || "right",
           );
           var backBtn = document.getElementById("schedule-log-back-btn");
@@ -5595,9 +5611,9 @@
           .then(function (data) {
             var entries = data.entries || [];
             var html =
-              '<div class="schedule-header-row"><div style="display:flex;align-items:center;gap:0.75rem;"><button type="button" id="schedule-log-back-btn" class="btn-secondary" style="padding: 0.4rem 0.6rem">' +
+              '<div class="schedule-header-row"><div style="display:flex;align-items:center;gap:0.75rem;"><button type="button" id="schedule-log-back-btn" class="btn-secondary" style="padding: 0.4rem 0.8rem">' +
               ICON_BACK +
-              '</button><div class="subtitle-chip">Schedule execution logs</div></div></div><div style="flex:1;display:flex;flex-direction:column;overflow-y:auto;padding-right:4px;">';
+              '<span>BACK</span></button><div class="subtitle-chip">Schedule execution logs</div></div></div><div style="flex:1;display:flex;flex-direction:column;overflow-y:auto;padding-right:4px;">';
             if (!entries.length) {
               html +=
                 '<div class="schedule-empty">No execution history found yet. Logs for operations will appear here.</div>';
@@ -5783,11 +5799,10 @@
           if (tr._resumeSyncLimit !== undefined) delete tr._resumeSyncLimit;
           if (tr._resumeExtractLimit !== undefined)
             delete tr._resumeExtractLimit;
-          if (resultDiv) {
-            resultDiv.className = "result result-placeholder";
-            resultDiv.innerHTML =
-              '<span class="result-placeholder-text">Select at least one brand or purchaser in the filter above, then click Run.</span>';
-          }
+          resultDiv.innerHTML =
+            '<span class="result-placeholder-text">' +
+            getPlaceholderText(caseId) +
+            "</span>";
           tr.querySelectorAll(".limit-sync, .limit-extract").forEach(
             function (input) {
               input.disabled = false;
@@ -6321,7 +6336,9 @@
                 if (resultDiv) {
                   resultDiv.className = "result result-placeholder";
                   resultDiv.innerHTML =
-                    '<span class="result-placeholder-text">Ready to extract. Configure filters and click Run.</span>';
+                    '<span class="result-placeholder-text">' +
+                    getPlaceholderText(caseId) +
+                    "</span>";
                 }
                 if (resetBtn) {
                   resetBtn.disabled = false;
