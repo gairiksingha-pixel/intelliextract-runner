@@ -1983,6 +1983,70 @@
         background: var(--fail-bg);
         color: var(--fail);
       }
+      /* Responsive tweaks for 1024x768 */
+      @media (max-width: 1080px) {
+        .header {
+          margin: 0.5rem 1rem 0.25rem 1rem;
+        }
+        .header-inner {
+          gap: 1rem;
+          padding: 0.5rem 1rem;
+        }
+        .header-status-panel {
+          margin-top: 12px;
+          padding: 0.35rem 0.75rem;
+          font-size: 0.75rem;
+        }
+        .header-btn-reset,
+        #brand-dropdown .filter-dropdown-trigger,
+        #purchaser-dropdown .filter-dropdown-trigger {
+          width: 155px !important;
+        }
+        .main {
+          padding: 0 1rem 0.75rem 1rem;
+        }
+        .download-bar {
+          margin-bottom: 0.5rem;
+          padding: 0.5rem 0.75rem;
+        }
+        .result.result-placeholder {
+          padding: 0.75rem;
+        }
+        .result-placeholder-text {
+          font-size: 0.75rem;
+        }
+      }
+      /* Better vertical fit for 768px height */
+      @media (max-height: 800px) {
+        .header {
+          margin-top: 0.25rem;
+          margin-bottom: 0.15rem;
+        }
+        .header-inner {
+          padding-top: 0.35rem;
+          padding-bottom: 0.35rem;
+        }
+        .main {
+          padding-top: 0;
+          padding-bottom: 0.5rem;
+        }
+        .download-bar {
+          margin-bottom: 0.25rem;
+          padding: 0.35rem 0.75rem;
+        }
+        .limit-chip,
+        button.run,
+        .header-btn-reset {
+          height: 32px;
+          font-size: 0.8rem;
+        }
+        .op-title {
+          font-size: 0.95rem;
+        }
+        .op-description {
+          font-size: 0.75rem;
+        }
+      }
       /* Report Overlay */
       #report-view-overlay {
         display: none;

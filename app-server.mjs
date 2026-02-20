@@ -1010,6 +1010,14 @@ function buildExtractionDataPageHtml() {
       border-color: var(--primary);
       color: white;
     }
+    @media (max-width: 1080px) {
+      .report-header { padding: 0.75rem 1rem; min-height: 64px; }
+      .report-header-title { font-size: 0.75rem; padding: 0 0.75rem; }
+      .header-filter-row { gap: 0.5rem; }
+      .brand-field-wrap .filter-dropdown-trigger { min-width: 140px; max-width: 140px; }
+      .purchaser-field-wrap .filter-dropdown-trigger { min-width: 160px; max-width: 160px; }
+      .header-btn-reset { width: 140px; font-size: 0.75rem; padding: 0 0.8rem; }
+    }
   </style>
 </head>
 <body>
