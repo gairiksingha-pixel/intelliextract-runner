@@ -262,7 +262,21 @@ export function loadHistoricalRunSummaries(
     // Group records in this run by (brand, purchaser)
     const recordsByGroup = new Map<string, CheckpointRecord[]>();
     for (const r of records) {
-      const key = `${r.brand}|${r.purchaser || ""}`;
+      let p = r.purchaser;
+      if (!p && r.relativePath) {
+        // Try to infer purchaser from path if missing in metadata
+        const parts = r.relativePath.split(/[\\/]/);
+        if (
+          parts.length > 1 ||
+          (parts.length === 1 && !parts[0].includes("."))
+        ) {
+          const first = parts[0];
+          if (first && first !== "output" && first !== "staging") {
+            p = first;
+          }
+        }
+      }
+      const key = `${r.brand}|${p || ""}`;
       if (!recordsByGroup.has(key)) recordsByGroup.set(key, []);
       recordsByGroup.get(key)!.push(r);
     }
@@ -270,20 +284,6 @@ export function loadHistoricalRunSummaries(
     for (const [key, groupRecords] of recordsByGroup) {
       const { start, end } = minMaxDatesFromRecords(groupRecords);
       let [brand, purchaser] = key.split("|");
-
-      // Robust detection for display
-      if (!purchaser || purchaser === "") {
-        const pSet = new Set<string>();
-        for (const r of groupRecords) {
-          if (r.purchaser) pSet.add(r.purchaser);
-          else if (r.relativePath) {
-            const first = r.relativePath.split(/[\\/]/)[0];
-            if (first && first !== "output" && first !== "staging")
-              pSet.add(first);
-          }
-        }
-        if (pSet.size === 1) purchaser = [...pSet][0];
-      }
 
       const results = filterExtractionResultsForRecords(
         groupRecords,
@@ -956,7 +956,15 @@ function htmlReportFromHistory(
   );
   const allPurchasers = Array.from(
     new Set(historicalSummaries.map((s) => s.purchaser).filter(Boolean)),
-  );
+  ).sort((a, b) => {
+    const nameA = formatPurchaserDisplayName(a!).toLowerCase();
+    const nameB = formatPurchaserDisplayName(b!).toLowerCase();
+    const isTempA = nameA.includes("temp");
+    const isTempB = nameB.includes("temp");
+    if (isTempA && !isTempB) return 1;
+    if (!isTempA && isTempB) return -1;
+    return nameA.localeCompare(nameB);
+  });
 
   const brandNamesMap: Record<string, string> = {};
   allBrands.forEach((id) => (brandNamesMap[id!] = formatBrandDisplayName(id!)));
@@ -1436,10 +1444,12 @@ function htmlReportFromHistory(
     .filter-dropdown-trigger {
       border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
       font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
-      min-width: 150px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
       background-repeat: no-repeat; background-position: right 8px center;
     }
+    .brand-field-wrap .filter-dropdown-trigger { min-width: 162px; max-width: 162px; }
+    .purchaser-field-wrap .filter-dropdown-trigger { min-width: 187px; max-width: 187px; }
     .filter-dropdown-panel {
       display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
       min-width: 220px; max-height: 400px; overflow-y: auto; background: white;

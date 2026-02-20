@@ -492,18 +492,38 @@ function buildExtractionDataPageHtml() {
   else if (day % 10 === 3 && day !== 13) suffix = "rd";
   const now = `${day}${suffix} ${month} ${year}`;
 
+  // Pre-process files to accurately identify brand and purchaser
+  const processedFiles = allFiles.map((f) => {
+    const brand = f.filename.split("_")[0] || "";
+    let purchaser = "";
+    const rest = f.filename.slice(brand.length + 1);
+    const possiblePurchasers = BRAND_PURCHASERS[brand] || [];
+    for (const p of possiblePurchasers) {
+      if (rest.startsWith(p + "_")) {
+        purchaser = p;
+        break;
+      }
+    }
+    if (!purchaser) {
+      purchaser = f.content?.pattern?.purchaser_key || "";
+    }
+    return { ...f, brand, purchaser };
+  });
+
   const allBrands = Array.from(
-    new Set(
-      allFiles.map((f) => f.filename.split("_")[0] || "").filter(Boolean),
-    ),
+    new Set(processedFiles.map((f) => f.brand).filter(Boolean)),
   );
   const allPurchasers = Array.from(
-    new Set(
-      allFiles
-        .map((f) => f.content?.pattern?.purchaser_key || "")
-        .filter(Boolean),
-    ),
-  );
+    new Set(processedFiles.map((f) => f.purchaser).filter(Boolean)),
+  ).sort((a, b) => {
+    const nameA = formatPurchaserDisplayName(a).toLowerCase();
+    const nameB = formatPurchaserDisplayName(b).toLowerCase();
+    const isTempA = nameA.includes("temp");
+    const isTempB = nameB.includes("temp");
+    if (isTempA && !isTempB) return 1;
+    if (!isTempA && isTempB) return -1;
+    return nameA.localeCompare(nameB);
+  });
 
   const brandNamesMap = {};
   allBrands.forEach((id) => (brandNamesMap[id] = formatBrandDisplayName(id)));
@@ -513,13 +533,11 @@ function buildExtractionDataPageHtml() {
   );
 
   const brandPurchaserMap = {};
-  allFiles.forEach((f) => {
-    const brand = f.filename.split("_")[0];
-    const purchaser = f.content?.pattern?.purchaser_key;
-    if (brand && purchaser) {
-      if (!brandPurchaserMap[brand]) brandPurchaserMap[brand] = [];
-      if (!brandPurchaserMap[brand].includes(purchaser))
-        brandPurchaserMap[brand].push(purchaser);
+  processedFiles.forEach((f) => {
+    if (f.brand && f.purchaser) {
+      if (!brandPurchaserMap[f.brand]) brandPurchaserMap[f.brand] = [];
+      if (!brandPurchaserMap[f.brand].includes(f.purchaser))
+        brandPurchaserMap[f.brand].push(f.purchaser);
     }
   });
 
@@ -531,10 +549,10 @@ function buildExtractionDataPageHtml() {
       .replace(/"/g, "&quot;");
 
   const rowsJson = JSON.stringify(
-    allFiles.map((f) => ({
+    processedFiles.map((f) => ({
       filename: f.filename,
-      brand: f.filename.split("_")[0] || "",
-      purchaser: f.content?.pattern?.purchaser_key || "",
+      brand: f.brand,
+      purchaser: f.purchaser,
       status: f.status,
       mtime: f.mtime,
       patternKey: f.content?.pattern?.pattern_key ?? null,
@@ -665,10 +683,13 @@ function buildExtractionDataPageHtml() {
     .filter-dropdown-trigger {
       border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
       font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
-      min-width: 180px; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
       background-repeat: no-repeat; background-position: right 8px center;
     }
+    .brand-field-wrap .filter-dropdown-trigger { min-width: 162px; max-width: 162px; }
+    .purchaser-field-wrap .filter-dropdown-trigger { min-width: 187px; max-width: 187px; }
+
     .filter-dropdown-panel {
       display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
       min-width: 220px; max-height: 400px; overflow-y: auto; background: white;
@@ -1439,7 +1460,15 @@ function buildSyncReportHtml() {
   );
   const allPurchasers = Array.from(
     new Set(filesData.map((f) => f.purchaser).filter(Boolean)),
-  );
+  ).sort((a, b) => {
+    const nameA = formatPurchaserDisplayName(a).toLowerCase();
+    const nameB = formatPurchaserDisplayName(b).toLowerCase();
+    const isTempA = nameA.includes("temp");
+    const isTempB = nameB.includes("temp");
+    if (isTempA && !isTempB) return 1;
+    if (!isTempA && isTempB) return -1;
+    return nameA.localeCompare(nameB);
+  });
 
   const brandNamesMap = {};
   allBrands.forEach((id) => (brandNamesMap[id] = formatBrandDisplayName(id)));

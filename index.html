@@ -4651,8 +4651,8 @@
               ALL_PURCHASERS = Array.from(set).sort(function (a, b) {
                 var nameA = formatPurchaserName(a).toLowerCase();
                 var nameB = formatPurchaserName(b).toLowerCase();
-                var isTempA = nameA.startsWith("temp");
-                var isTempB = nameB.startsWith("temp");
+                var isTempA = nameA.includes("temp");
+                var isTempB = nameB.includes("temp");
                 if (isTempA && !isTempB) return 1;
                 if (!isTempA && isTempB) return -1;
                 return nameA.localeCompare(nameB);
@@ -4685,8 +4685,8 @@
         opts.sort(function (a, b) {
           var nameA = formatPurchaserName(a).toLowerCase();
           var nameB = formatPurchaserName(b).toLowerCase();
-          var isTempA = nameA.startsWith("temp");
-          var isTempB = nameB.startsWith("temp");
+          var isTempA = nameA.includes("temp");
+          var isTempB = nameB.includes("temp");
           if (isTempA && !isTempB) return 1;
           if (!isTempA && isTempB) return -1;
           return nameA.localeCompare(nameB);
@@ -5212,8 +5212,8 @@
                 return Array.from(set).sort(function (a, b) {
                   var nameA = formatPurchaserName(a).toLowerCase();
                   var nameB = formatPurchaserName(b).toLowerCase();
-                  var isTempA = nameA.startsWith("temp");
-                  var isTempB = nameB.startsWith("temp");
+                  var isTempA = nameA.includes("temp");
+                  var isTempB = nameB.includes("temp");
                   if (isTempA && !isTempB) return 1;
                   if (!isTempA && isTempB) return -1;
                   return nameA.localeCompare(nameB);
