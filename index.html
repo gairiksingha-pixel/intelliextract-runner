@@ -503,6 +503,21 @@
       thead th:last-child {
         border-top-right-radius: 0;
       }
+      /* Remove outer borders to fill gaps at edges */
+      .table-section th:first-child,
+      .table-section td:first-child {
+        border-left: none !important;
+      }
+      .table-section th:last-child,
+      .table-section td:last-child {
+        border-right: none !important;
+      }
+      .table-section thead th {
+        border-top: none !important;
+      }
+      .table-section tbody tr:last-child td {
+        border-bottom: none !important;
+      }
       thead tr {
         height: 40.8px;
       }
@@ -1256,7 +1271,7 @@
         white-space: pre-wrap;
         font-weight: 500;
       }
-      .result-table-wrap tr.metric-row {
+      .result-table-wrap tr {
         height: 1px;
       }
       .result-table-wrap tr:nth-child(even) td {
@@ -3118,9 +3133,9 @@
               var cumDetail =
                 "Success: " +
                 escapeHtml(parsed.cumSuccess) +
-                ", Failed: " +
+                ', Failed<span class="info-icon" title="Aggregated status of all unique files found for this filter across all historical runs.">i</span>: ' +
                 escapeHtml(parsed.cumFailed) +
-                ' <span class="info-icon" title="Aggregated status of all unique files found for this filter across all historical runs.">i</span> (Total: ' +
+                " (Total: " +
                 escapeHtml(parsed.cumTotal) +
                 ")";
               rows.push(["Overall status", cumDetail]);
@@ -3128,7 +3143,7 @@
             if (parsed.extractionResultsPath || parsed.reportsPath) {
               rows.push([
                 "Operation report",
-                "Reports and extraction data are ready. View the summary from <b>Reports</b>.",
+                "Reports and extraction data are ready check it from the <b>Reports</b> toolbar.",
               ]);
             }
           }
@@ -3160,6 +3175,8 @@
           var label = r[0];
           var metrics = [
             "Status",
+            "Brand and purchaser",
+            "Staging path",
             "Download overview",
             "Extraction overview",
             "Overall status",
@@ -6322,7 +6339,7 @@
       window.stopBackgroundJob = function (caseId) {
         showAppAlert(
           "Stop Operation",
-          "Are you sure you want to stop development extraction? This will terminate the currently running background process.",
+          "Are you sure you want to stop extraction? This will terminate the currently running background process.",
           {
             isConfirm: true,
             onConfirm: function () {

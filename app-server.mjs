@@ -1826,7 +1826,7 @@ function buildSyncReportHtml() {
   <div class="page-body">
     <div class="dashboard-grid">
       <div class="chart-card">
-        <h4>Download History (Last 30 Batches)</h4>
+        <h4>Download History (Last 30 Runs)</h4>
         <div class="chart-container">
           <canvas id="historyChart"></canvas>
         </div>
