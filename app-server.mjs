@@ -1870,6 +1870,48 @@ function buildSyncReportHtml() {
       opacity: 1;
       color: var(--primary);
     }
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin: 1.5rem 0 1rem;
+      background: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      flex-wrap: wrap;
+    }
+    .search-wrap {
+      flex: 1;
+      min-width: 300px;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .search-wrap svg {
+      position: absolute;
+      left: 12px;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      height: 38px;
+      padding: 0 1rem 0 2.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+      font-size: 0.85rem;
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .results-info { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); }
   </style>
 </head>
 <body>
@@ -1938,6 +1980,15 @@ function buildSyncReportHtml() {
     </div>
 
     <h3 id="files-title">Current Staging Files</h3>
+    
+    <div class="controls-bar">
+      <div class="search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" class="search-input" id="search-input" placeholder="Search filename or path…">
+      </div>
+      <div class="results-info" id="results-info"></div>
+    </div>
+
     <table id="files-table">
       <thead><tr>
         <th class="sortable" onclick="handleSort('path')" id="sort-path">Path (staging)</th>
@@ -1961,9 +2012,10 @@ function buildSyncReportHtml() {
     };
 
     let currentPage = 1;
-    const pageSize = 100;
+    const pageSize = 20;
     let selectedBrands = [];
     let selectedPurchasers = [];
+    let currentSearch = '';
     let historyChartInstance = null;
     let currentSortField = 'mtime';
     let currentSortOrder = 'desc'; // 'asc' or 'desc'
@@ -2039,6 +2091,12 @@ function buildSyncReportHtml() {
         purchaserPanel.appendChild(div);
       });
 
+      document.getElementById('search-input').oninput = (e) => {
+        currentSearch = e.target.value.toLowerCase();
+        currentPage = 1;
+        renderTable();
+      };
+
       window.onclick = () => {
         if (brandPanel) brandPanel.classList.remove('open');
         if (purchaserPanel) purchaserPanel.classList.remove('open');
@@ -2094,6 +2152,11 @@ function buildSyncReportHtml() {
       const filtered = ALL_FILES.filter(f => {
         if (selectedBrands.length > 0 && !selectedBrands.includes(f.brand)) return false;
         if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(f.purchaser)) return false;
+        
+        if (currentSearch) {
+          if (!f.path.toLowerCase().includes(currentSearch)) return false;
+        }
+        
         return true;
       });
 
@@ -2165,6 +2228,11 @@ function buildSyncReportHtml() {
           <td>\${new Date(f.mtime).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
         </tr>
       \`).join('');
+      
+      const info = document.getElementById('results-info');
+      if (info) {
+        info.innerText = 'Showing ' + (filtered.length ? start + 1 : 0) + '-' + end + ' of ' + filtered.length + ' file(s)';
+      }
       
       renderPagination(filtered.length);
     }

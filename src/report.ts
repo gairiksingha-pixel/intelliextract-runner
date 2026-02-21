@@ -864,8 +864,11 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   </details>`
       : "";
 
+  const dataStatus =
+    displayInfraFailed > 0 || displayApiFailed > 0 ? "failed" : "success";
+
   return `
-  <details class="${sectionClass}" data-brand="${entry.brand || ""}" data-purchaser="${entry.purchaser || ""}" data-items="${processed}">
+  <details class="${sectionClass}" data-brand="${entry.brand || ""}" data-purchaser="${entry.purchaser || ""}" data-items="${processed}" data-status="${dataStatus}">
   <summary class="run-section-summary">
     <div class="summary-content">
       <div class="operation-pointer">
@@ -983,6 +986,24 @@ function htmlReportFromHistory(
       }
     }
   });
+
+  const runsWithStatus = historicalSummaries.map((s) => {
+    const succeededCount = s.extractionResults.filter(
+      (e) => e.extractionSuccess,
+    ).length;
+    const displayInfraFailed = s.metrics.failed;
+    const displayApiFailed = Math.max(0, s.metrics.success - succeededCount);
+    const status =
+      displayInfraFailed > 0 || displayApiFailed > 0 ? "failed" : "success";
+    return { status };
+  });
+  const countAll = runsWithStatus.length;
+  const countSuccess = runsWithStatus.filter(
+    (r) => r.status === "success",
+  ).length;
+  const countFailed = runsWithStatus.filter(
+    (r) => r.status === "failed",
+  ).length;
 
   const runsHtml = historicalSummaries
     .map((entry) => sectionForRun(entry))
@@ -1500,6 +1521,89 @@ function htmlReportFromHistory(
     }
     .header-btn-reset:hover { filter: brightness(1.1); transform: translateY(-1px); }
     
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin: 1.5rem 0 1.25rem;
+      background: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      flex-wrap: wrap;
+    }
+    .status-group {
+      display: flex;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 10px;
+      gap: 2px;
+    }
+    .status-tab {
+      border: none;
+      background: none;
+      padding: 0.5rem 1.1rem;
+      font-family: inherit;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #64748b;
+      cursor: pointer;
+      border-radius: 7px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .status-tab.active {
+      background: white;
+      color: var(--header-bg);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    }
+    .status-tab .count {
+      background: #e2e8f0;
+      color: #475569;
+      padding: 1px 6.5px;
+      border-radius: 4.5px;
+      font-size: 0.65rem;
+    }
+    .status-tab.active .count {
+      background: var(--accent-light);
+      color: var(--primary);
+    }
+    .search-wrap {
+      flex: 1;
+      min-width: 300px;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .search-wrap svg {
+      position: absolute;
+      left: 12px;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      height: 38px;
+      padding: 0 1.25rem 0 2.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+      font-size: 0.82rem;
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .results-info { font-size: 0.72rem; font-weight: 800; color: var(--header-bg); text-transform: uppercase; letter-spacing: 0.05em; }
+    
     .filtered-out { display: none !important; }
 
     @media (max-width: 1080px) {
@@ -1659,7 +1763,7 @@ function htmlReportFromHistory(
             <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
           </div>
           <div class="report-header-right">
-             <div class="header-filter-row">
+             <div class="header-filter-row" style="gap: 1.25rem;">
                   <div class="header-field-wrap brand-field-wrap">
                     <div id="brand-dropdown" class="filter-dropdown">
                       <div class="filter-chip">
@@ -1771,6 +1875,18 @@ function htmlReportFromHistory(
     </div>
 
     <div id="history" class="tab-content">
+      <div class="controls-bar">
+        <div class="status-group">
+          <button class="status-tab active" data-filter="all">All <span class="count" id="c-all">${countAll}</span></button>
+          <button class="status-tab" data-filter="success">Success <span class="count" id="c-succ">${countSuccess}</span></button>
+          <button class="status-tab" data-filter="failed">Failed <span class="count" id="c-fail">${countFailed}</span></button>
+        </div>
+        <div class="search-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" class="search-input" id="search-input" placeholder="Search operation ID, brand, purchaser…">
+        </div>
+        <div class="results-info" id="results-info"></div>
+      </div>
       <div id="history-items-container">
         ${runsHtml}
       </div>
@@ -1793,12 +1909,31 @@ function htmlReportFromHistory(
       }
     }
 
+    let currentStatusFilter = 'all';
+    let currentSearch = '';
     let historyPage = 1;
     const historyPageSize = 20;
 
     function renderHistory() {
       const allItems = Array.from(document.querySelectorAll('.history-item'));
-      const visibleItems = allItems.filter(i => !i.classList.contains('filtered-out'));
+      
+      const visibleItems = allItems.filter(item => {
+        // Filter out if brand/purchaser filters don't match (prev logic)
+        if (item.classList.contains('filtered-out')) return false;
+
+        // Filter by status tab
+        if (currentStatusFilter !== 'all') {
+          if (item.getAttribute('data-status') !== currentStatusFilter) return false;
+        }
+
+        // Filter by search text
+        if (currentSearch) {
+          const content = item.innerText.toLowerCase();
+          if (!content.includes(currentSearch)) return false;
+        }
+
+        return true;
+      });
       
       const total = visibleItems.length;
       const pages = Math.ceil(total / historyPageSize);
@@ -1835,6 +1970,11 @@ function htmlReportFromHistory(
 
       html += '<button class="pg-btn" ' + (historyPage === pages ? 'disabled' : '') + ' onclick="goHistoryPage(' + (historyPage + 1) + ')">Next</button>';
       pgContainer.innerHTML = html;
+
+      const info = document.getElementById('results-info');
+      if (info) {
+        info.innerText = 'Showing ' + (total ? (historyPage - 1) * historyPageSize + 1 : 0) + '-' + Math.min(historyPage * historyPageSize, total) + ' of ' + total + ' operation(s)';
+      }
     }
 
     function goHistoryPage(p) {
@@ -1902,6 +2042,27 @@ function htmlReportFromHistory(
       });
 
       document.addEventListener('click', closeAllPanels);
+
+      // Status filters
+      document.querySelectorAll('.status-tab').forEach(btn => {
+        btn.onclick = () => {
+          document.querySelectorAll('.status-tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentStatusFilter = btn.getAttribute('data-filter');
+          historyPage = 1;
+          renderHistory();
+        };
+      });
+
+      // Search filters
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.oninput = (e) => {
+          currentSearch = e.target.value.toLowerCase();
+          historyPage = 1;
+          renderHistory();
+        };
+      }
     }
 
     function closeAllPanels() {
@@ -1951,6 +2112,22 @@ function htmlReportFromHistory(
       updateFilters();
     }
 
+    function updateStatusCounts() {
+      const allItems = Array.from(document.querySelectorAll('.history-item'));
+      const activeItems = allItems.filter(i => !i.classList.contains('filtered-out'));
+      
+      const all = activeItems.length;
+      const success = activeItems.filter(i => i.getAttribute('data-status') === 'success').length;
+      const failed = activeItems.filter(i => i.getAttribute('data-status') === 'failed').length;
+      
+      const cAll = document.getElementById('c-all');
+      if (cAll) cAll.innerText = all;
+      const cSucc = document.getElementById('c-succ');
+      if (cSucc) cSucc.innerText = success;
+      const cFail = document.getElementById('c-fail');
+      if (cFail) cFail.innerText = failed;
+    }
+
     function applyFilteringToUI() {
       const items = document.querySelectorAll('.history-item');
       let visibleCount = 0;
@@ -1959,6 +2136,17 @@ function htmlReportFromHistory(
         let match = true;
         if (selectedBrands.length > 0 && !selectedBrands.includes(d.brand)) match = false;
         if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(d.purchaser)) match = false;
+        
+        if (currentStatusFilter !== 'all') {
+          if (d.status !== currentStatusFilter) return false;
+        }
+
+        if (currentSearch) {
+          const q = currentSearch.toLowerCase();
+          const haystack = (d.runId + ' ' + d.brand + ' ' + d.purchaser).toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+
         return match;
       });
 
@@ -1982,6 +2170,8 @@ function htmlReportFromHistory(
       renderHistory();
       
       document.getElementById('operation-count-label').innerText = visibleCount + ' operation(s)';
+      
+      updateStatusCounts();
     }
 
     initFilters();
@@ -2003,6 +2193,15 @@ function htmlReportFromHistory(
             (s.runDurationSeconds || 1)) *
           60,
         errors: s.metrics.failureBreakdown,
+        status:
+          s.metrics.failed > 0 ||
+          Math.max(
+            0,
+            s.metrics.success -
+              s.extractionResults.filter((e) => e.extractionSuccess).length,
+          ) > 0
+            ? "failed"
+            : "success",
       })),
     )};
 
