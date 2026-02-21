@@ -1018,6 +1018,34 @@ function buildExtractionDataPageHtml() {
       .purchaser-field-wrap .filter-dropdown-trigger { min-width: 160px; max-width: 160px; }
       .header-btn-reset { width: 140px; font-size: 0.75rem; padding: 0 0.8rem; }
     }
+    .data-table thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+      position: relative;
+      padding-right: 2rem;
+    }
+    .data-table thead th.sortable:hover {
+      background: #f1f5f9;
+      color: var(--primary);
+    }
+    .data-table thead th.sortable::after {
+      content: '↕';
+      position: absolute;
+      right: 0.75rem;
+      opacity: 0.3;
+      font-size: 0.8rem;
+    }
+    .data-table thead th.sortable.sort-asc::after {
+      content: '↑';
+      opacity: 1;
+      color: var(--primary);
+    }
+    .data-table thead th.sortable.sort-desc::after {
+      content: '↓';
+      opacity: 1;
+      color: var(--primary);
+    }
   </style>
 </head>
 <body>
@@ -1117,11 +1145,11 @@ function buildExtractionDataPageHtml() {
         <thead>
           <tr>
             <th class="toggle-cell"></th>
-            <th>Timestamp</th>
-            <th>Filename</th>
-            <th>Pattern Key</th>
-            <th>Purchaser</th>
-            <th>Status</th>
+            <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Timestamp</th>
+            <th class="sortable" onclick="handleSort('filename')" id="sort-filename">Filename</th>
+            <th class="sortable" onclick="handleSort('patternKey')" id="sort-patternKey">Pattern Key</th>
+            <th class="sortable" onclick="handleSort('purchaserKey')" id="sort-purchaserKey">Purchaser</th>
+            <th class="sortable" onclick="handleSort('status')" id="sort-status">Status</th>
             <th class="action-cell">Action</th>
           </tr>
         </thead>
@@ -1149,6 +1177,8 @@ function buildExtractionDataPageHtml() {
     var expandedRows = new Set();
     var selectedBrands = [];
     var selectedPurchasers = [];
+    var currentSortField = 'mtime';
+    var currentSortOrder = 'desc'; // 'asc' or 'desc'
 
     function goToHome() { 
       try {
@@ -1289,7 +1319,7 @@ function buildExtractionDataPageHtml() {
     }
 
     function getFilteredRows() {
-      return ALL_ROWS.filter(function(r) {
+      var filtered = ALL_ROWS.filter(function(r) {
         if (currentFilter !== 'all' && r.status !== currentFilter) return false;
         if (selectedBrands.length > 0 && !selectedBrands.includes(r.brand)) return false;
         if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(r.purchaser)) return false;
@@ -1300,6 +1330,48 @@ function buildExtractionDataPageHtml() {
         }
         return true;
       });
+
+      if (currentSortField) {
+        filtered.sort(function(a, b) {
+          var valA = a[currentSortField];
+          var valB = b[currentSortField];
+
+          if (currentSortField === 'purchaserKey') {
+            valA = (CONFIG.purchaserNames[a.purchaserKey] || a.purchaserKey || '').toLowerCase();
+            valB = (CONFIG.purchaserNames[b.purchaserKey] || b.purchaserKey || '').toLowerCase();
+          } else if (typeof valA === 'string') {
+            valA = valA.toLowerCase();
+            valB = (valB || '').toLowerCase();
+          }
+
+          if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
+          if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+      return filtered;
+    }
+
+    function handleSort(field) {
+      if (currentSortField === field) {
+        currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSortField = field;
+        currentSortOrder = 'asc';
+      }
+      updateSortUI();
+      currentPage = 1;
+      render();
+    }
+
+    function updateSortUI() {
+      document.querySelectorAll('.data-table thead th.sortable').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+      });
+      const currentTh = document.getElementById('sort-' + currentSortField);
+      if (currentTh) {
+        currentTh.classList.add(currentSortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+      }
     }
 
     function downloadRow(idx) {
@@ -1446,6 +1518,7 @@ function buildExtractionDataPageHtml() {
     };
 
     initFilters();
+    updateSortUI();
     render();
   </script>
 </body>
@@ -1766,6 +1839,34 @@ function buildSyncReportHtml() {
     }
     .header-btn-reset:hover { filter: brightness(1.1); transform: translateY(-1px); }
     @keyframes slideDownPanel { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    #files-table thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+      position: relative;
+      padding-right: 2rem;
+    }
+    #files-table thead th.sortable:hover {
+      background: #f1f5f9;
+      color: var(--primary);
+    }
+    #files-table thead th.sortable::after {
+      content: '↕';
+      position: absolute;
+      right: 0.75rem;
+      opacity: 0.3;
+      font-size: 0.8rem;
+    }
+    #files-table thead th.sortable.sort-asc::after {
+      content: '↑';
+      opacity: 1;
+      color: var(--primary);
+    }
+    #files-table thead th.sortable.sort-desc::after {
+      content: '↓';
+      opacity: 1;
+      color: var(--primary);
+    }
   </style>
 </head>
 <body>
@@ -1835,7 +1936,11 @@ function buildSyncReportHtml() {
 
     <h3 id="files-title">Current Staging Files</h3>
     <table id="files-table">
-      <thead><tr><th>Path (staging)</th><th>Size (bytes)</th><th>Modified</th></tr></thead>
+      <thead><tr>
+        <th class="sortable" onclick="handleSort('path')" id="sort-path">Path (staging)</th>
+        <th class="sortable" onclick="handleSort('size')" id="sort-size">Size (bytes)</th>
+        <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Modified</th>
+      </tr></thead>
       <tbody id="files-body"></tbody>
     </table>
     <div id="pagination" class="pagination"></div>
@@ -1857,6 +1962,8 @@ function buildSyncReportHtml() {
     let selectedBrands = [];
     let selectedPurchasers = [];
     let historyChartInstance = null;
+    let currentSortField = 'mtime';
+    let currentSortOrder = 'desc'; // 'asc' or 'desc'
 
     function goToHome() { 
       try {
@@ -1981,11 +2088,50 @@ function buildSyncReportHtml() {
     }
 
     function getFilteredFiles() {
-      return ALL_FILES.filter(f => {
+      const filtered = ALL_FILES.filter(f => {
         if (selectedBrands.length > 0 && !selectedBrands.includes(f.brand)) return false;
         if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(f.purchaser)) return false;
         return true;
       });
+
+      if (currentSortField) {
+        filtered.sort((a, b) => {
+          let valA = a[currentSortField];
+          let valB = b[currentSortField];
+
+          if (typeof valA === 'string') {
+            valA = valA.toLowerCase();
+            valB = (valB || '').toLowerCase();
+          }
+
+          if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
+          if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+      return filtered;
+    }
+
+    function handleSort(field) {
+      if (currentSortField === field) {
+        currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSortField = field;
+        currentSortOrder = 'asc';
+      }
+      updateSortUI();
+      currentPage = 1;
+      renderTable();
+    }
+
+    function updateSortUI() {
+      document.querySelectorAll('#files-table thead th.sortable').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+      });
+      const currentTh = document.getElementById('sort-' + currentSortField);
+      if (currentTh) {
+        currentTh.classList.add(currentSortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+      }
     }
 
     function renderTable() {
@@ -2133,6 +2279,7 @@ function buildSyncReportHtml() {
         Chart.defaults.color = "#5a5a5a";
       }
       initFilters();
+      updateSortUI();
       renderTable();
       updateCharts();
       
