@@ -4386,14 +4386,24 @@
       })();
 
       function getTimestampForFilename() {
-        var now = new Date();
-        var year = now.getFullYear();
-        var month = String(now.getMonth() + 1).padStart(2, "0");
-        var day = String(now.getDate()).padStart(2, "0");
-        var h = String(now.getHours()).padStart(2, "0");
-        var m = String(now.getMinutes()).padStart(2, "0");
-        var s = String(now.getSeconds()).padStart(2, "0");
-        return year + month + day + "-" + h + m + "-" + s;
+        var options = {
+          timeZone: "Asia/Kolkata",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        };
+        var parts = new Intl.DateTimeFormat("en-IN", options).formatToParts(
+          new Date(),
+        );
+        var d = {};
+        parts.forEach((p) => (d[p.type] = p.value));
+        return (
+          d.year + d.month + d.day + "-" + d.hour + d.minute + "-" + d.second
+        );
       }
 
       (function initActionButtons() {
@@ -4888,16 +4898,32 @@
 
       function formatDateWithSuffix(dateStr) {
         if (!dateStr) return "";
-        var date = new Date(dateStr);
-        var day = date.getDate();
-        var month = date.toLocaleString("default", { month: "short" });
-        var year = date.getFullYear();
-        var h = date.getHours();
-        var m = date.getMinutes();
-        var ampm = h >= 12 ? "PM" : "AM";
-        var hh = h % 12;
-        hh = hh ? hh : 12; // the hour '0' should be '12'
-        var mm = m < 10 ? "0" + m : m;
+        var d = new Date(dateStr);
+        // Extract parts in IST
+        var dayFormatter = new Intl.DateTimeFormat("en-IN", {
+          timeZone: "Asia/Kolkata",
+          day: "numeric",
+        });
+        var monthFormatter = new Intl.DateTimeFormat("en-IN", {
+          timeZone: "Asia/Kolkata",
+          month: "short",
+        });
+        var yearFormatter = new Intl.DateTimeFormat("en-IN", {
+          timeZone: "Asia/Kolkata",
+          year: "numeric",
+        });
+        var timeFormatter = new Intl.DateTimeFormat("en-IN", {
+          timeZone: "Asia/Kolkata",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: true,
+        });
+
+        var day = parseInt(dayFormatter.format(d));
+        var month = monthFormatter.format(d);
+        var year = yearFormatter.format(d);
+        var timeStr = timeFormatter.format(d); // e.g. "2:38 pm"
+
         return (
           day +
           getOrdinalSuffix(day) +
@@ -4906,11 +4932,7 @@
           " " +
           year +
           ", " +
-          hh +
-          ":" +
-          mm +
-          " " +
-          ampm
+          timeStr
         );
       }
 
@@ -5107,7 +5129,11 @@
             r.status === "success"
               ? '<span class="badge badge-success">Success</span>'
               : '<span class="badge badge-failed">Failed</span>';
-          var time = r.timestamp ? new Date(r.timestamp).toLocaleString() : "—";
+          var time = r.timestamp
+            ? new Date(r.timestamp).toLocaleString("en-IN", {
+                timeZone: "Asia/Kolkata",
+              })
+            : "—";
           html += `<tr class="row-${r.status}">
               <td style="white-space:nowrap; font-size: 0.75rem">${escapeHtml(time)}</td>
               <td style="font-size:0.75rem; color:var(--text); word-break: break-all">${escapeHtml(r.filename)}</td>
@@ -5707,8 +5733,10 @@
                 '<table class="schedule-list"><thead><tr><th>Time</th><th>Schedule ID</th><th>Outcome</th><th>Message</th></tr></thead><tbody>';
               entries.forEach(function (e) {
                 var time = e.timestamp
-                  ? new Date(e.timestamp).toLocaleString()
-                  : "";
+                  ? new Date(e.timestamp).toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata",
+                    })
+                  : "—";
                 var schedId =
                   e.scheduleId != null ? String(e.scheduleId).slice(0, 20) : "";
                 var outcome = (e.outcome || "executed").toLowerCase();

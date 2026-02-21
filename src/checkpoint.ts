@@ -218,12 +218,15 @@ function formatRunId(date: Date, num?: number): string {
   if (num !== undefined) {
     return `RUN${num}`;
   }
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  const s = String(date.getSeconds()).padStart(2, "0");
+  const istDate = new Date(
+    date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+  );
+  const y = istDate.getFullYear();
+  const m = String(istDate.getMonth() + 1).padStart(2, "0");
+  const d = String(istDate.getDate()).padStart(2, "0");
+  const h = String(istDate.getHours()).padStart(2, "0");
+  const min = String(istDate.getMinutes()).padStart(2, "0");
+  const s = String(istDate.getSeconds()).padStart(2, "0");
   const suffix = Math.random().toString(36).slice(2, 4);
   // For non-work/skipped runs, use a distinctive format so we don't consume a sequence number
   return `SKIP-${y}${m}${d}-${h}${min}${s}-${suffix}`;

@@ -495,13 +495,16 @@ function dayOrdinal(day: number): string {
 /** Human-readable date and time for a run (e.g. "Feb-2nd-2026 09:32-AM") for accordion labels. */
 function formatRunDateTime(iso: string): string {
   const d = new Date(iso);
-  const month = MONTH_NAMES[d.getMonth()].toUpperCase();
-  const day = d.getDate();
-  const year = d.getFullYear();
-  const hours24 = d.getHours();
+  const istDate = new Date(
+    d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+  );
+  const month = MONTH_NAMES[istDate.getMonth()].toUpperCase();
+  const day = istDate.getDate();
+  const year = istDate.getFullYear();
+  const hours24 = istDate.getHours();
   const hours12 = hours24 % 12 || 12;
   const h = String(hours12).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
+  const min = String(istDate.getMinutes()).padStart(2, "0");
   const ampm = hours24 < 12 ? "AM" : "PM";
   // Format: FEB-14-2026-12:19:PM
   return `${month}-${day}-${year}-${h}:${min}:${ampm}`;
@@ -522,8 +525,11 @@ function formatDateHuman(d: Date): string {
     "Nov",
     "Dec",
   ];
-  const day = d.getDate();
-  return `${dayOrdinal(day)} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  const istDate = new Date(
+    d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+  );
+  const day = istDate.getDate();
+  return `${dayOrdinal(day)} ${months[istDate.getMonth()]} ${istDate.getFullYear()}`;
 }
 
 function formatBrandDisplayName(brandId?: string): string {

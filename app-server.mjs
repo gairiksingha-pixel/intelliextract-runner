@@ -1205,7 +1205,7 @@ function buildExtractionDataPageHtml() {
 
     function formatTime(ms) {
       if (!ms) return '—';
-      return new Date(ms).toLocaleString();
+      return new Date(ms).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
     }
 
     function initFilters() {
@@ -1603,9 +1603,12 @@ function buildSyncReportHtml() {
       "Nov",
       "Dec",
     ];
-    const day = d.getDate();
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
+    const istDate = new Date(
+      d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+    );
+    const day = istDate.getDate();
+    const month = months[istDate.getMonth()];
+    const year = istDate.getFullYear();
     let suffix = "th";
     if (day % 10 === 1 && day !== 11) suffix = "st";
     else if (day % 10 === 2 && day !== 12) suffix = "nd";
@@ -2159,7 +2162,7 @@ function buildSyncReportHtml() {
         <tr>
           <td>\${esc(f.path)}</td>
           <td>\${f.size.toLocaleString()}</td>
-          <td>\${new Date(f.mtime).toISOString().replace('T', ' ').split('.')[0]}</td>
+          <td>\${new Date(f.mtime).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
         </tr>
       \`).join('');
       
