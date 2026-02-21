@@ -1029,8 +1029,11 @@ function htmlReportFromHistory(
       --accent-light: #e8f5ee;
       --radius: 12px;
       --radius-sm: 8px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
     }
     * { box-sizing: border-box; }
+    html { scrollbar-gutter: stable; }
     body {
       font-family: 'JetBrains Mono', 'Consolas', monospace;
       max-width: 1400px;
@@ -1039,20 +1042,20 @@ function htmlReportFromHistory(
       background: var(--bg);
       color: var(--text);
       font-size: 13px;
+      scrollbar-gutter: stable;
     }
     .page-body { padding: 0.75rem 0; }
     
     .report-header {
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(10px);
+      background: var(--surface);
       padding: 1rem 2rem;
       border-radius: 0 0 16px 16px;
-      margin-bottom: 1rem;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+      margin-bottom: 1.25rem;
+      box-shadow: var(--shadow-md);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border: 1px solid rgba(176, 191, 201, 0.3);
+      border: 1px solid var(--border-light);
       position: sticky;
       top: 0;
       z-index: 1000;
@@ -1062,45 +1065,46 @@ function htmlReportFromHistory(
       background: var(--header-bg) !important;
       color: white !important;
       border: none;
-      border-radius: 8px;
-      height: 36px;
+      border-radius: 6px;
+      height: 34px;
       padding: 0 1.25rem;
-      font-size: 0.85rem;
-      font-weight: 700;
+      font-size: 0.82rem;
+      font-weight: 800;
       font-family: 'JetBrains Mono', monospace !important;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 10px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 12px rgba(33, 108, 109, 0.2);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 6px rgba(33, 108, 109, 0.25);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
     .btn-back-main:hover {
       background: var(--primary) !important;
-      transform: translateX(-4px);
-      box-shadow: 0 6px 16px rgba(45, 157, 95, 0.3);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(45, 157, 95, 0.3);
     }
-    .btn-back-main svg { width: 16px; height: 16px; transition: transform 0.2s; }
+    .btn-back-main svg { width: 14px; height: 14px; transition: transform 0.2s; stroke-width: 3.5px; }
     .btn-back-main:hover svg { transform: translateX(-2px); }
     .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
     .report-header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
     .report-header-title {
       margin: 0;
       height: 34px;
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: #ffffff;
       background: var(--header-bg);
-      padding: 0 1.1rem;
+      padding: 0 1.25rem;
       border-radius: 6px;
       display: inline-flex;
       align-items: center;
       line-height: 1;
       font-family: inherit;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
     }
     
     h1:not(.report-header-title) { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
@@ -1113,9 +1117,20 @@ function htmlReportFromHistory(
     .table-responsive { width: 100%; overflow-x: auto; margin-bottom: 1.5rem; border-radius: var(--radius-sm); box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); background: var(--surface); }
     table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: auto; min-width: 800px; }
     th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); word-break: break-all; overflow-wrap: anywhere; }
-    th { background: var(--surface); color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
-    th:last-child, td:last-child { border-right: none; }
-    tr:last-child td { border-bottom: none; }
+    th {
+      background: var(--header-bg);
+      color: white;
+      font-size: 0.725rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 800;
+      border-right: 1px solid rgba(255, 255, 255, 0.15);
+      border-bottom: none;
+      padding: 0.85rem 1rem;
+    }
+    th:last-child { border-right: none; }
+    td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-light); border-right: 1px solid var(--border-light); word-break: break-all; overflow-wrap: anywhere; }
+    td:last-child { border-right: none; }
 
     /* Column Sizing for Failure Details */
     .failure-details-table th:nth-child(1) { width: 80px; }
@@ -1669,9 +1684,9 @@ function htmlReportFromHistory(
                 </div>
           </div>
         </div>
-        <div class="meta" style="display: flex; gap: 1.25rem; opacity: 0.85;">
+        <div class="meta" style="display: flex; gap: 1.25rem;">
           <span>Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))}</span>
-          <span id="operation-count-label">${historicalSummaries.length} operation(s)</span>
+          <span id="operation-count-label" style="font-weight: 800; color: var(--header-bg);">${historicalSummaries.length} operation(s)</span>
         </div>
       </div>
     </div>
