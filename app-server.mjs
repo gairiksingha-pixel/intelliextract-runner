@@ -2606,6 +2606,11 @@ function bootstrapSchedules() {
 }
 createServer(async (req, res) => {
   const url = req.url?.split("?")[0] || "/";
+  if (req.method === "GET" && url === "/api/ping") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "pong" }));
+    return;
+  }
   if (req.method === "GET" && url.startsWith("/assets/")) {
     let decodedPath;
     try {
