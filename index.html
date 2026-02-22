@@ -2129,7 +2129,7 @@
         </a>
         <div class="system-status-pill">
           <div class="pulse-dot"></div>
-          <span id="system-status-text">Runner Active</span>
+          <span id="system-status-text">Runner is active</span>
         </div>
         <div class="header-right">
           <div class="header-filter-row">
@@ -2597,9 +2597,9 @@
 
         var newText = text;
         if (!newText) {
-          if (isOffline) newText = "Runner Offline";
-          else if (isBusy) newText = "Runner Busy";
-          else newText = "Runner Active";
+          if (isOffline) newText = "Runner is offline";
+          else if (isBusy) newText = "Runner is busy";
+          else newText = "Runner is active";
         }
 
         if (statusText.textContent !== newText) {
@@ -2819,7 +2819,7 @@
                 ? Math.min(100, Math.round((100 * skipSync) / skipSyncTotal))
                 : 100;
             extra +=
-              '<div class="sync-progress-wrap skip-progress-wrap">Skipping synced files: ' +
+              '<div class="sync-progress-wrap skip-progress-wrap">Runner is skipping synced files: ' +
               skipSync +
               " / " +
               skipSyncTotal +
@@ -2836,7 +2836,7 @@
                 ? Math.min(100, Math.round((100 * skipExt) / skipExtTotal))
                 : 100;
             extra +=
-              '<div class="sync-progress-wrap skip-progress-wrap">Skipping extracted files: ' +
+              '<div class="sync-progress-wrap skip-progress-wrap">Runner is skipping extracted files: ' +
               skipExt +
               " / " +
               skipExtTotal +
@@ -2851,7 +2851,7 @@
             var pct =
               total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
             extra +=
-              '<div class="sync-progress-wrap">Downloading: ' +
+              '<div class="sync-progress-wrap">Runner is syncing file: ' +
               (total > 0 ? done + " / " + total : done + " file(s)") +
               "</div>" +
               (total > 0
@@ -2872,7 +2872,7 @@
                 ? Math.min(100, Math.round((100 * extDone) / extTotal))
                 : 0;
             extra +=
-              '<div class="sync-progress-wrap extraction-progress-wrap">Extracting: ' +
+              '<div class="sync-progress-wrap extraction-progress-wrap">Runner is extracting: ' +
               (extTotal > 0
                 ? extDone + " / " + extTotal
                 : extDone + " file(s)") +
@@ -2898,16 +2898,16 @@
               showDots = false;
               var showSyncSkipLabel = hasResumeSkipSync && caseId !== "PIPE";
               label = showSyncSkipLabel
-                ? "Skipping synced files…"
+                ? "Runner is skipping synced files…"
                 : hasResumeSkipExtract && !hasSync && !hasExtraction
-                  ? "Skipping extracted files…"
+                  ? "Runner is skipping extracted files…"
                   : hasResumeSkipExtract && (hasSync || hasExtraction)
-                    ? "Skipped extract, syncing/extracting…"
+                    ? "Runner is skipping extract, syncing/extracting…"
                     : hasSync && hasExtraction
-                      ? "Sync & extract…"
+                      ? "Runner is sync & extract…"
                       : hasSync
-                        ? "Syncing…"
-                        : "Extracting…";
+                        ? "Runner is syncing file…"
+                        : "Runner is extracting…";
             } else {
               var pctVal =
                 progress && progress.percent != null
@@ -2928,7 +2928,7 @@
                 doneVal != null
               ) {
                 label =
-                  "Running… " +
+                  "Runner is extracting… " +
                   pctVal +
                   "% (" +
                   doneVal +
@@ -2937,10 +2937,10 @@
                   ")";
                 showDots = false;
               } else if (pctVal != null) {
-                label = "Running… " + pctVal + "%";
+                label = "Runner is extracting… " + pctVal + "%";
                 showDots = false;
               } else {
-                label = "Running…";
+                label = "Runner is active…";
               }
             }
           }
@@ -3583,19 +3583,19 @@
         }
         var isRetry = !!(runOptions && runOptions.retryFailed);
         var initStatus = isRetry
-          ? "Retrying Failed Extractions..."
+          ? "Runner is retrying failed extractions..."
           : caseId === "P1" || caseId === "P4" || caseId === "E3"
-            ? "Syncing Files..."
+            ? "Runner is syncing file..."
             : caseId === "P2" ||
                 caseId === "P5" ||
                 caseId === "P6" ||
                 caseId === "E1" ||
                 caseId === "E2" ||
                 caseId === "E5"
-              ? "Extracting Files..."
+              ? "Runner is extracting..."
               : caseId === "PIPE"
-                ? "Syncing Files..." // Starts with sync
-                : "Running Operation...";
+                ? "Runner is syncing file..." // Starts with sync
+                : "Runner is active...";
         setSystemStatus(true, initStatus);
         if (row) {
           row.querySelectorAll("button.run").forEach(function (b) {
@@ -3829,7 +3829,7 @@
                       lastResumeSkipExtract,
                     );
                   } else if (msg.type === "sync_progress") {
-                    setSystemStatus(true, "Syncing Files...");
+                    setSystemStatus(true, "Runner is syncing file...");
                     lastSyncProgress = { done: msg.done, total: msg.total };
                     showResult(
                       resultDiv,
@@ -3843,7 +3843,7 @@
                       lastResumeSkipExtract,
                     );
                   } else if (msg.type === "extraction_progress") {
-                    setSystemStatus(true, "Extracting Files...");
+                    setSystemStatus(true, "Runner is extracting...");
                     lastExtractionProgress = {
                       done: msg.done,
                       total: msg.total,
@@ -4083,7 +4083,7 @@
             if (!data || !data.activeRuns || data.activeRuns.length === 0)
               return;
 
-            setSystemStatus(true, "Operation in Progress...");
+            setSystemStatus(true, "Runner is active...");
             data.activeRuns.forEach(function (run) {
               var caseRow = tbody
                 ? tbody.querySelector('tr[data-case-id="' + run.caseId + '"]')
@@ -4160,10 +4160,10 @@
 
               if (resultDiv) {
                 resultDiv.className = "result running";
-                var msg = "Running";
+                var msg = "Runner is active";
                 if (run.progress) {
-                  msg +=
-                    "… " +
+                  msg =
+                    "Runner is active… " +
                     run.progress.percent +
                     "% (" +
                     run.progress.done +
@@ -4171,21 +4171,21 @@
                     run.progress.total +
                     ")";
                 } else if (run.syncProgress) {
-                  msg +=
-                    "… Syncing (" +
+                  msg =
+                    "Runner is syncing file (" +
                     run.syncProgress.done +
                     " / " +
                     run.syncProgress.total +
                     ")";
                 } else if (run.extractProgress) {
-                  msg +=
-                    "… Extracting (" +
+                  msg =
+                    "Runner is extracting (" +
                     run.extractProgress.done +
                     " / " +
                     run.extractProgress.total +
                     ")";
                 } else {
-                  msg += "…";
+                  msg = "Runner is active…";
                 }
                 resultDiv.innerHTML =
                   '<span class="exit">' +
@@ -6414,9 +6414,9 @@
           if (!statusTextEl) return;
           var currentText = statusTextEl.textContent;
           var wasBusy =
-            currentText.includes("Syncing") ||
-            currentText.includes("Extracting") ||
-            currentText.includes("Busy");
+            currentText.toLowerCase().includes("syncing") ||
+            currentText.toLowerCase().includes("extracting") ||
+            currentText.toLowerCase().includes("busy");
 
           fetch("/api/ping")
             .then(function (r) {

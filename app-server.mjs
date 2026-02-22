@@ -441,6 +441,27 @@ function buildExtractionDataPageHtml() {
 
   const loadFiles = (dir, status) => {
     if (!existsSync(dir)) return [];
+
+    // Load checkpoint DB to recover source paths for existing JSONs that don't have _relativePath
+    const checkpointData = existsSync(CHECKPOINT_PATH)
+      ? JSON.parse(readFileSync(CHECKPOINT_PATH, "utf8"))
+      : { checkpoints: [] };
+    const filenameToMetadata = {};
+    if (checkpointData.checkpoints) {
+      checkpointData.checkpoints.forEach((c) => {
+        const safe = (c.relative_path || "")
+          .replaceAll("/", "_")
+          .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+        const base = c.brand + "_" + (safe || "file");
+        const jsonName = base.endsWith(".json") ? base : base + ".json";
+        filenameToMetadata[jsonName] = {
+          relativePath: c.relative_path,
+          brand: c.brand,
+          purchaser: c.purchaser,
+        };
+      });
+    }
+
     return readdirSync(dir)
       .filter((f) => f.endsWith(".json"))
       .map((f) => {
@@ -453,6 +474,14 @@ function buildExtractionDataPageHtml() {
         try {
           mtime = statSync(path).mtimeMs;
         } catch (_) {}
+
+        // Best effort to recover relativePath if missing in JSON
+        if (content && !content._relativePath && filenameToMetadata[f]) {
+          content._relativePath = filenameToMetadata[f].relativePath;
+          content._brand = filenameToMetadata[f].brand;
+          content._purchaser = filenameToMetadata[f].purchaser;
+        }
+
         return { filename: f, status, content, mtime };
       });
   };
@@ -560,6 +589,10 @@ function buildExtractionDataPageHtml() {
       purchaserKey: f.content?.pattern?.purchaser_key ?? null,
       success: f.content?.success ?? null,
       json: f.content,
+      // Source file recovery metadata
+      sourceRelativePath: f.content?._relativePath || null,
+      sourceBrand: f.content?._brand || f.brand || null,
+      sourcePurchaser: f.content?._purchaser || f.purchaser || null,
     })),
   );
 
@@ -594,6 +627,7 @@ function buildExtractionDataPageHtml() {
       --radius-sm: 8px;
     }
     * { box-sizing: border-box; }
+    html { scrollbar-gutter: stable; }
     body {
       font-family: 'JetBrains Mono', 'Consolas', monospace;
       max-width: 1400px;
@@ -602,6 +636,7 @@ function buildExtractionDataPageHtml() {
       background: var(--bg);
       color: var(--text);
       font-size: 13px;
+      scrollbar-gutter: stable;
     }
     .report-header {
       background: rgba(255, 255, 255, 0.9);
@@ -866,17 +901,20 @@ function buildExtractionDataPageHtml() {
     .json-viewer {
       padding: 1.25rem 1.5rem;
       overflow-x: auto;
-      max-height: 500px;
+      max-height: 600px;
       overflow-y: auto;
-      animation: slideDown 0.28s cubic-bezier(0.25, 1, 0.5, 1);
+      transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
     }
+    .expand-row-content { overflow: hidden; height: 0; opacity: 0; transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+    .expand-row-content.open { height: auto; opacity: 1; }
+    
     @keyframes slideDown {
-      from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
-      to   { opacity: 1; max-height: 500px; }
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
     @keyframes slideUp {
-      from { opacity: 1; max-height: 500px; }
-      to   { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+      from { opacity: 1; transform: translateY(0); }
+      to   { opacity: 0; transform: translateY(-10px); }
     }
     .json-viewer pre {
       margin: 0;
@@ -991,7 +1029,7 @@ function buildExtractionDataPageHtml() {
     }
     .time-cell { font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
     .toggle-cell { width: 40px; text-align: center; vertical-align: middle; }
-    .action-cell { width: 100px; text-align: center; vertical-align: middle; }
+    .action-cell { width: 160px; text-align: center; vertical-align: middle; }
     .btn-download-row {
       background: var(--bg);
       border: 1px solid var(--border-light);
@@ -1389,6 +1427,13 @@ function buildExtractionDataPageHtml() {
       URL.revokeObjectURL(url);
     }
 
+    function downloadSource(idx) {
+      const r = ALL_ROWS[idx];
+      if (!r || !r.sourceRelativePath) return;
+      const fullPath = 'output/staging/' + r.sourceBrand + '/' + r.sourceRelativePath;
+      window.location.href = '/api/download-file?file=' + encodeURIComponent(fullPath);
+    }
+
     function render() {
       var filtered = getFilteredRows();
       var total = filtered.length;
@@ -1445,8 +1490,18 @@ function buildExtractionDataPageHtml() {
         html += '<td class="pattern-cell"><code>' + escHtml(r.patternKey || '—') + '</code></td>';
         html += '<td style="font-size:0.72rem; color:var(--text-secondary);">' + escHtml(CONFIG.purchaserNames[r.purchaserKey] || r.purchaserKey || '—') + '</td>';
         html += '<td>' + badge + '</td>';
-        html += '<td class="action-cell"><button class="btn-download-row" onclick="event.stopPropagation(); downloadRow(' + globalIdx + ')">' +
-                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> JSON</button></td>';
+        var sourceBtn = '';
+        if (r.sourceRelativePath) {
+          sourceBtn = '<button class="btn-download-row" style="background: var(--accent-light); border-color: var(--primary); color: var(--primary); padding: 0.3rem 0.5rem;" onclick="event.stopPropagation(); downloadSource(' + globalIdx + ')" title="Download Source File">' +
+                      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> SOURCE</button>';
+        }
+
+        html += '<td class="action-cell">' + 
+                '<div style="display: flex; gap: 6px; justify-content: center; align-items: center;">' +
+                  '<button class="btn-download-row" style="padding: 0.3rem 0.5rem;" onclick="event.stopPropagation(); downloadRow(' + globalIdx + ')" title="Download Extraction JSON">' +
+                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> JSON</button>' + 
+                  sourceBtn + 
+                '</div></td>';
         html += '</tr>';
       });
       tbody.innerHTML = html;
@@ -1456,11 +1511,18 @@ function buildExtractionDataPageHtml() {
           var idx = parseInt(this.getAttribute('data-idx'), 10);
           var existingExpand = tbody.querySelector('tr.expand-row[data-for="' + idx + '"]');
           if (existingExpand) {
-            var viewer = existingExpand.querySelector('.json-viewer');
-            if (viewer) {
-              viewer.style.animation = 'slideUp 0.15s forwards';
-              viewer.onanimationend = () => existingExpand.remove();
-            } else existingExpand.remove();
+            var container = existingExpand.querySelector('.expand-row-content');
+            if (container) {
+              container.style.height = container.scrollHeight + 'px';
+              container.offsetHeight; // reflow
+              container.style.height = '0';
+              container.style.opacity = '0';
+              setTimeout(() => {
+                existingExpand.remove();
+              }, 350);
+            } else {
+              existingExpand.remove();
+            }
             this.classList.remove('expanded');
             expandedRows.delete(idx);
           } else {
@@ -1468,14 +1530,34 @@ function buildExtractionDataPageHtml() {
             var expandTr = document.createElement('tr');
             expandTr.className = 'expand-row';
             expandTr.setAttribute('data-for', idx);
-            expandTr.innerHTML = '<td colspan="7"><div class="json-loader"><div class="json-spinner"></div><span>Loading...</span></div></td>';
+            expandTr.innerHTML = '<td colspan="7"><div class="expand-row-content"><div class="json-loader"><div class="json-spinner"></div><span>Loading...</span></div></div></td>';
             this.parentNode.insertBefore(expandTr, this.nextSibling);
+            
+            var container = expandTr.querySelector('.expand-row-content');
             this.classList.add('expanded');
             expandedRows.add(idx);
+            
+            // Animate initial loader
+            container.style.height = '60px'; // Approx loader height
+            container.style.opacity = '1';
+
             setTimeout(() => {
               const highlighted = syntaxHighlight(r.json);
-              expandTr.querySelector('td').innerHTML = '<div class="json-viewer"><pre>' + highlighted + '</pre></div>';
-            }, 50);
+              container.innerHTML = '<div class="json-viewer" style="animation: slideDown 0.3s ease-out;"><pre>' + highlighted + '</pre></div>';
+              
+              // Smoothly transition to content height
+              const newHeight = Math.min(600, container.scrollHeight);
+              container.style.height = newHeight + 'px';
+              
+              // Allow it to grow/shrink or scroll after animation
+              setTimeout(() => {
+                if (container.scrollHeight > 600) {
+                   container.style.height = '600px';
+                } else {
+                   container.style.height = 'auto';
+                }
+              }, 350);
+            }, 60);
           }
         };
       });

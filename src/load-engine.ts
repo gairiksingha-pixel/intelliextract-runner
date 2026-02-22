@@ -262,6 +262,14 @@ function writeExtractionResult(
       typeof data === "object" &&
       data !== null &&
       (data as { success?: boolean }).success === true;
+
+    // Add metadata for easier source file recovery in reports
+    if (typeof data === "object" && data !== null) {
+      (data as any)._relativePath = job.relativePath;
+      (data as any)._brand = job.brand;
+      (data as any)._purchaser = job.purchaser;
+    }
+
     const subdir = success ? "succeeded" : "failed";
     const extractionsDir = join(baseDir, subdir);
     mkdirSync(extractionsDir, { recursive: true });

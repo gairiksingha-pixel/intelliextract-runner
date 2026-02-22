@@ -912,6 +912,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     </div>
   </summary>
   <div class="run-section-body">
+    <div class="run-section-body-inner" style="padding: 0.5rem 1.5rem 1.5rem;">
     ${sessionsSection}
     <div style="margin-bottom: 2rem;">
       <h3 style="margin-top: 0;">Consolidated Overview</h3>
@@ -970,7 +971,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   <div class="anomalies-container">
     ${anomaliesList}
   </div>
-  ${fullLogSection}
+  </div>
   </div>
   </details>`;
   // Note: I will need to properly integrate this into the sectionForRun string.
@@ -1194,12 +1195,30 @@ function htmlReportFromHistory(
     .failure-details-table th:nth-child(2) { min-width: 400px; }
     .failure-details-table th:nth-child(3) { min-width: 400px; }
     
-    .run-section { margin-bottom: 1.25rem; background: white; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid var(--border); overflow: hidden; border-left: 6px solid #cbd5e1; transition: all 0.2s; }
-    .run-section[open] { border-color: var(--header-bg); }
+    .run-section { 
+      margin-bottom: 1.25rem; 
+      background: white; 
+      border-radius: 10px; 
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+      border: 1px solid var(--border); 
+      overflow: hidden; 
+      border-left: 6px solid #cbd5e1; 
+      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease; 
+    }
+    .run-section[open] { 
+      border-color: var(--header-bg); 
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      transform: translateY(-2px);
+    }
     .run-section.status-error { border-left-color: #ef4444; }
     .run-section.status-warning { border-left-color: #f59e0b; }
     .run-section.status-error[open] { border-color: #ef4444; }
     .run-section.status-warning[open] { border-color: #f59e0b; }
+
+    .run-section-body { overflow: hidden; }
+    /* Animation helper classes */
+    .collapsing { transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+    .expanding { transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
     
     .run-section-summary { cursor: pointer; padding: 1rem 1.25rem; background: #f8fafc; list-style: none; transition: background 0.2s; border-bottom: 1px solid var(--border-light); }
     .run-section-summary::-webkit-details-marker { display: none; }
@@ -1326,7 +1345,7 @@ function htmlReportFromHistory(
     .badge-status.fail { background: #fee2e2; color: #b91c1c; border: 1px solid rgba(185, 28, 28, 0.2); }
     .badge-status.secondary { background: #f1f5f9; color: var(--text-secondary); border: 1px solid var(--border-light); }
     
-    .run-section-body { padding: 0.5rem 1.5rem 1.5rem; }
+    .run-section-body { padding: 0; }
     
     .chip { display: inline-flex; align-items: center; background: #f1f5f9; color: var(--text); padding: 0.2rem 0.6rem; border-radius: 100px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border); }
     .chip.success { background: var(--accent-light); color: var(--primary); border-color: rgba(45, 157, 95, 0.2); }
@@ -2304,7 +2323,56 @@ function htmlReportFromHistory(
       }
       initCharts(runData);
       renderHistory();
+      setupSmoothAccordion();
     };
+
+    function setupSmoothAccordion() {
+      document.querySelectorAll('.run-section').forEach(el => {
+        const summary = el.querySelector('.run-section-summary');
+        const content = el.querySelector('.run-section-body');
+        
+        summary.onclick = (e) => {
+          e.preventDefault();
+          if (el.classList.contains('collapsing') || el.classList.contains('expanding')) return;
+
+          if (el.hasAttribute('open')) {
+            // Close
+            const startHeight = el.offsetHeight;
+            el.classList.add('collapsing');
+            el.style.height = startHeight + 'px';
+            
+            // Reflow
+            el.offsetHeight;
+            
+            el.style.height = summary.offsetHeight + 'px';
+            
+            setTimeout(() => {
+              el.removeAttribute('open');
+              el.classList.remove('collapsing');
+              el.style.height = '';
+            }, 350);
+          } else {
+            // Open
+            const startHeight = el.offsetHeight;
+            el.setAttribute('open', '');
+            const endHeight = el.offsetHeight;
+            
+            el.classList.add('expanding');
+            el.style.height = startHeight + 'px';
+            
+            // Reflow
+            el.offsetHeight;
+            
+            el.style.height = endHeight + 'px';
+            
+            setTimeout(() => {
+              el.classList.remove('expanding');
+              el.style.height = '';
+            }, 350);
+          }
+        };
+      });
+    }
 
     function updateDashboardStats(data) {
       const totalProcessed = data.reduce((a, b) => a + b.success + b.failed, 0);
