@@ -249,6 +249,7 @@ function writeExtractionResult(
   runId: string,
   job: FileJob,
   responseBody: string,
+  latencyMs?: number,
 ): string | null {
   try {
     const baseDir = join(dirname(config.report.outputDir), "extractions");
@@ -268,6 +269,9 @@ function writeExtractionResult(
       (data as any)._relativePath = job.relativePath;
       (data as any)._brand = job.brand;
       (data as any)._purchaser = job.purchaser;
+      if (typeof latencyMs === "number") {
+        (data as any)._latencyMs = latencyMs;
+      }
     }
 
     const subdir = success ? "succeeded" : "failed";
@@ -392,7 +396,7 @@ export async function extractOneFile(
   const status = finalSuccess ? "done" : "error";
 
   if (result.body) {
-    writeExtractionResult(config, runId, job, result.body);
+    writeExtractionResult(config, runId, job, result.body, result.latencyMs);
   }
 
   const baseErrorSnippet = finalSuccess ? undefined : result.body.slice(0, 500);
@@ -677,7 +681,13 @@ export async function runExtraction(
           const finalSuccess = isAppSuccess;
           const status = finalSuccess ? "done" : "error";
           if (result.body) {
-            writeExtractionResult(config, runIdToUse, job, result.body);
+            writeExtractionResult(
+              config,
+              runIdToUse,
+              job,
+              result.body,
+              result.latencyMs,
+            );
           }
           const baseErrorSnippet = finalSuccess
             ? undefined

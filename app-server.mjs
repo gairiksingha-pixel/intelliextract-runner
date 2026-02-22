@@ -3508,7 +3508,10 @@ createServer(async (req, res) => {
     }
     return;
   }
-  if (req.method === "GET" && url === "/api/download-file") {
+  if (
+    (req.method === "GET" || req.method === "HEAD") &&
+    url === "/api/download-file"
+  ) {
     try {
       const q = new URL(req.url, `http://${req.headers.host}`).searchParams;
       const fileId = q.get("file");

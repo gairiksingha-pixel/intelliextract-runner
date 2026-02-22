@@ -242,7 +242,18 @@ export function loadHistoricalRunSummaries(
   const db = openCheckpointDb(config.run.checkpointPath);
   const runIds = getAllRunIdsOrdered(db);
 
-  // 1. Collect raw data for all runs
+  // 1. Build a global latency map to enrich skipped records later
+  const globalLatencyMap = new Map<string, number>();
+  for (const rid of runIds) {
+    const recs = getRecordsForRun(db, rid);
+    for (const r of recs) {
+      if (r.status === "done" && r.latencyMs) {
+        globalLatencyMap.set(r.filePath, r.latencyMs);
+      }
+    }
+  }
+
+  // 2. Collect raw data for all runs
   const rawSummaries: Array<{
     runId: string;
     records: any[];
@@ -278,6 +289,15 @@ export function loadHistoricalRunSummaries(
       }
       const key = `${r.brand}|${p || ""}`;
       if (!recordsByGroup.has(key)) recordsByGroup.set(key, []);
+
+      // Enrich skipped records with previous latency if available
+      if (r.status === "skipped" && !r.latencyMs) {
+        const prevLatency = globalLatencyMap.get(r.filePath);
+        if (prevLatency) {
+          (r as any).latencyMs = prevLatency;
+        }
+      }
+
       recordsByGroup.get(key)!.push(r);
     }
 
@@ -589,10 +609,13 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   // 1. displaySuccess: Status=Done AND JSON success=true
   // 2. displayApiFailed: Status=Done AND JSON success=false (or missing)
   // 3. displayInfraFailed: Status=Error
+  // displaySuccess is succeededCount (JSONs on disk), which already includes skipped files.
+  // We set processed to the total attempt count (Success + Failed + Skipped) so metrics correctly
+  // represent the full scope of the operation.
   const displaySuccess = succeededCount;
   const displayInfraFailed = m.failed;
   const displayApiFailed = Math.max(0, m.success - displaySuccess);
-  const processed = m.success + m.failed;
+  const processed = m.success + m.failed + m.skipped;
   const throughputPerSecond =
     entry.runDurationSeconds > 0 ? processed / entry.runDurationSeconds : 0;
   const throughputPerMinute = throughputPerSecond * 60;
@@ -664,10 +687,10 @@ function sectionForRun(entry: HistoricalRunSummary): string {
             const sourcePath = `output/staging/${f.brand}/${f.relativePath}`;
             const jsonPath = `output/extractions/failed/${extractionResultFilenameFromRecord({ relativePath: f.relativePath, brand: f.brand, purchaser: f.purchaser })}`;
             return `<tr><td>${f.statusCode ?? "—"}</td><td class="file-path">${escapeHtml(f.filePath)}</td><td>${snippet}</td><td class="action-cell">
-        <a href="/api/download-file?file=${encodeURIComponent(sourcePath)}" class="action-btn" title="Download Source File">
+        <a href="javascript:void(0)" onclick="downloadFile('${sourcePath}', this)" class="action-btn" title="Download Source File">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
         </a>
-        <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Response">
+        <a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Response">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </a>
       </td></tr>`;
@@ -698,10 +721,10 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       const sourcePath = `output/staging/${e.brand}/${e.relativePath}`;
 
       return `<tr><td class="file-path">${escapeHtml(e.filePath)}</td><td>${e.latencyMs.toFixed(0)}</td><td>${escapeHtml(e.patternKey ?? "—")}</td><td class="action-cell">
-        <a href="/api/download-file?file=${encodeURIComponent(sourcePath)}" class="action-btn" title="Download Source File">
+        <a href="javascript:void(0)" onclick="downloadFile('${sourcePath}', this)" class="action-btn" title="Download Source File">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
         </a>
-        <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON">
+        <a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Extraction JSON">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </a>
       </td></tr>`;
@@ -801,52 +824,137 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   const infraFailBadge = `<span class="badge-status fail">${displayInfraFailed} INFRA FAIL</span>`;
   const itemCountBadge = `<span class="badge-status secondary" style="background: rgba(33, 108, 109, 0.1); color: var(--header-bg); border: 1px solid rgba(33, 108, 109, 0.2);">${processed} ITEMS</span>`;
 
+  // Build a lookup map from extraction results (actual JSON files on disk)
+  // so we can enrich skipped records and verify file existence for buttons
+  const extractionResultMap = new Map<
+    string,
+    { patternKey?: string; success: boolean; latencyMs?: number }
+  >();
+  for (const er of entry.extractionResults) {
+    const resp = er.response as Record<string, any> | null;
+    const pattern = resp?.pattern as Record<string, any> | undefined;
+    const meta = resp?.meta as Record<string, any> | undefined;
+
+    // Try to find latency in various standard locations
+    const foundLatency =
+      resp?.latency_ms ??
+      meta?.latency_ms ??
+      resp?._latencyMs ??
+      resp?.latencyMs ??
+      meta?.latencyMs;
+
+    extractionResultMap.set(er.filename, {
+      patternKey: (pattern?.pattern_key as string) ?? undefined,
+      success: er.extractionSuccess,
+      latencyMs: typeof foundLatency === "number" ? foundLatency : undefined,
+    });
+  }
+
   // Create full log rows from records
   const fullLogRows = entry.records
     .map((rec) => {
-      const isSuccess = rec.status === "done";
-      const status = isSuccess
-        ? '<span class="status-icon success">✅</span> SUCCESS'
-        : '<span class="status-icon error">❌</span> FAILED';
-
       const jsonName = extractionResultFilenameFromRecord({
         relativePath: rec.relativePath,
         brand: rec.brand,
         purchaser: rec.purchaser,
       });
-      const jsonDir =
-        rec.status === "done"
-          ? "output/extractions/succeeded"
-          : "output/extractions/failed";
+
+      // Check if extraction JSON actually exists on disk
+      const extractionResult = extractionResultMap.get(jsonName);
+      const jsonExists = !!extractionResult;
+
+      let statusDisplay = "";
+      let jsonDir = "output/extractions/failed";
+      let showJson = false;
+      let showSource = false;
+      let displayPatternKey = rec.patternKey;
+      let displayLatency = rec.latencyMs;
+
+      if (rec.status === "done") {
+        statusDisplay = '<span class="status-icon success">✅</span> SUCCESS';
+        jsonDir =
+          extractionResult?.success !== false
+            ? "output/extractions/succeeded"
+            : "output/extractions/failed";
+        showJson = jsonExists;
+        if (!displayPatternKey && extractionResult?.patternKey) {
+          displayPatternKey = extractionResult.patternKey;
+        }
+        if (!displayLatency && extractionResult?.latencyMs) {
+          displayLatency = extractionResult.latencyMs;
+        }
+      } else if (rec.status === "skipped") {
+        if (jsonExists) {
+          // File was extracted in a previous session — show as SUCCESS with enriched data
+          statusDisplay =
+            '<span class="status-icon success">✅</span> SUCCESS <span class="muted small" style="font-weight:400">(SKIPPED)</span>';
+          jsonDir =
+            extractionResult?.success !== false
+              ? "output/extractions/succeeded"
+              : "output/extractions/failed";
+          showJson = true;
+          if (!displayPatternKey && extractionResult?.patternKey) {
+            displayPatternKey = extractionResult.patternKey;
+          }
+          if (!displayLatency && extractionResult?.latencyMs) {
+            displayLatency = extractionResult.latencyMs;
+          }
+        } else {
+          // Skipped but no extraction JSON found — interrupted run
+          statusDisplay =
+            '<span class="status-icon secondary">⏭️</span> SKIPPED';
+          showJson = false;
+          showSource = true;
+        }
+      } else if (rec.status === "error") {
+        statusDisplay = '<span class="status-icon error">❌</span> FAILED';
+        jsonDir = "output/extractions/failed";
+        showJson = jsonExists;
+      } else {
+        statusDisplay = `<span class="status-icon secondary">⏳</span> ${rec.status.toUpperCase()}`;
+        showJson = false;
+      }
+
       const jsonPath = `${jsonDir}/${jsonName}`;
-
       const sourcePath = `output/staging/${rec.brand}/${rec.relativePath}`;
+      showSource = existsSync(sourcePath);
 
-      return `<tr class="log-row" data-search="${escapeHtml((rec.filePath + status + (rec.patternKey || "")).toLowerCase())}">
-      <td>${status}</td>
-      <td class="file-path">${escapeHtml(rec.filePath)}</td>
-      <td>${escapeHtml(rec.patternKey ?? "—")}</td>
-      <td><span class="chip">${rec.latencyMs ? rec.latencyMs.toFixed(0) : "—"} ms</span></td>
-      <td class="action-cell">
-        <a href="/api/download-file?file=${encodeURIComponent(sourcePath)}" class="action-btn" title="Download Source File" data-type="source">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-        </a>
-        <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON" data-type="json">
+      const jsonBtn = showJson
+        ? `<a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Extraction JSON" data-type="json" data-path="${jsonPath}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        </a>
+        </a>`
+        : "";
+
+      const sourceBtn = showSource
+        ? `<a href="javascript:void(0)" onclick="downloadFile('${sourcePath}', this)" class="action-btn" title="Download Source File" data-type="source" data-path="${sourcePath}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </a>`
+        : "";
+
+      return `<tr class="log-row" data-search="${escapeHtml((rec.filePath + statusDisplay + (displayPatternKey || "")).toLowerCase())}">
+      <td>${statusDisplay}</td>
+      <td class="file-path">${escapeHtml(rec.filePath)}</td>
+      <td>${escapeHtml(displayPatternKey ?? "—")}</td>
+      <td><span class="chip">${displayLatency ? displayLatency.toFixed(0) : "—"} ms</span></td>
+      <td class="action-cell">
+        ${sourceBtn}
+        ${jsonBtn}
       </td>
     </tr>`;
     })
     .join("");
 
+  const accordionArrow = `<svg class="accordion-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 12px; flex-shrink: 0;"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+
   const fullLogSection = `
     <details class="full-log-container">
-      <summary class="run-section-summary" style="border-radius: 8px; border: 1px solid var(--border-light);">
-        <div class="summary-content">
+      <summary class="run-section-summary" style="border: none;">
+        <div class="summary-content" style="justify-content: flex-start;">
           <div style="font-weight: 800; font-size: 0.85rem; text-transform: uppercase;">📦 View Full Extraction Log (${entry.records.length} files)</div>
+          ${accordionArrow}
         </div>
       </summary>
-      <div style="padding: 1.5rem 0;">
+      <div class="run-section-body" style="padding: 1.5rem 1.5rem;">
         <div class="log-search-container" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
           <input type="text" placeholder="Search files, patterns, or status..." onkeyup="filterSectionLog(this)" style="flex: 1;">
           <div style="display: flex; gap: 8px;">
@@ -897,12 +1005,13 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     (entry.sessions?.length ?? 0) > 1
       ? `
   <details class="full-log-container" style="margin-top: 1rem; margin-bottom: 2rem;">
-    <summary class="run-section-summary" style="border-radius: 8px; border: 1px solid var(--border-light); background: #f8fafc;">
-      <div class="summary-content">
+    <summary class="run-section-summary" style="border: none; background: #f8fafc;">
+      <div class="summary-content" style="justify-content: flex-start;">
         <div style="font-weight: 800; font-size: 0.85rem; text-transform: uppercase;">🕒 Execution Timeline (${entry.sessions!.length} Sessions)</div>
+        ${accordionArrow}
       </div>
     </summary>
-    <div style="padding: 1rem 0;">
+    <div class="run-section-body" style="padding: 1rem 1.5rem;">
       <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">This operation consists of multiple sessions executed within a 2-hour window. Consolidated metrics above reflect the final state.</p>
       <div class="table-responsive">
         <table>
@@ -932,6 +1041,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       </div>
       <div class="summary-badges">
         ${itemCountBadge} ${successBadge} ${apiFailBadge} ${infraFailBadge}
+        ${accordionArrow}
       </div>
     </div>
   </summary>
@@ -1284,6 +1394,7 @@ function htmlReportFromHistory(
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
       border: 1px solid rgba(0,0,0,0.05);
       width: 420px;
+      font-family: 'JetBrains Mono', monospace;
       max-width: 90vw;
       padding: 0;
       display: flex;
@@ -1324,6 +1435,7 @@ function htmlReportFromHistory(
       color: white;
       border: none;
       border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
       height: 42px;
       padding: 0 1.5rem;
       font-weight: 700;
@@ -1337,6 +1449,7 @@ function htmlReportFromHistory(
       color: #475569;
       border: 1px solid #e2e8f0;
       border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
       height: 42px;
       padding: 0 1.5rem;
       font-weight: 600;
@@ -1469,7 +1582,10 @@ function htmlReportFromHistory(
     .small { font-size: 0.75rem; }
     td.file-path { font-family: inherit; font-size: 0.72rem; color: var(--text-secondary); overflow-wrap: anywhere; word-break: break-all; }
     
-    .full-log-container { margin-top: 1.5rem; }
+    .full-log-container { margin-top: 1.5rem; overflow: hidden; border-radius: 8px; border: 1px solid var(--border-light); }
+    .full-log-container[open] { border-color: var(--header-bg); }
+    .accordion-arrow { transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); color: #94a3b8; }
+    details[open] .accordion-arrow { transform: rotate(180deg); color: var(--header-bg); }
     .log-search-container { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
     .log-search-container input { flex: 1; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border); font-family: inherit; font-size: 0.85rem; }
     .log-search-container span { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); }
@@ -1783,14 +1899,6 @@ function htmlReportFromHistory(
     // Modal Helpers
     let currentConfirmCallback = null;
     function showAppAlert(title, message, options) {
-      // Proxy to parent if possible for better experience
-      try {
-        if (window.parent && typeof window.parent.showAppAlert === 'function') {
-          window.parent.showAppAlert(title, message, options);
-          return;
-        }
-      } catch (e) {}
-
       const overlay = document.getElementById("app-alert-modal-overlay");
       const headerText = document.getElementById("app-alert-header-text");
       const msgEl = document.getElementById("app-alert-message");
@@ -1951,14 +2059,21 @@ function htmlReportFromHistory(
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-label">Total Items Processed</div>
-          <div class="stat-value">${historicalSummaries.reduce((a, b) => a + b.metrics.success + b.metrics.failed, 0)}</div>
+          <div class="stat-value">${historicalSummaries.reduce((a, b) => a + b.metrics.success + b.metrics.failed + (b.metrics.skipped || 0), 0)}</div>
         </div>
         <div class="stat-card success">
           <div class="stat-label">Success Rate</div>
           <div class="stat-value">${(
-            (historicalSummaries.reduce((a, b) => a + b.metrics.success, 0) /
+            (historicalSummaries.reduce(
+              (a, b) => a + b.metrics.success + (b.metrics.skipped || 0),
+              0,
+            ) /
               (historicalSummaries.reduce(
-                (a, b) => a + b.metrics.success + b.metrics.failed,
+                (a, b) =>
+                  a +
+                  b.metrics.success +
+                  b.metrics.failed +
+                  (b.metrics.skipped || 0),
                 0,
               ) || 1)) *
             100
@@ -2124,8 +2239,8 @@ function htmlReportFromHistory(
       const files = rows.map(r => {
         const link = r.querySelector('a[data-type="' + (type || 'json') + '"]');
         if (!link) return null;
-        const url = new URL(link.href, window.location.origin);
-        return url.searchParams.get('file');
+        const path = link.getAttribute('data-path');
+        return path;
       }).filter(Boolean);
 
       if (files.length === 0) {
@@ -2164,6 +2279,34 @@ function htmlReportFromHistory(
       } finally {
         btn.innerHTML = originalHtml;
         btn.disabled = false;
+      }
+    }
+
+    async function downloadFile(path, btn) {
+      if (!path) return;
+      
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '...';
+      btn.style.pointerEvents = 'none';
+
+      try {
+        const checkUrl = '/api/download-file?file=' + encodeURIComponent(path);
+        const response = await fetch(checkUrl, { method: 'HEAD' });
+        
+        if (response.status === 404) {
+          showAppAlert('File Not Found', 'The requested file was not found on the server. It may not have been generated yet or was moved.', { isError: true });
+        } else if (!response.ok) {
+          throw new Error('Download check failed');
+        } else {
+          window.location.href = checkUrl;
+        }
+      } catch (e) {
+        showAppAlert('Error', 'Failed to retrieve file: ' + e.message, { isError: true });
+      } finally {
+        setTimeout(() => {
+          btn.innerHTML = originalHtml;
+          btn.style.pointerEvents = 'auto';
+        }, 300);
       }
     }
 
@@ -2379,7 +2522,7 @@ function htmlReportFromHistory(
         brand: s.brand || "",
         purchaser: s.purchaser || "",
         throughput:
-          ((s.metrics.success + s.metrics.failed) /
+          ((s.metrics.success + s.metrics.failed + s.metrics.skipped) /
             (s.runDurationSeconds || 1)) *
           60,
         errors: s.metrics.failureBreakdown,
@@ -2404,12 +2547,13 @@ function htmlReportFromHistory(
         Chart.defaults.color = "#5a5a5a";
       }
       initCharts(runData);
+      updateDashboardStats(runData);
       renderHistory();
       setupSmoothAccordion();
     };
 
     function setupSmoothAccordion() {
-      document.querySelectorAll('.run-section').forEach(el => {
+      document.querySelectorAll('.run-section, .full-log-container').forEach(el => {
         const summary = el.querySelector('.run-section-summary');
         const content = el.querySelector('.run-section-body');
         
@@ -2457,8 +2601,8 @@ function htmlReportFromHistory(
     }
 
     function updateDashboardStats(data) {
-      const totalProcessed = data.reduce((a, b) => a + b.success + b.failed, 0);
-      const totalSuccess = data.reduce((a, b) => a + b.success, 0);
+      const totalProcessed = data.reduce((a, b) => a + b.success + b.failed + (b.skipped || 0), 0);
+      const totalSuccess = data.reduce((a, b) => a + b.success + (b.skipped || 0), 0);
       const successRate = totalProcessed > 0 ? (totalSuccess / totalProcessed * 100).toFixed(1) : "0.0";
       const avgLatency = data.length > 0 ? Math.round(data.reduce((a, b) => a + (b.p50 || 0), 0) / data.length) : 0;
       
