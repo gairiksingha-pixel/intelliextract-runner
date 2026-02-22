@@ -863,7 +863,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
           <table class="log-table">
             <thead>
-              <tr><th style="width: 140px;">Status</th><th>File Path</th><th style="width: 200px;">Pattern</th><th style="width: 100px;">Latency</th><th style="width: 80px;" class="action-cell">Action</th></tr>
+              <tr><th style="width: 140px;">Status</th><th>File Path</th><th style="width: 200px;">Pattern</th><th style="width: 100px;">Latency</th><th style="width: 100px;" class="action-cell">Action</th></tr>
             </thead>
             <tbody>
               ${fullLogRows}
@@ -1490,6 +1490,9 @@ function htmlReportFromHistory(
       height: 44px;
       line-height: 1.2;
     }
+    .log-table th.action-cell {
+      text-align: center;
+    }
     .log-row-hidden { display: none !important; }
 
     /* Premium Scrollbar */
@@ -1734,6 +1737,10 @@ function htmlReportFromHistory(
     .action-cell {
       text-align: center;
       vertical-align: middle;
+      white-space: nowrap;
+    }
+    .action-cell .action-btn {
+      margin: 0 2px;
     }
 
     .filtered-out { display: none !important; }
