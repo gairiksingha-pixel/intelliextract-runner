@@ -1728,10 +1728,35 @@ function buildSyncReportHtml() {
       border: 1px solid var(--border-light);
       border-radius: 16px; 
       padding: 1.6rem; 
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.02);
       margin-bottom: 2rem;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
-    .chart-card h4 { margin: 0 0 1rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--header-bg); border-bottom: 2px solid rgba(33, 108, 109, 0.1); padding-bottom: 0.6rem; font-weight: 800; }
+    .chart-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.06);
+    }
+    .chart-card h4 { 
+      margin: 0 0 1.25rem; 
+      font-size: 0.85rem; 
+      text-transform: uppercase; 
+      letter-spacing: 0.1em; 
+      color: var(--header-bg); 
+      border-bottom: 1px solid rgba(176,191,201,0.2); 
+      padding-bottom: 0.75rem; 
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chart-card h4::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 16px;
+      background: var(--primary);
+      border-radius: 2px;
+    }
     .chart-container { position: relative; height: 350px; width: 100%; }
 
     h3 { color: var(--header-bg); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 2rem 0 1rem; border-bottom: 2px solid var(--border-light); padding-bottom: 0.4rem; }
@@ -2349,21 +2374,80 @@ function buildSyncReportHtml() {
       }
 
       const ctx = canvas.getContext('2d');
+      
+      // Create gradients
+      const gradSynced = ctx.createLinearGradient(0, 0, 0, 400);
+      gradSynced.addColorStop(0, '#2d9d5f');
+      gradSynced.addColorStop(1, '#1e6b41');
+
+      const gradSkipped = ctx.createLinearGradient(0, 0, 0, 400);
+      gradSkipped.addColorStop(0, '#94a3b8');
+      gradSkipped.addColorStop(1, '#64748b');
+
+      const gradErrors = ctx.createLinearGradient(0, 0, 0, 400);
+      gradErrors.addColorStop(0, '#ef4444');
+      gradErrors.addColorStop(1, '#991b1b');
+
       historyChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: labels,
           datasets: [
-            { label: 'Downloaded (New)', data: filteredHistory.map(d => d.synced), backgroundColor: '#2d9d5f' },
-            { label: 'Skipped (Unchanged)', data: filteredHistory.map(d => d.skipped), backgroundColor: '#94a3b8' },
-            { label: 'Errors', data: filteredHistory.map(d => d.errors), backgroundColor: '#ef4444' }
+            { 
+              label: 'Downloaded (New)', 
+              data: filteredHistory.map(d => d.synced), 
+              backgroundColor: gradSynced,
+              borderRadius: 4,
+              borderWidth: 0
+            },
+            { 
+              label: 'Skipped (Unchanged)', 
+              data: filteredHistory.map(d => d.skipped), 
+              backgroundColor: gradSkipped,
+              borderRadius: 4,
+              borderWidth: 0
+            },
+            { 
+              label: 'Errors', 
+              data: filteredHistory.map(d => d.errors), 
+              backgroundColor: gradErrors,
+              borderRadius: 4,
+              borderWidth: 0
+            }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-          plugins: { legend: { position: 'bottom' } }
+          plugins: { 
+            legend: { 
+              position: 'bottom',
+              labels: {
+                usePointStyle: true,
+                padding: 20,
+                font: { weight: '600' }
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(33, 108, 109, 0.95)',
+              padding: 12,
+              titleFont: { size: 14, weight: 'bold' },
+              bodyFont: { size: 13 },
+              cornerRadius: 8,
+              boxPadding: 6
+            }
+          },
+          scales: { 
+            x: { 
+              stacked: true, 
+              grid: { display: false } 
+            }, 
+            y: { 
+              stacked: true, 
+              beginAtZero: true,
+              grid: { color: 'rgba(0,0,0,0.05)' }
+            } 
+          }
         }
       });
     }

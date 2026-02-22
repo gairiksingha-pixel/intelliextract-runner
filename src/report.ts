@@ -1353,9 +1353,34 @@ function htmlReportFromHistory(
       border: 1px solid var(--border-light); 
       border-radius: var(--radius); 
       padding: 1.6rem; 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.02);
+      transition: transform 0.2s, box-shadow 0.2s;
     }
-    .chart-card h4 { margin: 0 0 1rem; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--header-bg); border-bottom: 2px solid rgba(33, 108, 109, 0.1); padding-bottom: 0.6rem; font-weight: 800; }
+    .chart-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.06);
+    }
+    .chart-card h4 { 
+      margin: 0 0 1.25rem; 
+      font-size: 0.85rem; 
+      text-transform: uppercase; 
+      letter-spacing: 0.1em; 
+      color: var(--header-bg); 
+      border-bottom: 1px solid rgba(176,191,201,0.2); 
+      padding-bottom: 0.75rem; 
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chart-card h4::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 16px;
+      background: var(--primary);
+      border-radius: 2px;
+    }
     .chart-scroll-wrapper { 
       overflow-x: auto; 
       overflow-y: hidden; 
@@ -2380,8 +2405,62 @@ function htmlReportFromHistory(
       Object.keys(chartConfigs).forEach(id => {
         const canvas = document.getElementById(id);
         if (!canvas) return;
+        const ctx = canvas.getContext('2d');
         if (chartInstances[id]) chartInstances[id].destroy();
-        chartInstances[id] = new Chart(canvas, chartConfigs[id]);
+
+        // Implement Gradients based on chart type
+        const config = chartConfigs[id];
+        if (id === 'volChart') {
+          const gSucc = ctx.createLinearGradient(0, 0, 0, 300);
+          gSucc.addColorStop(0, '#2d9d5f');
+          gSucc.addColorStop(1, '#1e6b41');
+          config.data.datasets[0].backgroundColor = gSucc;
+          config.data.datasets[0].borderRadius = 4;
+
+          const gFail = ctx.createLinearGradient(0, 0, 0, 300);
+          gFail.addColorStop(0, '#ef4444');
+          gFail.addColorStop(1, '#991b1b');
+          config.data.datasets[1].backgroundColor = gFail;
+          config.data.datasets[1].borderRadius = 4;
+
+          const gSkip = ctx.createLinearGradient(0, 0, 0, 300);
+          gSkip.addColorStop(0, '#94a3b8');
+          gSkip.addColorStop(1, '#64748b');
+          config.data.datasets[2].backgroundColor = gSkip;
+          config.data.datasets[2].borderRadius = 4;
+        } else if (id === 'latencyChart') {
+          // Line charts usually look better with just the colors, but we can add a subtle glow/shadow
+          config.options.plugins.tooltip = {
+            backgroundColor: 'rgba(33, 108, 109, 0.95)',
+            padding: 12,
+            cornerRadius: 8
+          };
+        } else if (id === 'throughputChart') {
+          const gThrough = ctx.createLinearGradient(0, 0, 0, 300);
+          gThrough.addColorStop(0, 'rgba(33, 108, 109, 0.4)');
+          gThrough.addColorStop(1, 'rgba(33, 108, 109, 0.05)');
+          config.data.datasets[0].backgroundColor = gThrough;
+          config.data.datasets[0].borderColor = '#216c6d';
+        } else if (id === 'errorChart') {
+          // Doughnut gradient is more complex (conic), we'll use slightly better solid colors
+          config.data.datasets[0].backgroundColor = [
+            '#f59e0b', // timeout
+            '#ef4444', // 4xx
+            '#991b1b', // 5xx
+            '#3b82f6', // read
+            '#64748b'  // other
+          ];
+          config.options.cutout = '70%';
+        }
+        
+        // Universal premium options
+        config.options.plugins = config.options.plugins || {};
+        config.options.plugins.legend = {
+          position: 'bottom',
+          labels: { usePointStyle: true, padding: 15, font: { weight: '600' } }
+        };
+
+        chartInstances[id] = new Chart(canvas, config);
       });
     }
 
