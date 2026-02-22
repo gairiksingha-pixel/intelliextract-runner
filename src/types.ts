@@ -138,6 +138,9 @@ export interface RunMetrics {
   /** Top 5 slowest files by processing time (from completed requests). */
   topSlowestFiles: {
     filePath: string;
+    relativePath: string;
+    brand: string;
+    purchaser?: string;
     latencyMs: number;
     patternKey?: string;
   }[];
@@ -146,6 +149,9 @@ export interface RunMetrics {
   /** Per-failure API status and message (for debugging 4xx/5xx). */
   failureDetails?: {
     filePath: string;
+    relativePath: string;
+    brand: string;
+    purchaser?: string;
     statusCode?: number;
     errorMessage?: string;
   }[];

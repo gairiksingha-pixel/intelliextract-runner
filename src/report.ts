@@ -661,7 +661,11 @@ function sectionForRun(entry: HistoricalRunSummary): string {
               msg.length > 0
                 ? escapeHtml(msg)
                 : '<span class="muted">(no response body)</span>';
-            return `<tr><td>${f.statusCode ?? "—"}</td><td class="file-path">${escapeHtml(f.filePath)}</td><td>${snippet}</td></tr>`;
+            return `<tr><td>${f.statusCode ?? "—"}</td><td class="file-path">${escapeHtml(f.filePath)}</td><td>${snippet}</td><td>
+        <a href="/api/download-file?file=${encodeURIComponent("output/extractions/failed/" + extractionResultFilenameFromRecord({ relativePath: f.relativePath, brand: f.brand, purchaser: f.purchaser }))}" class="action-btn" title="Download Response">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        </a>
+      </td></tr>`;
           })
           .join("")
       : "";
@@ -672,17 +676,26 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   <p>Use these to debug 4xx/5xx: HTTP status and error body snippet per file.</p>
   <div class="table-responsive">
     <table class="failure-details-table">
-      <tr><th>Status</th><th>File</th><th>Message snippet</th></tr>
+      <tr><th>Status</th><th>File</th><th>Message snippet</th><th>Action</th></tr>
       ${failureDetailsRows}
     </table>
   </div>`
       : "";
 
   const topSlowestRows = m.topSlowestFiles
-    .map(
-      (e) =>
-        `<tr><td class="file-path">${escapeHtml(e.filePath)}</td><td>${e.latencyMs.toFixed(0)}</td><td>${escapeHtml(e.patternKey ?? "—")}</td></tr>`,
-    )
+    .map((e) => {
+      const jsonName = extractionResultFilenameFromRecord({
+        relativePath: e.relativePath,
+        brand: e.brand,
+        purchaser: e.purchaser,
+      });
+      const jsonPath = `output/extractions/succeeded/${jsonName}`;
+      return `<tr><td class="file-path">${escapeHtml(e.filePath)}</td><td>${e.latencyMs.toFixed(0)}</td><td>${escapeHtml(e.patternKey ?? "—")}</td><td>
+        <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        </a>
+      </td></tr>`;
+    })
     .join("");
   const topSlowestSection =
     m.topSlowestFiles.length > 0
@@ -690,7 +703,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
 <h3>Top ${m.topSlowestFiles.length} slowest files (by processing time)</h3>
  <div class="table-responsive">
   <table>
-    <tr><th>File</th><th>Latency (ms)</th><th>Pattern Key</th></tr>
+    <tr><th>File</th><th>Latency (ms)</th><th>Pattern Key</th><th>Action</th></tr>
     ${topSlowestRows}
   </table>
 </div>`
@@ -785,11 +798,28 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       const status = isSuccess
         ? '<span class="status-icon success">✅</span> SUCCESS'
         : '<span class="status-icon error">❌</span> FAILED';
+
+      const jsonName = extractionResultFilenameFromRecord({
+        relativePath: rec.relativePath,
+        brand: rec.brand,
+        purchaser: rec.purchaser,
+      });
+      const jsonDir =
+        rec.status === "done"
+          ? "output/extractions/succeeded"
+          : "output/extractions/failed";
+      const jsonPath = `${jsonDir}/${jsonName}`;
+
       return `<tr class="log-row" data-search="${escapeHtml((rec.filePath + status + (rec.patternKey || "")).toLowerCase())}">
       <td>${status}</td>
       <td class="file-path">${escapeHtml(rec.filePath)}</td>
       <td>${escapeHtml(rec.patternKey ?? "—")}</td>
       <td><span class="chip">${rec.latencyMs ? rec.latencyMs.toFixed(0) : "—"} ms</span></td>
+      <td>
+        <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        </a>
+      </td>
     </tr>`;
     })
     .join("");
@@ -809,7 +839,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
           <table class="log-table">
             <thead>
-              <tr><th style="width: 140px;">Status</th><th>File Path</th><th style="width: 200px;">Pattern</th><th style="width: 100px;">Latency</th></tr>
+              <tr><th style="width: 140px;">Status</th><th>File Path</th><th style="width: 200px;">Pattern</th><th style="width: 100px;">Latency</th><th style="width: 80px;">Action</th></tr>
             </thead>
             <tbody>
               ${fullLogRows}
@@ -1604,6 +1634,25 @@ function htmlReportFromHistory(
     }
     .results-info { font-size: 0.72rem; font-weight: 800; color: var(--header-bg); text-transform: uppercase; letter-spacing: 0.05em; }
     
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: #f1f5f9;
+      color: #64748b;
+      transition: all 0.2s;
+      text-decoration: none;
+      border: 1px solid var(--border-light);
+    }
+    .action-btn:hover {
+      background: var(--accent-light);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
     .filtered-out { display: none !important; }
 
     @media (max-width: 1080px) {

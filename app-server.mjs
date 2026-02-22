@@ -25,6 +25,7 @@ import {
   normalize,
   resolve,
   relative,
+  basename,
 } from "node:path";
 import { fileURLToPath } from "node:url";
 import cron from "node-cron";
@@ -1799,6 +1800,24 @@ function buildSyncReportHtml() {
       padding: 0 0.75rem; height: 100%; display: flex; align-items: center;
       border-right: 1px solid rgba(45,157,95,0.2); text-transform: uppercase; letter-spacing: 0.04em;
     }
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: #f1f5f9;
+      color: #64748b;
+      transition: all 0.2s;
+      text-decoration: none;
+      border: 1px solid var(--border-light);
+    }
+    .action-btn:hover {
+      background: var(--accent-light);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
     .filter-dropdown-trigger {
       border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
       font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
@@ -1994,6 +2013,7 @@ function buildSyncReportHtml() {
         <th class="sortable" onclick="handleSort('path')" id="sort-path">Path (staging)</th>
         <th class="sortable" onclick="handleSort('size')" id="sort-size">Size (bytes)</th>
         <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Modified</th>
+        <th style="width: 100px;">Action</th>
       </tr></thead>
       <tbody id="files-body"></tbody>
     </table>
@@ -2226,6 +2246,11 @@ function buildSyncReportHtml() {
           <td>\${esc(f.path)}</td>
           <td>\${f.size.toLocaleString()}</td>
           <td>\${new Date(f.mtime).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
+          <td>
+            <a href="/api/download-file?file=\${encodeURIComponent('output/staging/' + f.path)}" class="action-btn download-btn" title="Download File">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </a>
+          </td>
         </tr>
       \`).join('');
       
@@ -3204,6 +3229,41 @@ createServer(async (req, res) => {
     } catch (e) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === "GET" && url === "/api/download-file") {
+    try {
+      const q = new URL(req.url, `http://${req.headers.host}`).searchParams;
+      const fileId = q.get("file");
+      if (!fileId) throw new Error("File path is required");
+
+      const fullPath = resolve(ROOT, fileId);
+      if (
+        !fullPath.startsWith(EXTRACTIONS_DIR) &&
+        !fullPath.startsWith(STAGING_DIR) &&
+        !fullPath.startsWith(REPORTS_DIR)
+      ) {
+        res.writeHead(403);
+        res.end("Access denied");
+        return;
+      }
+
+      if (!existsSync(fullPath)) {
+        res.writeHead(404);
+        res.end("File not found");
+        return;
+      }
+
+      const filename = basename(fullPath);
+      res.writeHead(200, {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      });
+      createReadStream(fullPath).pipe(res);
+    } catch (e) {
+      res.writeHead(500);
+      res.end(e.message);
     }
     return;
   }

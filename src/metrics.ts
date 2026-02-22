@@ -40,15 +40,22 @@ function computeFailureBreakdown(failed: CheckpointRecord[]): FailureBreakdown {
   return breakdown;
 }
 
-function computeTopSlowestFiles(
-  done: CheckpointRecord[],
-): { filePath: string; latencyMs: number }[] {
+function computeTopSlowestFiles(done: CheckpointRecord[]): {
+  filePath: string;
+  relativePath: string;
+  brand: string;
+  purchaser?: string;
+  latencyMs: number;
+}[] {
   return done
     .filter((r) => typeof r.latencyMs === "number" && r.latencyMs >= 0)
     .sort((a, b) => (b.latencyMs ?? 0) - (a.latencyMs ?? 0))
     .slice(0, TOP_SLOWEST_N)
     .map((r) => ({
       filePath: r.filePath,
+      relativePath: r.relativePath,
+      brand: r.brand,
+      purchaser: r.purchaser,
       latencyMs: r.latencyMs!,
       patternKey: r.patternKey,
     }));
@@ -121,6 +128,9 @@ export function computeMetrics(
           }
           return {
             filePath: r.filePath,
+            relativePath: r.relativePath,
+            brand: r.brand,
+            purchaser: r.purchaser,
             statusCode: r.statusCode,
             errorMessage,
           };
