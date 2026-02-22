@@ -832,9 +832,12 @@ function sectionForRun(entry: HistoricalRunSummary): string {
         </div>
       </summary>
       <div style="padding: 1.5rem 0;">
-        <div class="log-search-container">
-          <input type="text" placeholder="Search files, patterns, or status..." onkeyup="filterSectionLog(this)">
-          <span>Showing results for this run</span>
+        <div class="log-search-container" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+          <input type="text" placeholder="Search files, patterns, or status..." onkeyup="filterSectionLog(this)" style="flex: 1;">
+          <button class="pg-btn" onclick="exportRun('${entry.runId}', this)" title="Export extraction JSONs for this run (ZIP)" style="height: 38px; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Files
+          </button>
         </div>
         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
           <table class="log-table">
@@ -898,7 +901,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
     displayInfraFailed > 0 || displayApiFailed > 0 ? "failed" : "success";
 
   return `
-  <details class="${sectionClass}" data-brand="${entry.brand || ""}" data-purchaser="${entry.purchaser || ""}" data-items="${processed}" data-status="${dataStatus}">
+  <details class="${sectionClass} history-item" data-runid="${entry.runId}" data-brand="${entry.brand || ""}" data-purchaser="${entry.purchaser || ""}" data-items="${processed}" data-status="${dataStatus}">
   <summary class="run-section-summary">
     <div class="summary-content">
       <div class="operation-pointer">
@@ -971,11 +974,10 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   <div class="anomalies-container">
     ${anomaliesList}
   </div>
+  ${fullLogSection}
   </div>
   </div>
   </details>`;
-  // Note: I will need to properly integrate this into the sectionForRun string.
-  // I will do a single replacement for the whole return block to be safe.
 }
 
 const REPORT_TITLE = "IntelliExtract Operation Summary";
@@ -1489,6 +1491,7 @@ function htmlReportFromHistory(
       font-size: 0.85rem;
       font-weight: 700;
       color: var(--header-bg);
+      font-family: inherit;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 2px 4px rgba(0,0,0,0.04);
     }
@@ -2082,6 +2085,56 @@ function htmlReportFromHistory(
       const info = document.getElementById('results-info');
       if (info) {
         info.innerText = 'Showing ' + (total ? (historyPage - 1) * historyPageSize + 1 : 0) + '-' + Math.min(historyPage * historyPageSize, total) + ' of ' + total + ' operation(s)';
+      }
+    }
+
+    async function exportRun(runId, btn) {
+      if (!runId) return;
+
+      const container = btn.closest('.run-section-body');
+      const rows = Array.from(container.querySelectorAll('.log-row:not(.log-row-hidden)'));
+      const files = rows.map(r => {
+        const link = r.querySelector('a[href*="/api/download-file"]');
+        if (!link) return null;
+        const url = new URL(link.href, window.location.origin);
+        return url.searchParams.get('file');
+      }).filter(Boolean);
+
+      if (files.length === 0) {
+        alert('No files visible to export.');
+        return;
+      }
+
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = 'Preparing...';
+      btn.disabled = true;
+
+      try {
+        const response = await fetch('/api/export-zip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            files,
+            zipName: 'extractions_' + runId + '_' + new Date().getTime()
+          })
+        });
+        
+        if (!response.ok) throw new Error('Export failed');
+        
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'extractions_' + runId + '_' + new Date().getTime() + '.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Export failed: ' + e.message);
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
       }
     }
 

@@ -30,6 +30,11 @@ import {
 import { fileURLToPath } from "node:url";
 import cron from "node-cron";
 import { getEmailConfig, saveEmailConfig } from "./dist/mailer.js";
+import {
+  openCheckpointDb,
+  getRecordsForRun,
+  closeCheckpointDb,
+} from "./dist/checkpoint.js";
 
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
@@ -1177,6 +1182,16 @@ function buildExtractionDataPageHtml() {
         <input type="text" class="search-input" id="search-input" placeholder="Search filename, pattern, purchaser…">
       </div>
       <div class="results-info" id="results-info"></div>
+      <div style="display: flex; gap: 8px;">
+        <button class="pg-btn" id="export-source-btn" onclick="exportBatch('source')" title="Export Visible Source Files (ZIP)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export Source
+        </button>
+        <button class="pg-btn" id="export-json-btn" onclick="exportBatch('json')" title="Export Visible Extraction JSONs (ZIP)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export JSON
+        </button>
+      </div>
     </div>
 
     <div class="data-table-wrap">
@@ -1432,6 +1447,55 @@ function buildExtractionDataPageHtml() {
       if (!r || !r.sourceRelativePath) return;
       const fullPath = 'output/staging/' + r.sourceBrand + '/' + r.sourceRelativePath;
       window.location.href = '/api/download-file?file=' + encodeURIComponent(fullPath);
+    }
+
+    async function exportBatch(type) {
+      const filtered = getFilteredRows();
+      if (filtered.length === 0) return;
+      
+      const files = filtered.map(r => {
+        if (type === 'source') {
+          return r.sourceRelativePath ? 'output/staging/' + r.sourceBrand + '/' + r.sourceRelativePath : null;
+        } else {
+          const statusDir = r.status === 'success' ? 'succeeded' : 'failed';
+          return 'output/extractions/' + statusDir + '/' + r.filename;
+        }
+      }).filter(Boolean);
+
+      if (files.length === 0) {
+         alert('No ' + type + ' files available for export in this view.');
+         return;
+      }
+
+      const btn = document.getElementById('export-' + type + '-btn');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = 'Exporting...';
+      btn.disabled = true;
+
+      try {
+        const response = await fetch('/api/export-zip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            files,
+            zipName: 'intelliextract_' + type + '_' + new Date().toISOString().split('T')[0]
+          })
+        });
+        if (!response.ok) throw new Error('Export failed');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'intelliextract_' + type + '_' + new Date().getTime() + '.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (e) {
+        alert('Export failed: ' + e.message);
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
     }
 
     function render() {
@@ -1869,6 +1933,7 @@ function buildSyncReportHtml() {
       font-size: 0.85rem;
       font-weight: 700;
       color: var(--header-bg);
+      font-family: inherit;
       transition: all 0.2s;
       display: inline-flex;
       align-items: center;
@@ -2117,6 +2182,10 @@ function buildSyncReportHtml() {
         <input type="text" class="search-input" id="search-input" placeholder="Search filename or path…">
       </div>
       <div class="results-info" id="results-info"></div>
+      <button class="pg-btn" id="export-zip-btn" onclick="exportBatch()" title="Export Visible Files (ZIP)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Files
+      </button>
     </div>
 
     <table id="files-table">
@@ -2270,6 +2339,43 @@ function buildSyncReportHtml() {
       currentPage = 1;
       renderTable();
       updateCharts();
+    }
+
+    async function exportBatch() {
+      const filtered = getFilteredFiles();
+      if (filtered.length === 0) return;
+      
+      const files = filtered.map(f => 'output/staging/' + f.path);
+
+      const btn = document.getElementById('export-zip-btn');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = 'Exporting...';
+      btn.disabled = true;
+
+      try {
+        const response = await fetch('/api/export-zip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            files,
+            zipName: 'intelliextract_inventory_' + new Date().toISOString().split('T')[0]
+          })
+        });
+        if (!response.ok) throw new Error('Export failed');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'inventory_export_' + new Date().getTime() + '.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (e) {
+        alert('Export failed: ' + e.message);
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
     }
 
     function resetFilters() {
@@ -3955,6 +4061,107 @@ createServer(async (req, res) => {
     } catch (e) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: String(e.message) }));
+    }
+    return;
+  }
+  if (req.method === "POST" && url === "/api/export-zip") {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    try {
+      const { files, zipName } = JSON.parse(body);
+      if (!Array.isArray(files) || files.length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing or invalid 'files' array" }));
+        return;
+      }
+      const finalZipName = (zipName || "export") + ".zip";
+
+      res.writeHead(200, {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="${finalZipName.replace(/"/g, '\\"')}"`,
+      });
+
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      archive.on("error", (err) => {
+        if (!res.writableEnded) res.end();
+      });
+      archive.pipe(res);
+
+      const allowedDirs = [REPORTS_DIR, EXTRACTIONS_DIR, STAGING_DIR];
+      const allowedResolve = allowedDirs.map((d) => resolve(d));
+
+      for (const f of files) {
+        // f could be absolute or relative to project root
+        const absPath = resolve(ROOT, f);
+        const isAllowed = allowedResolve.some((dir) => absPath.startsWith(dir));
+        if (isAllowed && existsSync(absPath) && statSync(absPath).isFile()) {
+          // Use basename for the file inside the zip to avoid deep nesting
+          archive.file(absPath, { name: basename(absPath) });
+        }
+      }
+      archive.finalize();
+    } catch (e) {
+      if (!res.writableEnded) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(e.message) }));
+      }
+    }
+    return;
+  }
+  if (req.method === "POST" && url === "/api/export-results-by-runs") {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    try {
+      const { runIds } = JSON.parse(body);
+      if (!Array.isArray(runIds) || runIds.length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing or invalid 'runIds' array" }));
+        return;
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="run_results_${Date.now()}.zip"`,
+      });
+
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      archive.on("error", (err) => {
+        if (!res.writableEnded) res.end();
+      });
+      archive.pipe(res);
+
+      const db = openCheckpointDb(CHECKPOINT_PATH);
+      const allFiles = new Set();
+
+      for (const runId of runIds) {
+        const records = getRecordsForRun(db, runId);
+        for (const r of records) {
+          const safe = (r.relativePath || "")
+            .replaceAll("/", "_")
+            .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+          const base = r.brand + "_" + (safe || "file");
+          const jsonName = base.endsWith(".json") ? base : base + ".json";
+
+          // Try succeeded first, then failed
+          const succPath = resolve(EXTRACTIONS_DIR, "succeeded", jsonName);
+          const failPath = resolve(EXTRACTIONS_DIR, "failed", jsonName);
+
+          if (existsSync(succPath)) allFiles.add(succPath);
+          else if (existsSync(failPath)) allFiles.add(failPath);
+        }
+      }
+      closeCheckpointDb(db);
+
+      for (const absPath of allFiles) {
+        archive.file(absPath, { name: basename(absPath) });
+      }
+
+      archive.finalize();
+    } catch (e) {
+      if (!res.writableEnded) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(e.message) }));
+      }
     }
     return;
   }
