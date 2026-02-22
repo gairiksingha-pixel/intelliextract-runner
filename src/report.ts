@@ -661,7 +661,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
               msg.length > 0
                 ? escapeHtml(msg)
                 : '<span class="muted">(no response body)</span>';
-            return `<tr><td>${f.statusCode ?? "—"}</td><td class="file-path">${escapeHtml(f.filePath)}</td><td>${snippet}</td><td>
+            return `<tr><td>${f.statusCode ?? "—"}</td><td class="file-path">${escapeHtml(f.filePath)}</td><td>${snippet}</td><td class="action-cell">
         <a href="/api/download-file?file=${encodeURIComponent("output/extractions/failed/" + extractionResultFilenameFromRecord({ relativePath: f.relativePath, brand: f.brand, purchaser: f.purchaser }))}" class="action-btn" title="Download Response">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </a>
@@ -676,7 +676,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   <p>Use these to debug 4xx/5xx: HTTP status and error body snippet per file.</p>
   <div class="table-responsive">
     <table class="failure-details-table">
-      <tr><th>Status</th><th>File</th><th>Message snippet</th><th>Action</th></tr>
+      <tr><th>Status</th><th>File</th><th>Message snippet</th><th class="action-cell">Action</th></tr>
       ${failureDetailsRows}
     </table>
   </div>`
@@ -690,7 +690,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
         purchaser: e.purchaser,
       });
       const jsonPath = `output/extractions/succeeded/${jsonName}`;
-      return `<tr><td class="file-path">${escapeHtml(e.filePath)}</td><td>${e.latencyMs.toFixed(0)}</td><td>${escapeHtml(e.patternKey ?? "—")}</td><td>
+      return `<tr><td class="file-path">${escapeHtml(e.filePath)}</td><td>${e.latencyMs.toFixed(0)}</td><td>${escapeHtml(e.patternKey ?? "—")}</td><td class="action-cell">
         <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </a>
@@ -703,7 +703,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
 <h3>Top ${m.topSlowestFiles.length} slowest files (by processing time)</h3>
  <div class="table-responsive">
   <table>
-    <tr><th>File</th><th>Latency (ms)</th><th>Pattern Key</th><th>Action</th></tr>
+    <tr><th>File</th><th>Latency (ms)</th><th>Pattern Key</th><th class="action-cell">Action</th></tr>
     ${topSlowestRows}
   </table>
 </div>`
@@ -815,7 +815,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       <td class="file-path">${escapeHtml(rec.filePath)}</td>
       <td>${escapeHtml(rec.patternKey ?? "—")}</td>
       <td><span class="chip">${rec.latencyMs ? rec.latencyMs.toFixed(0) : "—"} ms</span></td>
-      <td>
+      <td class="action-cell">
         <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </a>
@@ -839,7 +839,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
           <table class="log-table">
             <thead>
-              <tr><th style="width: 140px;">Status</th><th>File Path</th><th style="width: 200px;">Pattern</th><th style="width: 100px;">Latency</th><th style="width: 80px;">Action</th></tr>
+              <tr><th style="width: 140px;">Status</th><th>File Path</th><th style="width: 200px;">Pattern</th><th style="width: 100px;">Latency</th><th style="width: 80px;" class="action-cell">Action</th></tr>
             </thead>
             <tbody>
               ${fullLogRows}
@@ -1436,7 +1436,18 @@ function htmlReportFromHistory(
     .status-icon.success { color: #2d9d5f; }
     .status-icon.error { color: #ef4444; }
     
-    .log-table th { position: sticky; top: 0; z-index: 10; background: #f8fafc; }
+    .log-table th { 
+      position: sticky; 
+      top: 0; 
+      z-index: 100; 
+      background: var(--header-bg) !important; 
+      color: white !important;
+      text-align: left;
+      padding: 0.85rem 1rem;
+      border-bottom: 2px solid rgba(0,0,0,0.1);
+      height: 44px;
+      line-height: 1.2;
+    }
     .log-row-hidden { display: none !important; }
 
     /* Premium Scrollbar */
@@ -1676,6 +1687,10 @@ function htmlReportFromHistory(
       background: var(--accent-light);
       color: var(--primary);
       border-color: var(--primary);
+    }
+    .action-cell {
+      text-align: center;
+      vertical-align: middle;
     }
 
     .filtered-out { display: none !important; }

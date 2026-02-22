@@ -990,8 +990,8 @@ function buildExtractionDataPageHtml() {
       color: var(--header-bg);
     }
     .time-cell { font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
-    .toggle-cell { width: 40px; text-align: center; }
-    .action-cell { width: 100px; text-align: center; }
+    .toggle-cell { width: 40px; text-align: center; vertical-align: middle; }
+    .action-cell { width: 100px; text-align: center; vertical-align: middle; }
     .btn-download-row {
       background: var(--bg);
       border: 1px solid var(--border-light);
@@ -1843,6 +1843,10 @@ function buildSyncReportHtml() {
       color: var(--primary);
       border-color: var(--primary);
     }
+    .action-cell {
+      text-align: center;
+      vertical-align: middle;
+    }
     .filter-dropdown-trigger {
       border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
       font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
@@ -2038,7 +2042,7 @@ function buildSyncReportHtml() {
         <th class="sortable" onclick="handleSort('path')" id="sort-path">Path (staging)</th>
         <th class="sortable" onclick="handleSort('size')" id="sort-size">Size (bytes)</th>
         <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Modified</th>
-        <th style="width: 100px;">Action</th>
+        <th class="action-cell" style="width: 100px;">Action</th>
       </tr></thead>
       <tbody id="files-body"></tbody>
     </table>
@@ -2271,7 +2275,7 @@ function buildSyncReportHtml() {
           <td>\${esc(f.path)}</td>
           <td>\${f.size.toLocaleString()}</td>
           <td>\${new Date(f.mtime).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
-          <td>
+          <td class="action-cell">
             <a href="/api/download-file?file=\${encodeURIComponent('output/staging/' + f.path)}" class="action-btn download-btn" title="Download File">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             </a>
