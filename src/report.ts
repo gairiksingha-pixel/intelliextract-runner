@@ -661,8 +661,13 @@ function sectionForRun(entry: HistoricalRunSummary): string {
               msg.length > 0
                 ? escapeHtml(msg)
                 : '<span class="muted">(no response body)</span>';
+            const sourcePath = `output/staging/${f.brand}/${f.relativePath}`;
+            const jsonPath = `output/extractions/failed/${extractionResultFilenameFromRecord({ relativePath: f.relativePath, brand: f.brand, purchaser: f.purchaser })}`;
             return `<tr><td>${f.statusCode ?? "—"}</td><td class="file-path">${escapeHtml(f.filePath)}</td><td>${snippet}</td><td class="action-cell">
-        <a href="/api/download-file?file=${encodeURIComponent("output/extractions/failed/" + extractionResultFilenameFromRecord({ relativePath: f.relativePath, brand: f.brand, purchaser: f.purchaser }))}" class="action-btn" title="Download Response">
+        <a href="/api/download-file?file=${encodeURIComponent(sourcePath)}" class="action-btn" title="Download Source File">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </a>
+        <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Response">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </a>
       </td></tr>`;
@@ -690,7 +695,12 @@ function sectionForRun(entry: HistoricalRunSummary): string {
         purchaser: e.purchaser,
       });
       const jsonPath = `output/extractions/succeeded/${jsonName}`;
+      const sourcePath = `output/staging/${e.brand}/${e.relativePath}`;
+
       return `<tr><td class="file-path">${escapeHtml(e.filePath)}</td><td>${e.latencyMs.toFixed(0)}</td><td>${escapeHtml(e.patternKey ?? "—")}</td><td class="action-cell">
+        <a href="/api/download-file?file=${encodeURIComponent(sourcePath)}" class="action-btn" title="Download Source File">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </a>
         <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </a>
@@ -810,13 +820,18 @@ function sectionForRun(entry: HistoricalRunSummary): string {
           : "output/extractions/failed";
       const jsonPath = `${jsonDir}/${jsonName}`;
 
+      const sourcePath = `output/staging/${rec.brand}/${rec.relativePath}`;
+
       return `<tr class="log-row" data-search="${escapeHtml((rec.filePath + status + (rec.patternKey || "")).toLowerCase())}">
       <td>${status}</td>
       <td class="file-path">${escapeHtml(rec.filePath)}</td>
       <td>${escapeHtml(rec.patternKey ?? "—")}</td>
       <td><span class="chip">${rec.latencyMs ? rec.latencyMs.toFixed(0) : "—"} ms</span></td>
       <td class="action-cell">
-        <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON">
+        <a href="/api/download-file?file=${encodeURIComponent(sourcePath)}" class="action-btn" title="Download Source File" data-type="source">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </a>
+        <a href="/api/download-file?file=${encodeURIComponent(jsonPath)}" class="action-btn" title="Download Extraction JSON" data-type="json">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         </a>
       </td>
@@ -834,10 +849,16 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       <div style="padding: 1.5rem 0;">
         <div class="log-search-container" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
           <input type="text" placeholder="Search files, patterns, or status..." onkeyup="filterSectionLog(this)" style="flex: 1;">
-          <button class="pg-btn" onclick="exportRun('${entry.runId}', this)" title="Export extraction JSONs for this run (ZIP)" style="height: 38px; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export Files
-          </button>
+          <div style="display: flex; gap: 8px;">
+            <button class="pg-btn" onclick="exportRun('${entry.runId}', this, 'source')" title="Export source files for this run (ZIP)" style="height: 38px; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export Source
+            </button>
+            <button class="pg-btn" onclick="exportRun('${entry.runId}', this, 'json')" title="Export extraction JSONs for this run (ZIP)" style="height: 38px; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export JSON
+            </button>
+          </div>
         </div>
         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
           <table class="log-table">
@@ -2088,13 +2109,13 @@ function htmlReportFromHistory(
       }
     }
 
-    async function exportRun(runId, btn) {
+    async function exportRun(runId, btn, type) {
       if (!runId) return;
 
       const container = btn.closest('.run-section-body');
       const rows = Array.from(container.querySelectorAll('.log-row:not(.log-row-hidden)'));
       const files = rows.map(r => {
-        const link = r.querySelector('a[href*="/api/download-file"]');
+        const link = r.querySelector('a[data-type="' + (type || 'json') + '"]');
         if (!link) return null;
         const url = new URL(link.href, window.location.origin);
         return url.searchParams.get('file');
@@ -2125,7 +2146,8 @@ function htmlReportFromHistory(
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'extractions_' + runId + '_' + new Date().getTime() + '.zip';
+        const prefix = type === 'source' ? 'source_' : 'extractions_';
+        a.download = prefix + runId + '_' + new Date().getTime() + '.zip';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
