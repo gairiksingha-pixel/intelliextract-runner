@@ -1238,7 +1238,7 @@ export function htmlReportFromHistory(
     }
     .page-body { padding: 1.25rem; }
     
-    .report-header {
+    .header {
       background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(10px);
       padding: 0.6rem 1.25rem;
@@ -1256,27 +1256,36 @@ export function htmlReportFromHistory(
       z-index: 1000;
       min-height: 72px;
     }
-    .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
-    .report-header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
-    .report-header-title {
-      margin: 0;
-      height: 34px;
-      font-size: 0.85rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #ffffff;
-      background: var(--header-bg);
-      padding: 0 1.25rem;
-      border-radius: 6px;
-      display: inline-flex;
+    .system-status-pill {
+      display: flex;
       align-items: center;
-      line-height: 1;
-      font-family: inherit;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+      gap: 0.5rem;
+      background: white;
+      padding: 0.4rem 0.85rem;
+      border-radius: 100px;
+      border: 1px solid rgba(203, 213, 225, 0.5);
+      margin-left: 1.25rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
+    .header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
+    .header-title-area { display: flex; flex-direction: column; gap: 2px; }
+    .header-main-title {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
     }
     
-    h1:not(.report-header-title) { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
+    h1:not(.header-main-title) { color: var(--header-bg); font-size: 1.75rem; margin-bottom: 0.5rem; text-align: center; }
     h2 { color: var(--text-secondary); font-size: 1.1rem; font-weight: 500; margin-bottom: 1.5rem; text-align: center; }
     h3 { color: var(--header-bg); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 2rem 0 1rem; border-bottom: 2px solid var(--border-light); padding-bottom: 0.4rem; }
     
@@ -1339,8 +1348,8 @@ export function htmlReportFromHistory(
 
     /* Filtering Styles */
     .report-header-right { display: flex; align-items: center; justify-content: flex-end; }
-    .header-filter-row { display: flex; align-items: center; gap: 0.75rem; }
-    .header-field-wrap { display: flex; flex-direction: column; align-items: center; }
+    .header-filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .header-field-wrap { display: flex; align-items: center; margin-right: 0.5rem; height: 34px; }
     .filter-dropdown { position: relative; }
     .filter-chip { 
       display: flex; align-items: center; height: 34px; background: #fff; 
@@ -1396,16 +1405,12 @@ export function htmlReportFromHistory(
     
     .header-btn-reset {
       height: 34px; 
-      padding: 0 1.1rem; 
-      width: 185px;
+      width: 34px;
+      padding: 0; 
       background: var(--header-bg); 
       color: #fff;
       border: none; 
       border-radius: 6px; 
-      font-size: 0.82rem; 
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
       cursor: pointer; 
       box-shadow: 0 2px 5px rgba(33,108,109,0.2); 
       transition: all 0.2s;
@@ -1592,93 +1597,7 @@ export function htmlReportFromHistory(
       display: flex;
       flex-direction: column;
     }
-    .download-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 0.75rem 1.25rem;
-      background: #f8fafc;
-      border-bottom: 1px solid rgba(176, 191, 201, 0.45);
-      flex-wrap: wrap;
-    }
-    .download-chip {
-      display: flex;
-      align-items: center;
-      height: 36px;
-      background: white;
-      border: 1px solid rgba(176, 191, 201, 0.6);
-      border-radius: 0.5rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-      overflow: hidden;
-    }
-    .home-btn {
-      display: flex;
-      align-items: center;
-      padding: 0 1.25rem;
-      height: 100%;
-      width: 170px;
-      justify-content: center;
-      background: var(--header-bg) !important;
-      color: white !important;
-      text-transform: uppercase;
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      border: none;
-      border-right: 1.2px solid rgba(255, 255, 255, 0.15);
-      text-decoration: none;
-      white-space: nowrap;
-      transition: all 0.2s;
-    }
-    .home-btn:hover {
-      background: var(--primary) !important;
-    }
-    .download-bar-btns {
-      display: flex;
-      align-items: center;
-      height: 100%;
-      gap: 0;
-    }
-    .download-bar-btns a {
-      height: 100%;
-      width: 170px;
-      border: none;
-      border-radius: 0;
-      background: transparent !important;
-      color: var(--text-secondary) !important;
-      padding: 0 1rem;
-      font-size: 0.8rem;
-      font-weight: 700;
-      box-shadow: none;
-      border-right: 1px solid rgba(203, 213, 225, 0.5);
-      margin: 0;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .download-bar-btns a:hover {
-      background: #f1f5f9 !important;
-      color: var(--primary) !important;
-    }
-    .download-bar-btns a svg {
-      transition: transform 0.2s;
-    }
-    .download-bar-btns a:hover svg {
-      transform: translateY(-1px);
-      color: var(--primary);
-    }
-    .download-bar-btns a:last-child {
-      border-right: none;
-    }
-    .download-bar-btns a.active {
-      background: #f0fdf4 !important;
-      color: var(--primary) !important;
-    }
-
+    .sidebar.collapsed .nav-item span { opacity: 0; width: 0; pointer-events: none; transform: translateX(10px); }
 
     .btn-alert-cancel:hover { background: #e2e8f0; }
 
@@ -1956,15 +1875,12 @@ export function htmlReportFromHistory(
     
     .header-btn-reset {
       height: 34px; 
-      padding: 0 1.1rem; 
+      width: 34px;
+      padding: 0; 
       background: var(--header-bg); 
       color: #fff;
       border: none; 
       border-radius: 6px; 
-      font-size: 0.82rem; 
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
       cursor: pointer; 
       box-shadow: 0 2px 5px rgba(33,108,109,0.2); 
       transition: all 0.2s;
@@ -2096,7 +2012,7 @@ export function htmlReportFromHistory(
       .header-filter-row { gap: 0.5rem; }
       .brand-field-wrap .filter-dropdown-trigger { min-width: 140px; max-width: 140px; }
       .purchaser-field-wrap .filter-dropdown-trigger { min-width: 160px; max-width: 160px; }
-      .header-btn-reset { width: 140px; font-size: 0.75rem; padding: 0 0.8rem; }
+      .header-btn-reset { width: 34px; padding: 0; }
     }
   </style>
   <!-- Custom Alert Modal -->
@@ -2222,76 +2138,71 @@ export function htmlReportFromHistory(
   </script>
   <style>
     .report-header-left .logo { cursor: pointer; }
+    /* Sidebar Layout */
+    body { display: flex; flex-direction: row; min-height: 100vh; }
+    .app-container { display: flex; min-height: 100vh; width: 100%; }
+    .content-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; overflow-y: auto; background: #f5f7f9; }
+    .sidebar.collapsed { width: 80px; }
+    .sidebar-toggle-btn { position: absolute; right: -12px; top: 30px; width: 24px; height: 24px; background: white; border: 1px solid rgba(176,191,201,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2100; box-shadow: 0 2px 6px rgba(0,0,0,0.1); transition: all 0.3s; color: #5a5a5a; }
+    .sidebar-toggle-btn:hover { background: #e8f5ee; color: #2d9d5f; border-color: #2d9d5f; }
+    .sidebar-toggle-btn svg { width: 14px; height: 14px; transition: transform 0.3s; stroke-width: 2.5; }
+    .sidebar.collapsed .sidebar-toggle-btn svg { transform: none; }
+    .sidebar.collapsed .sidebar-header { padding: 0 0.75rem 2.5rem 0.75rem; display: flex; justify-content: center; }
+    .logo-small { display: none; height: 32px; width: auto; }
+    .sidebar.collapsed .sidebar-logo { display: none; }
+    .sidebar.collapsed .logo-small { display: block; }
+    .sidebar.collapsed .nav-item { padding: 0.85rem; justify-content: center; gap: 0; }
+    .nav-item span { transition: opacity 0.2s, transform 0.2s; opacity: 1; }
+    .sidebar.collapsed .nav-item span { opacity: 0; width: 0; pointer-events: none; transform: translateX(10px); }
   </style>
+  <script src="/assets/js/sidebar-component.js"></script>
 </head>
 <body>
-  <div class="report-header">
-    <div class="report-header-left">
-      <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center; height: 34px;">
-        <img src="${logoDataUri}" alt="intellirevenue" class="logo">
-      </a>
-      <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
-      <div class="meta" style="opacity: 0.85;">
-        <p>${historicalSummaries.length} operation(s)</p>
-        <p>Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))}</p>
-      </div>
-    </div>
-    <div class="report-header-right">
-      <div class="header-filter-row" style="gap: 1.25rem;">
-        <div class="header-field-wrap brand-field-wrap">
-          <div id="brand-dropdown" class="filter-dropdown">
-            <div class="filter-chip">
-              <label class="header-label" for="brand-dropdown-trigger">Brand</label>
-              <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
-                Select brand
-              </button>
-            </div>
-            <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
-          </div>
+<div class="app-container">
+  <app-sidebar active-tab="summary" logo-uri="${logoDataUri}"></app-sidebar>
+  <div class="content-wrapper">
+    <header class="header">
+      <div class="report-header-left">
+        <div class="header-title-area">
+          <h1 class="header-main-title">${escapeHtml(REPORT_TITLE)}</h1>
         </div>
-        <div class="header-field-wrap purchaser-field-wrap">
-          <div id="purchaser-dropdown" class="filter-dropdown">
-            <div class="filter-chip">
-              <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
-              <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
-                Select purchaser
-              </button>
-            </div>
-            <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
-          </div>
-        </div>
-        <div class="header-field-wrap header-filter-reset-wrap">
-          <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">Reset Filter</button>
+        <div class="system-status-pill">
+          <span id="operation-count-label">${historicalSummaries.length} operation(s)</span>
         </div>
       </div>
-    </div>
-  </div>
+      <div class="report-header-right">
+        <div class="header-filter-row">
+          <div class="header-field-wrap brand-field-wrap">
+            <div id="brand-dropdown" class="filter-dropdown">
+              <div class="filter-chip">
+                <label class="header-label" for="brand-dropdown-trigger">Brand</label>
+                <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
+                  Select brand
+                </button>
+              </div>
+              <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+            </div>
+          </div>
+          <div class="header-field-wrap purchaser-field-wrap">
+            <div id="purchaser-dropdown" class="filter-dropdown">
+              <div class="filter-chip">
+                <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
+                <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
+                  Select purchaser
+                </button>
+              </div>
+              <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+            </div>
+          </div>
+          <div class="header-field-wrap header-filter-reset-wrap">
+            <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()" title="Reset Filters"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg></button>
+          </div>
+        </div>
+      </div>
+    </header>
 
   <main class="main-container">
     <div class="report-card-box">
-      <div class="download-bar">
-        <div class="download-chip">
-          <a href="javascript:void(0)" onclick="goToHome()" class="home-btn" title="Back to Dashboard">
-            <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            <span>Home</span>
-          </a>
-          <div class="download-bar-btns">
-            <a href="/reports/inventory" title="View staging inventory report">
-              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-              <span>Inventory</span>
-            </a>
-            <a href="/reports/summary" class="active" title="View latest operation summary report">
-              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-              <span>Run Summary</span>
-            </a>
-            <a href="/reports/explorer" title="Explore extraction data — view full JSON responses">
-              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-              <span>Data Explorer</span>
-            </a>
-          </div>
-        </div>
-      </div>
-
       <div class="page-body">
         <div class="tabs">
           <button class="tab-btn active" onclick="switchTab('dashboard')">Analytics Dashboard</button>
@@ -3047,27 +2958,27 @@ export function htmlReportFromHistory(
       if (l) l.style.display = "none";
     }
     (function () {
-      if (document.readyState === "complete") hideLoader(); window.addEventListener("pageshow", function(e) { hideLoader(); }); setTimeout(hideLoader, 5000);
-      window.addEventListener("load", hideLoader);
-      document.addEventListener("click", function (e) {
-        var t = e.target.closest("a");
-        if (
-          t &&
-          t.href &&
-          !t.href.startsWith("javascript:") &&
-          !t.href.startsWith("#") &&
-          t.target !== "_blank" &&
-          !e.ctrlKey &&
-          !e.metaKey
-        ) {
-          showLoader();
+      if (document.readyState === 'complete') hideLoader();
+      window.addEventListener('load', hideLoader);
+      window.addEventListener('pageshow', hideLoader);
+      setTimeout(hideLoader, 5000);
+
+      document.addEventListener('click', function(e) {
+        var t = e.target.closest('a');
+        if (t && t.href && !t.href.startsWith('javascript:') && !t.href.startsWith('#') && t.target !== '_blank' && !e.ctrlKey && !e.metaKey) {
+          // Only show loader if navigating to a DIFFERENT page URL
+          var currentUrl = window.location.href.split('#')[0].split('?')[0];
+          var targetUrl = t.href.split('#')[0].split('?')[0];
+          if (targetUrl !== currentUrl && targetUrl !== currentUrl + '/' && currentUrl !== targetUrl + '/') {
+            showLoader();
+          }
         }
       });
-      document.addEventListener("submit", function () {
-        showLoader();
-      });
+      document.addEventListener('submit', function() { showLoader(); });
     })();
   </script>
+  </div><!-- content-wrapper -->
+</div><!-- app-container -->
 </body>
 </html>`;
 }
