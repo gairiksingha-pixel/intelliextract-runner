@@ -269,6 +269,7 @@ function writeExtractionResult(
       (data as any)._relativePath = job.relativePath;
       (data as any)._brand = job.brand;
       (data as any)._purchaser = job.purchaser;
+      (data as any)._runId = runId;
       if (typeof latencyMs === "number") {
         (data as any)._latencyMs = latencyMs;
       }

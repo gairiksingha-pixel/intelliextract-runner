@@ -463,6 +463,7 @@ function buildExtractionDataPageHtml() {
           relativePath: c.relative_path,
           brand: c.brand,
           purchaser: c.purchaser,
+          runId: c.run_id,
         };
       });
     }
@@ -480,11 +481,14 @@ function buildExtractionDataPageHtml() {
           mtime = statSync(path).mtimeMs;
         } catch (_) {}
 
-        // Best effort to recover relativePath if missing in JSON
-        if (content && !content._relativePath && filenameToMetadata[f]) {
-          content._relativePath = filenameToMetadata[f].relativePath;
-          content._brand = filenameToMetadata[f].brand;
-          content._purchaser = filenameToMetadata[f].purchaser;
+        // Best effort to recover metadata if missing in JSON
+        if (content && filenameToMetadata[f]) {
+          if (!content._relativePath)
+            content._relativePath = filenameToMetadata[f].relativePath;
+          if (!content._brand) content._brand = filenameToMetadata[f].brand;
+          if (!content._purchaser)
+            content._purchaser = filenameToMetadata[f].purchaser;
+          if (!content._runId) content._runId = filenameToMetadata[f].runId;
         }
 
         return { filename: f, status, content, mtime };
@@ -594,6 +598,7 @@ function buildExtractionDataPageHtml() {
       purchaserKey: f.content?.pattern?.purchaser_key ?? null,
       success: f.content?.success ?? null,
       json: f.content,
+      runId: f.content?._runId || null,
       // Source file recovery metadata
       sourceRelativePath: f.content?._relativePath || null,
       sourceBrand: f.content?._brand || f.brand || null,
@@ -1321,6 +1326,7 @@ function buildExtractionDataPageHtml() {
                 <th class="toggle-cell"></th>
                 <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Timestamp</th>
                 <th class="sortable" onclick="handleSort('filename')" id="sort-filename">Filename</th>
+                <th class="sortable" onclick="handleSort('runId')" id="sort-runId">Run ID</th>
                 <th class="sortable" onclick="handleSort('patternKey')" id="sort-patternKey">Pattern Key</th>
                 <th class="sortable" onclick="handleSort('purchaserKey')" id="sort-purchaserKey">Purchaser</th>
                 <th class="sortable" onclick="handleSort('status')" id="sort-status">Status</th>
@@ -1502,7 +1508,7 @@ function buildExtractionDataPageHtml() {
         if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(r.purchaser)) return false;
         if (currentSearch) {
           var q = currentSearch.toLowerCase();
-          var haystack = (r.filename + ' ' + (r.patternKey || '') + ' ' + (r.purchaserKey || '')).toLowerCase();
+          var haystack = (r.filename + ' ' + (r.runId || '') + ' ' + (r.patternKey || '') + ' ' + (r.purchaserKey || '')).toLowerCase();
           if (!haystack.includes(q)) return false;
         }
         return true;
@@ -1631,7 +1637,7 @@ function buildExtractionDataPageHtml() {
         if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(r.purchaser)) return false;
         if (currentSearch) {
           var q = currentSearch.toLowerCase();
-          var haystack = (r.filename + ' ' + (r.patternKey || '') + ' ' + (r.purchaserKey || '')).toLowerCase();
+          var haystack = (r.filename + ' ' + (r.runId || '') + ' ' + (r.patternKey || '') + ' ' + (r.purchaserKey || '')).toLowerCase();
           if (!haystack.includes(q)) return false;
         }
         return true;
@@ -1660,7 +1666,7 @@ function buildExtractionDataPageHtml() {
 
       var tbody = document.getElementById('table-body');
       if (page.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📂</div><p>No extraction results match your filter.</p></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">📂</div><p>No extraction results match your filter.</p></div></td></tr>';
         document.getElementById('pagination-bar').innerHTML = '';
         return;
       }
@@ -1674,6 +1680,7 @@ function buildExtractionDataPageHtml() {
         html += '<td class="toggle-cell">' + expandIcon + '</td>';
         html += '<td class="time-cell">' + escHtml(formatTime(r.mtime)) + '</td>';
         html += '<td class="filename-cell">' + escHtml(r.filename) + '</td>';
+        html += '<td style="font-size:0.75rem; font-weight:700; color:var(--primary);">' + escHtml(r.runId || '—') + '</td>';
         html += '<td class="pattern-cell"><code>' + escHtml(r.patternKey || '—') + '</code></td>';
         html += '<td style="font-size:0.72rem; color:var(--text-secondary);">' + escHtml(CONFIG.purchaserNames[r.purchaserKey] || r.purchaserKey || '—') + '</td>';
         html += '<td>' + badge + '</td>';
@@ -1717,7 +1724,7 @@ function buildExtractionDataPageHtml() {
             var expandTr = document.createElement('tr');
             expandTr.className = 'expand-row';
             expandTr.setAttribute('data-for', idx);
-            expandTr.innerHTML = '<td colspan="7"><div class="expand-row-content"><div class="json-loader"><div class="json-spinner"></div><span>Loading...</span></div></div></td>';
+            expandTr.innerHTML = '<td colspan="8"><div class="expand-row-content"><div class="json-loader"><div class="json-spinner"></div><span>Loading...</span></div></div></td>';
             this.parentNode.insertBefore(expandTr, this.nextSibling);
             
             var container = expandTr.querySelector('.expand-row-content');
@@ -1799,11 +1806,30 @@ function buildSyncReportHtml() {
   const files = listStagingFiles(STAGING_DIR, STAGING_DIR, []);
   files.sort((a, b) => b.mtime - a.mtime);
 
+  // Load checkpoint mapping
+  const checkpointData = existsSync(CHECKPOINT_PATH)
+    ? JSON.parse(readFileSync(CHECKPOINT_PATH, "utf8"))
+    : { checkpoints: [] };
+  const pathToRunId = {};
+  if (checkpointData.checkpoints) {
+    checkpointData.checkpoints.forEach((c) => {
+      const key = (c.brand + "/" + (c.relative_path || "")).replace(/\\/g, "/");
+      pathToRunId[key] = c.run_id;
+    });
+  }
+
   const filesData = files.map((f) => {
     const parts = f.path.split("/");
     const brand = parts[0] || "";
     const purchaser = parts[1] || "";
-    return { path: f.path, size: f.size, mtime: f.mtime, brand, purchaser };
+    return {
+      path: f.path,
+      size: f.size,
+      mtime: f.mtime,
+      brand,
+      purchaser,
+      runId: pathToRunId[f.path] || null,
+    };
   });
 
   const allBrands = Array.from(
@@ -2579,6 +2605,7 @@ function buildSyncReportHtml() {
         <table id="files-table">
           <thead><tr>
             <th class="sortable" onclick="handleSort('path')" id="sort-path">Path (staging)</th>
+            <th class="sortable" onclick="handleSort('runId')" id="sort-runId">Run ID</th>
             <th class="sortable" onclick="handleSort('size')" id="sort-size">Size (bytes)</th>
             <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Modified</th>
             <th class="action-cell" style="width: 100px;">Action</th>
@@ -2782,7 +2809,9 @@ function buildSyncReportHtml() {
         if (selectedPurchasers.length > 0 && !selectedPurchasers.includes(f.purchaser)) return false;
         
         if (currentSearch) {
-          if (!f.path.toLowerCase().includes(currentSearch)) return false;
+          var q = currentSearch.toLowerCase();
+          var haystack = (f.path + ' ' + (f.runId || '')).toLowerCase();
+          if (!haystack.includes(q)) return false;
         }
         
         return true;
@@ -2860,7 +2889,7 @@ function buildSyncReportHtml() {
 
       const pContainer = document.getElementById('pagination');
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3">No files found for selected filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5">No files found for selected filters.</td></tr>';
         if (pContainer) pContainer.innerHTML = '';
         return;
       }
@@ -2872,6 +2901,7 @@ function buildSyncReportHtml() {
       tbody.innerHTML = page.map(f => \`
         <tr>
           <td>\${esc(f.path)}</td>
+          <td style="font-weight:700; color:var(--primary); font-size:0.85rem">\${esc(f.runId || '—')}</td>
           <td>\${f.size.toLocaleString()}</td>
           <td>\${new Date(f.mtime).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
           <td class="action-cell">

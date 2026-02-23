@@ -2336,7 +2336,7 @@ function htmlReportFromHistory(
         </div>
         <div class="search-wrap">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <input type="text" class="search-input" id="search-input" placeholder="Search operation ID, brand, purchaser…">
+          <input type="text" class="search-input" id="search-input" placeholder="Search Run ID, brand, purchaser…">
         </div>
         <div class="results-info" id="results-info"></div>
       </div>
