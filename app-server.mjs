@@ -606,7 +606,7 @@ function buildExtractionDataPageHtml() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Operation Data Explorer — IntelliExtract</title>
+  <title>Data Explorer — IntelliExtract</title>
   ${REPORT_FAVICON_DATA_URI ? `<link rel="icon" href="${REPORT_FAVICON_DATA_URI}" type="image/x-icon">` : ""}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -632,23 +632,31 @@ function buildExtractionDataPageHtml() {
       --radius-sm: 8px;
     }
     * { box-sizing: border-box; }
-    html { scrollbar-gutter: stable; }
+    html { overflow-y: scroll; scrollbar-gutter: stable; }
+    @keyframes pageFadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     body {
       font-family: 'JetBrains Mono', 'Consolas', monospace;
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 1rem;
+      margin: 0;
+      padding: 0;
       background: var(--bg);
       color: var(--text);
       font-size: 13px;
-      scrollbar-gutter: stable;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      animation: pageFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .report-header {
       background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(10px);
-      padding: 1rem 2rem;
-      border-radius: 0 0 16px 16px;
-      margin-bottom: 1rem;
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius);
+      margin: 0.75rem auto 0.5rem auto;
+      max-width: 1820px;
+      width: calc(100% - 2.5rem);
       box-shadow: 0 4px 20px rgba(0,0,0,0.06);
       display: flex;
       align-items: center;
@@ -659,32 +667,8 @@ function buildExtractionDataPageHtml() {
       z-index: 1000;
       min-height: 72px;
     }
-    .btn-back-main {
-      background: var(--header-bg) !important;
-      color: white !important;
-      border: none;
-      border-radius: 8px;
-      height: 36px;
-      padding: 0 1.25rem;
-      font-size: 0.85rem;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace !important;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 12px rgba(33, 108, 109, 0.2);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .btn-back-main:hover {
-      background: var(--primary) !important;
-      transform: translateX(-4px);
-      box-shadow: 0 6px 16px rgba(45, 157, 95, 0.3);
-    }
-    .btn-back-main svg { width: 16px; height: 16px; transition: transform 0.2s; }
-    .btn-back-main:hover svg { transform: translateX(-2px); }
+
+
     .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
     .report-header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
     .report-header-title {
@@ -728,16 +712,34 @@ function buildExtractionDataPageHtml() {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
       background-repeat: no-repeat; background-position: right 8px center;
     }
-    .brand-field-wrap .filter-dropdown-trigger { min-width: 162px; max-width: 162px; }
-    .purchaser-field-wrap .filter-dropdown-trigger { min-width: 187px; max-width: 187px; }
+    .brand-field-wrap .filter-dropdown-trigger { min-width: 185px; max-width: 185px; }
+    .purchaser-field-wrap .filter-dropdown-trigger { min-width: 185px; max-width: 185px; }
 
     .filter-dropdown-panel {
-      display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
-      min-width: 220px; max-height: 400px; overflow-y: auto; background: white;
-      border: 1px solid var(--border-light); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-      z-index: 1100; padding: 0.5rem 0;
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      min-width: 230px;
+      max-height: 400px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.05);
+      z-index: 2000;
+      padding: 0.5rem 0;
+      display: none;
+      transform-origin: top;
     }
-    .filter-dropdown-panel.open { display: block; animation: slideDownPanel 0.2s ease-out; }
+    @keyframes slideDownPanel {
+      from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .filter-dropdown-panel.open { 
+      display: block; 
+      animation: slideDownPanel 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+      will-change: transform, opacity;
+    }
     .filter-dropdown-option {
       display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
       font-size: 0.85rem; cursor: pointer; transition: background 0.1s;
@@ -748,6 +750,7 @@ function buildExtractionDataPageHtml() {
     .header-btn-reset {
       height: 34px; 
       padding: 0 1.1rem; 
+      width: 185px;
       background: var(--header-bg); 
       color: #fff;
       border: none; 
@@ -765,10 +768,8 @@ function buildExtractionDataPageHtml() {
       line-height: 1;
       font-family: inherit;
     }
-    .header-btn-reset:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    @keyframes slideDownPanel { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-
-    .page-body { padding: 0.75rem 0; }
+    .report-header:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+    .page-body { padding: 1.25rem; }
 
     .stats-grid {
       display: grid;
@@ -1090,129 +1091,251 @@ function buildExtractionDataPageHtml() {
       opacity: 1;
       color: var(--primary);
     }
+    
+    /* Reports Toolbar */
+    .main-container {
+      padding: 0 0 1.25rem 0;
+      max-width: 1820px;
+      width: calc(100% - 2.5rem);
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+    .report-card-box {
+      background: var(--surface);
+      border: 1px solid rgba(176, 191, 201, 0.55);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .download-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 1.25rem;
+      background: #f8fafc;
+      border-bottom: 1px solid rgba(176, 191, 201, 0.45);
+      flex-wrap: wrap;
+    }
+    .home-btn {
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      height: 100%;
+      width: 170px;
+      justify-content: center;
+      background: var(--header-bg) !important;
+      color: white !important;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      border: none;
+      border-right: 1.2px solid rgba(255, 255, 255, 0.15);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .home-btn:hover {
+      background: var(--primary) !important;
+    }
+    .download-chip {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      background: white;
+      border: 1px solid rgba(176, 191, 201, 0.6);
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .download-bar-btns {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      gap: 0;
+    }
+    .download-bar-btns a {
+      height: 100%;
+      width: 170px;
+      border: none;
+      border-radius: 0;
+      background: transparent !important;
+      color: var(--text-secondary) !important;
+      padding: 0 1rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      box-shadow: none;
+      border-right: 1px solid rgba(203, 213, 225, 0.5);
+      margin: 0;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .download-bar-btns a:hover {
+      background: #f1f5f9 !important;
+      color: var(--primary) !important;
+    }
+    .download-bar-btns a svg {
+      transition: transform 0.2s;
+    }
+    .download-bar-btns a:hover svg {
+      transform: translateY(-1px);
+      color: var(--primary);
+    }
+    .download-bar-btns a:last-child {
+      border-right: none;
+    }
+    .download-bar-btns a.active {
+      background: #f0fdf4 !important;
+      color: var(--primary) !important;
+    }
   </style>
+
+
 </head>
 <body>
   <div class="report-header">
-    <div style="display: flex; align-items: center; gap: 1.5rem; width: 100%;">
+    <div class="report-header-left">
       <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center; height: 34px;">
         <img src="${REPORT_LOGO_DATA_URI}" alt="intellirevenue" class="logo">
       </a>
-      <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <button type="button" onclick="goToHome()" class="btn-back-main">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="15 18 9 12 15 6"></polyline></svg>
-              <span>Back</span>
+      <h1 class="report-header-title">Data Explorer</h1>
+      <div class="meta" style="opacity: 0.85;">
+        <p id="operation-count-label">${totalAll} operation(s)</p>
+        <p>Generated: ${now}</p>
+      </div>
+    </div>
+    <div class="report-header-right">
+      <div class="header-filter-row">
+        <div class="header-field-wrap brand-field-wrap">
+          <div id="brand-dropdown" class="filter-dropdown">
+            <div class="filter-chip">
+              <label class="header-label" for="brand-dropdown-trigger">Brand</label>
+              <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
+                Select brand
+              </button>
+            </div>
+            <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+          </div>
+        </div>
+        <div class="header-field-wrap purchaser-field-wrap">
+          <div id="purchaser-dropdown" class="filter-dropdown">
+            <div class="filter-chip">
+              <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
+              <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
+                Select purchaser
+              </button>
+            </div>
+            <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+          </div>
+        </div>
+        <div class="header-field-wrap">
+          <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">Reset Filter</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="main-container">
+    <div class="report-card-box">
+      <div class="download-bar">
+        <div class="download-chip">
+          <a href="javascript:void(0)" onclick="goToHome()" class="home-btn" title="Back to Dashboard">
+            <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Home
+          </a>
+          <div class="download-bar-btns">
+            <a href="/api/sync-report" title="View staging inventory report">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+              <span>Staging Inventory</span>
+            </a>
+            <a href="/api/reports/html/latest" title="View latest operation summary report">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+              <span>Run Summary</span>
+            </a>
+            <a href="/api/extraction-data-page" class="active" title="Explore extraction data — view full JSON responses">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              <span>Data Explorer</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-body">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Operations</div>
+            <div class="stat-value" id="tot-val">${totalAll}</div>
+            <div class="stat-sub">Across visible runs</div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-label">Succeeded</div>
+            <div class="stat-value" id="succ-val">${totalSuccess}</div>
+            <div class="stat-sub">Extraction success</div>
+          </div>
+          <div class="stat-card failed">
+            <div class="stat-label">Failed</div>
+            <div class="stat-value" id="fail-val">${totalFailed}</div>
+            <div class="stat-sub">Require attention</div>
+          </div>
+          <div class="stat-card rate">
+            <div class="stat-label">Success Rate</div>
+            <div class="stat-value" id="rate-val">${successRate}%</div>
+            <div class="stat-sub">Filter applied</div>
+          </div>
+        </div>
+
+        <div class="controls-bar">
+          <div class="tab-group">
+            <button class="tab-btn active" data-filter="all">All <span class="count" id="c-all">${totalAll}</span></button>
+            <button class="tab-btn" data-filter="success">Succeeded <span class="count" id="c-succ">${totalSuccess}</span></button>
+            <button class="tab-btn" data-filter="failed">Failed <span class="count" id="c-fail">${totalFailed}</span></button>
+          </div>
+          <div class="search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" class="search-input" id="search-input" placeholder="Search filename, pattern, purchaser…">
+          </div>
+          <div class="results-info" id="results-info"></div>
+          <div style="display: flex; gap: 8px;">
+            <button class="pg-btn" id="export-source-btn" onclick="exportBatch('source')" title="Export Visible Source Files (ZIP)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export Source
             </button>
-            <h1 class="report-header-title">Operation Data Explorer</h1>
-          </div>
-          <div class="report-header-right">
-             <div class="header-filter-row">
-                  <div class="header-field-wrap brand-field-wrap">
-                    <div id="brand-dropdown" class="filter-dropdown">
-                      <div class="filter-chip">
-                        <label class="header-label" for="brand-dropdown-trigger">Brand</label>
-                        <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
-                          Select brand
-                        </button>
-                      </div>
-                      <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
-                    </div>
-                  </div>
-                  <div class="header-field-wrap purchaser-field-wrap">
-                    <div id="purchaser-dropdown" class="filter-dropdown">
-                      <div class="filter-chip">
-                        <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
-                        <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
-                          Select purchaser
-                        </button>
-                      </div>
-                      <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
-                    </div>
-                  </div>
-                  <div class="header-field-wrap header-filter-reset-wrap">
-                    <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">
-                      Reset Filter
-                    </button>
-                  </div>
-                </div>
+            <button class="pg-btn" id="export-json-btn" onclick="exportBatch('json')" title="Export Visible Extraction JSONs (ZIP)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export JSON
+            </button>
           </div>
         </div>
-        <div class="meta" style="display: flex; gap: 1.25rem; opacity: 0.85;">
-          <span>Generated: ${now}</span>
-          <span id="operation-count-label">${totalAll} operation(s)</span>
+
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="toggle-cell"></th>
+                <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Timestamp</th>
+                <th class="sortable" onclick="handleSort('filename')" id="sort-filename">Filename</th>
+                <th class="sortable" onclick="handleSort('patternKey')" id="sort-patternKey">Pattern Key</th>
+                <th class="sortable" onclick="handleSort('purchaserKey')" id="sort-purchaserKey">Purchaser</th>
+                <th class="sortable" onclick="handleSort('status')" id="sort-status">Status</th>
+                <th class="action-cell">Action</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+            </tbody>
+          </table>
+          <div class="pagination-bar" id="pagination-bar"></div>
         </div>
       </div>
     </div>
-  </div>
+  </main>
 
-  <div class="page-body">
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total Extractions</div>
-        <div class="stat-value" id="tot-val">${totalAll}</div>
-        <div class="stat-sub">All time</div>
-      </div>
-      <div class="stat-card success">
-        <div class="stat-label">Succeeded</div>
-        <div class="stat-value" id="succ-val">${totalSuccess}</div>
-        <div class="stat-sub">Extraction success</div>
-      </div>
-      <div class="stat-card failed">
-        <div class="stat-label">Failed</div>
-        <div class="stat-value" id="fail-val">${totalFailed}</div>
-        <div class="stat-sub">Require attention</div>
-      </div>
-      <div class="stat-card rate">
-        <div class="stat-label">Success Rate</div>
-        <div class="stat-value" id="rate-val">${successRate}%</div>
-        <div class="stat-sub">Filter applied</div>
-      </div>
-    </div>
-
-    <div class="controls-bar">
-      <div class="tab-group">
-        <button class="tab-btn active" data-filter="all">All <span class="count" id="c-all">${totalAll}</span></button>
-        <button class="tab-btn" data-filter="success">Succeeded <span class="count" id="c-succ">${totalSuccess}</span></button>
-        <button class="tab-btn" data-filter="failed">Failed <span class="count" id="c-fail">${totalFailed}</span></button>
-      </div>
-      <div class="search-wrap">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" class="search-input" id="search-input" placeholder="Search filename, pattern, purchaser…">
-      </div>
-      <div class="results-info" id="results-info"></div>
-      <div style="display: flex; gap: 8px;">
-        <button class="pg-btn" id="export-source-btn" onclick="exportBatch('source')" title="Export Visible Source Files (ZIP)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export Source
-        </button>
-        <button class="pg-btn" id="export-json-btn" onclick="exportBatch('json')" title="Export Visible Extraction JSONs (ZIP)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export JSON
-        </button>
-      </div>
-    </div>
-
-    <div class="data-table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th class="toggle-cell"></th>
-            <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Timestamp</th>
-            <th class="sortable" onclick="handleSort('filename')" id="sort-filename">Filename</th>
-            <th class="sortable" onclick="handleSort('patternKey')" id="sort-patternKey">Pattern Key</th>
-            <th class="sortable" onclick="handleSort('purchaserKey')" id="sort-purchaserKey">Purchaser</th>
-            <th class="sortable" onclick="handleSort('status')" id="sort-status">Status</th>
-            <th class="action-cell">Action</th>
-          </tr>
-        </thead>
-        <tbody id="table-body">
-        </tbody>
-      </table>
-      <div class="pagination-bar" id="pagination-bar"></div>
-    </div>
-  </div>
 
   <script>
     var ALL_ROWS = ${rowsJson};
@@ -1706,13 +1829,18 @@ function buildSyncReportHtml() {
   );
 
   const brandPurchaserMap = {};
+  let totalSize = 0;
   filesData.forEach((f) => {
+    totalSize += f.size || 0;
     if (f.brand && f.purchaser) {
       if (!brandPurchaserMap[f.brand]) brandPurchaserMap[f.brand] = [];
       if (!brandPurchaserMap[f.brand].includes(f.purchaser))
         brandPurchaserMap[f.brand].push(f.purchaser);
     }
   });
+
+  const totalFiles = filesData.length;
+  const totalSizeStr = (totalSize / (1024 * 1024)).toFixed(1) + " MB";
 
   let manifestEntries = 0;
   if (existsSync(SYNC_MANIFEST_PATH)) {
@@ -1792,24 +1920,37 @@ function buildSyncReportHtml() {
       --accent-light: #e8f5ee;
       --radius: 12px;
       --radius-sm: 8px;
+      --muted: #6b7c85;
+      --pass: #2d9d5f;
+      --fail: #f44336;
     }
     * { box-sizing: border-box; }
+    html { overflow-y: scroll; scrollbar-gutter: stable; }
+    @keyframes pageFadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     body {
       font-family: 'JetBrains Mono', 'Consolas', monospace;
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 1rem;
+      margin: 0;
+      padding: 0;
       background: var(--bg);
       color: var(--text);
       font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      animation: pageFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     
     .report-header {
       background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(10px);
-      padding: 1rem 2rem;
-      border-radius: 0 0 16px 16px;
-      margin-bottom: 1rem;
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius);
+      margin: 0.75rem auto 0.5rem auto;
+      max-width: 1820px;
+      width: calc(100% - 2.5rem);
       box-shadow: 0 4px 20px rgba(0,0,0,0.06);
       display: flex;
       align-items: center;
@@ -1820,32 +1961,8 @@ function buildSyncReportHtml() {
       z-index: 1000;
       min-height: 72px;
     }
-    .btn-back-main {
-      background: var(--header-bg) !important;
-      color: white !important;
-      border: none;
-      border-radius: 8px;
-      height: 36px;
-      padding: 0 1.25rem;
-      font-size: 0.85rem;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace !important;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 12px rgba(33, 108, 109, 0.2);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .btn-back-main:hover {
-      background: var(--primary) !important;
-      transform: translateX(-4px);
-      box-shadow: 0 6px 16px rgba(45, 157, 95, 0.3);
-    }
-    .btn-back-main svg { width: 16px; height: 16px; transition: transform 0.2s; }
-    .btn-back-main:hover svg { transform: translateX(-2px); }
+
+
     .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
     .report-header .logo { height: 32px; width: auto; object-fit: contain; }
     .report-header-title {
@@ -1867,8 +1984,123 @@ function buildSyncReportHtml() {
     
     .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; }
     .meta p { margin: 2px 0; }
+
+    /* Filtering Styles */
+    .report-header-right { display: flex; align-items: center; justify-content: flex-end; }
+    .header-filter-row { display: flex; align-items: center; gap: 0.75rem; }
+    .header-field-wrap { display: flex; flex-direction: column; align-items: center; }
+    .filter-dropdown { position: relative; }
+    .filter-chip { 
+      display: flex; align-items: center; height: 34px; background: #fff; 
+      border: 1px solid rgba(176,191,201,0.6); border-radius: 8px; overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .filter-chip .header-label {
+      font-size: 0.7rem; color: var(--primary); font-weight: 800; background: var(--accent-light);
+      padding: 0 0.75rem; height: 100%; display: flex; align-items: center;
+      border-right: 1px solid rgba(45,157,95,0.2); text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .filter-dropdown-trigger {
+      border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
+      font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+    }
+    .brand-field-wrap .filter-dropdown-trigger { min-width: 185px; max-width: 185px; }
+    .purchaser-field-wrap .filter-dropdown-trigger { min-width: 185px; max-width: 185px; }
+
+    .filter-dropdown-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      min-width: 230px;
+      max-height: 400px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.05);
+      z-index: 2000;
+      padding: 0.5rem 0;
+      display: none;
+      transform-origin: top;
+    }
+    @keyframes slideDownPanel {
+      from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .filter-dropdown-panel.open { 
+      display: block; 
+      animation: slideDownPanel 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+      will-change: transform, opacity;
+    }
+    .filter-dropdown-option {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
+      font-size: 0.85rem; cursor: pointer; transition: background 0.1s;
+    }
+    .filter-dropdown-option:hover { background: #f8fafc; }
+    .filter-dropdown-option input { margin: 0; cursor: pointer; }
     
-    .page-body { padding: 0.75rem 0; }
+    .header-btn-reset {
+      height: 34px; 
+      padding: 0 1.1rem; 
+      width: 185px;
+      background: var(--header-bg); 
+      color: #fff;
+      border: none; 
+      border-radius: 6px; 
+      font-size: 0.82rem; 
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer; 
+      box-shadow: 0 2px 5px rgba(33,108,109,0.2); 
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .report-header:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+    
+    .page-body { padding: 1.25rem; }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .stat-card .stat-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+    .stat-card .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--header-bg);
+      line-height: 1;
+    }
+    .stat-card .stat-sub { font-size: 0.7rem; color: var(--muted); }
+    .stat-card.success .stat-value { color: var(--primary); }
+    .stat-card.failed .stat-value { color: #f44336; }
+    .stat-card.rate .stat-value { color: var(--accent); }
+
     .chart-card { 
       background: var(--surface);
       border: 1px solid var(--border-light);
@@ -2037,6 +2269,8 @@ function buildSyncReportHtml() {
     }
     .header-btn-reset:hover { filter: brightness(1.1); transform: translateY(-1px); }
     @keyframes slideDownPanel { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    
+
     #files-table thead th.sortable {
       cursor: pointer;
       user-select: none;
@@ -2069,7 +2303,69 @@ function buildSyncReportHtml() {
       display: flex;
       align-items: center;
       gap: 1.5rem;
-      margin: 1.5rem 0 1rem;
+      margin: 0.5rem 0 1rem 0;
+      background: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      flex-wrap: wrap;
+    }
+    
+    /* Reports Toolbar */
+    .main-container {
+      padding: 0 0 1.25rem 0;
+      max-width: 1820px;
+      width: calc(100% - 2.5rem);
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+    .report-card-box {
+      background: var(--surface);
+      border: 1px solid rgba(176, 191, 201, 0.55);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .download-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 1.25rem;
+      background: #f8fafc;
+      border-bottom: 1px solid rgba(176, 191, 201, 0.45);
+      flex-wrap: wrap;
+    }
+    .home-btn {
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      height: 100%;
+      width: 170px;
+      justify-content: center;
+      background: var(--header-bg) !important;
+      color: white !important;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      border: none;
+      border-right: 1.2px solid rgba(255, 255, 255, 0.15);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .home-btn:hover {
+      background: var(--primary) !important;
+    }
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin: 0.5rem 0 1rem 0;
       background: #fff;
       padding: 0.75rem 1.25rem;
       border-radius: var(--radius-sm);
@@ -2107,98 +2403,191 @@ function buildSyncReportHtml() {
       box-shadow: 0 0 0 3px var(--accent-light);
     }
     .results-info { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); }
+
+    .download-chip {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      background: white;
+      border: 1px solid rgba(176, 191, 201, 0.6);
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .download-bar-btns {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      gap: 0;
+    }
+    .download-bar-btns a {
+      height: 100%;
+      width: 170px;
+      border: none;
+      border-radius: 0;
+      background: transparent !important;
+      color: var(--text-secondary) !important;
+      padding: 0 1rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      box-shadow: none;
+      border-right: 1px solid rgba(203, 213, 225, 0.5);
+      margin: 0;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .download-bar-btns a:hover {
+      background: #f1f5f9 !important;
+      color: var(--primary) !important;
+    }
+    .download-bar-btns a svg {
+      transition: transform 0.2s;
+    }
+    .download-bar-btns a:hover svg {
+      transform: translateY(-1px);
+      color: var(--primary);
+    }
+    .download-bar-btns a:last-child {
+      border-right: none;
+    }
+    .download-bar-btns a.active {
+      background: #f0fdf4 !important;
+      color: var(--primary) !important;
+    }
   </style>
+
 </head>
 <body>
   <div class="report-header">
-    <div style="display: flex; align-items: center; gap: 1.5rem; width: 100%;">
+    <div class="report-header-left">
       <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center; height: 34px;">
         <img src="${REPORT_LOGO_DATA_URI}" alt="intellirevenue" class="logo">
       </a>
-      <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <button type="button" onclick="goToHome()" class="btn-back-main">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="15 18 9 12 15 6"></polyline></svg>
-              <span>Back</span>
-            </button>
-            <h1 class="report-header-title">Staging Inventory Report</h1>
-          </div>
-          <div class="report-header-right">
-             <div class="header-filter-row">
-                  <div class="header-field-wrap brand-field-wrap">
-                    <div id="brand-dropdown" class="filter-dropdown">
-                      <div class="filter-chip">
-                        <label class="header-label" for="brand-dropdown-trigger">Brand</label>
-                        <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
-                          Select brand
-                        </button>
-                      </div>
-                      <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
-                    </div>
-                  </div>
-                  <div class="header-field-wrap purchaser-field-wrap">
-                    <div id="purchaser-dropdown" class="filter-dropdown">
-                      <div class="filter-chip">
-                        <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
-                        <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
-                          Select purchaser
-                        </button>
-                      </div>
-                      <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
-                    </div>
-                  </div>
-                  <div class="header-field-wrap header-filter-reset-wrap">
-                    <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">
-                      Reset Filter
-                    </button>
-                  </div>
-                </div>
+      <h1 class="report-header-title">Staging Inventory Report</h1>
+      <div class="meta" style="opacity: 0.85;">
+        <p>Generated: ${formatDateHuman(new Date())}</p>
+        <p id="operation-count-label">Manifest: ${manifestEntries} | Staging: ${files.length} file(s)</p>
+      </div>
+    </div>
+    <div class="report-header-right">
+      <div class="header-filter-row">
+        <div class="header-field-wrap brand-field-wrap">
+          <div id="brand-dropdown" class="filter-dropdown">
+            <div class="filter-chip">
+              <label class="header-label" for="brand-dropdown-trigger">Brand</label>
+              <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
+                Select brand
+              </button>
+            </div>
+            <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
           </div>
         </div>
-        <div class="meta" style="display: flex; gap: 1.25rem; opacity: 0.85;">
-          <span>Generated: ${formatDateHuman(new Date())}</span>
-          <span id="operation-count-label">Manifest: ${manifestEntries} | Staging: ${files.length} file(s)</span>
+        <div class="header-field-wrap purchaser-field-wrap">
+          <div id="purchaser-dropdown" class="filter-dropdown">
+            <div class="filter-chip">
+              <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
+              <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
+                Select purchaser
+              </button>
+            </div>
+            <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+          </div>
+        </div>
+        <div class="header-field-wrap header-filter-reset-wrap">
+          <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">Reset Filter</button>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="page-body">
-    <div class="dashboard-grid">
-      <div class="chart-card">
-        <h4>Download History (Last 30 Runs)</h4>
-        <div class="chart-container">
-          <canvas id="historyChart"></canvas>
+  <main class="main-container">
+    <div class="report-card-box">
+      <div class="download-bar">
+        <div class="download-chip">
+          <a href="javascript:void(0)" onclick="goToHome()" class="home-btn" title="Back to Dashboard">
+            <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Home
+          </a>
+          <div class="download-bar-btns">
+            <a href="/api/sync-report" class="active" title="View staging inventory report">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+              <span>Staging Inventory</span>
+            </a>
+            <a href="/api/reports/html/latest" title="View latest operation summary report">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+              <span>Run Summary</span>
+            </a>
+            <a href="/api/extraction-data-page" title="View extraction data explorer">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              <span>Data Explorer</span>
+            </a>
+          </div>
         </div>
       </div>
-    </div>
 
-    <h3 id="files-title">Current Staging Files</h3>
-    
-    <div class="controls-bar">
-      <div class="search-wrap">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" class="search-input" id="search-input" placeholder="Search filename or path…">
+      <div class="page-body">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Staging Files</div>
+            <div class="stat-value" id="tot-files">${totalFiles}</div>
+            <div class="stat-sub">Across all brands</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Data Volume</div>
+            <div class="stat-value" id="tot-size">${totalSizeStr}</div>
+            <div class="stat-sub">Staged CSV/XML results</div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-label">Manifest Entries</div>
+            <div class="stat-value" id="manifest-val">${manifestEntries}</div>
+            <div class="stat-sub">Tracked in registry</div>
+          </div>
+          <div class="stat-card rate">
+            <div class="stat-label">Active Filters</div>
+            <div class="stat-value" id="filter-val">All</div>
+            <div class="stat-sub">By Brand/Purchaser</div>
+          </div>
+        </div>
+
+        <div class="chart-card" style="margin-bottom: 2rem;">
+          <h4>Download History (Last 30 Runs)</h4>
+          <div class="chart-container">
+            <canvas id="historyChart"></canvas>
+          </div>
+        </div>
+
+        <h3 id="files-title">Current Staging Files</h3>
+        
+        <div class="controls-bar">
+          <div class="search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" class="search-input" id="search-input" placeholder="Search filename or path…">
+          </div>
+          <div class="results-info" id="results-info"></div>
+          <button class="pg-btn" id="export-zip-btn" onclick="exportBatch()" title="Export Visible Files (ZIP)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Files
+          </button>
+        </div>
+
+        <table id="files-table">
+          <thead><tr>
+            <th class="sortable" onclick="handleSort('path')" id="sort-path">Path (staging)</th>
+            <th class="sortable" onclick="handleSort('size')" id="sort-size">Size (bytes)</th>
+            <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Modified</th>
+            <th class="action-cell" style="width: 100px;">Action</th>
+          </tr></thead>
+          <tbody id="files-body"></tbody>
+        </table>
+        <div id="pagination" class="pagination"></div>
       </div>
-      <div class="results-info" id="results-info"></div>
-      <button class="pg-btn" id="export-zip-btn" onclick="exportBatch()" title="Export Visible Files (ZIP)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export Files
-      </button>
     </div>
+  </main>
 
-    <table id="files-table">
-      <thead><tr>
-        <th class="sortable" onclick="handleSort('path')" id="sort-path">Path (staging)</th>
-        <th class="sortable" onclick="handleSort('size')" id="sort-size">Size (bytes)</th>
-        <th class="sortable" onclick="handleSort('mtime')" id="sort-mtime">Modified</th>
-        <th class="action-cell" style="width: 100px;">Action</th>
-      </tr></thead>
-      <tbody id="files-body"></tbody>
-    </table>
-    <div id="pagination" class="pagination"></div>
-  </div>
 
   <script>
     const historyData = ${historyData};
@@ -2442,6 +2831,26 @@ function buildSyncReportHtml() {
       if (!tbody) return;
       
       const filtered = getFilteredFiles();
+
+      // Update stat cards
+      const totFilesEl = document.getElementById('tot-files');
+      if (totFilesEl) totFilesEl.innerText = filtered.length;
+      
+      const totSizeEl = document.getElementById('tot-size');
+      if (totSizeEl) {
+        const bytes = filtered.reduce((acc, f) => acc + (f.size || 0), 0);
+        totSizeEl.innerText = (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+
+      const filterValEl = document.getElementById('filter-val');
+      if (filterValEl) {
+        if (selectedBrands.length === 0 && selectedPurchasers.length === 0 && currentSearch === '') {
+          filterValEl.innerText = 'All';
+        } else {
+          filterValEl.innerText = 'Active';
+        }
+      }
+
       const label = document.getElementById('operation-count-label');
       if (label) {
         label.innerText = 'Manifest: ${manifestEntries} | Staging: ' + filtered.length + ' file(s)';
@@ -3943,6 +4352,48 @@ createServer(async (req, res) => {
     }
     return;
   }
+  if (req.method === "GET" && url === "/api/reports/html/latest") {
+    try {
+      if (!existsSync(REPORTS_DIR)) {
+        res.writeHead(404);
+        res.end("No reports directory found");
+        return;
+      }
+      const files = readdirSync(REPORTS_DIR, { withFileTypes: true })
+        .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".html"))
+        .map((f) => ({
+          name: f.name,
+          mtime: statSync(join(REPORTS_DIR, f.name)).mtimeMs,
+        }))
+        .sort((a, b) => b.mtime - a.mtime);
+
+      if (files.length === 0) {
+        res.writeHead(404);
+        res.end("No HTML reports found");
+        return;
+      }
+
+      // Redirect to the actual latest report or just serve it?
+      // Serving it directly is easier for the toolbar.
+      const filePath = join(REPORTS_DIR, files[0].name);
+      let content = readFileSync(filePath, "utf-8");
+
+      const faviconHtml = REPORT_FAVICON_DATA_URI
+        ? `<link rel="icon" href="${REPORT_FAVICON_DATA_URI}" type="image/x-icon">`
+        : "";
+      if (content.includes("<head>")) {
+        content = content.replace("<head>", "<head>\n  " + faviconHtml);
+      }
+
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(content);
+    } catch (e) {
+      res.writeHead(500);
+      res.end(e.message);
+    }
+    return;
+  }
+
   if (req.method === "GET" && url === "/api/reports") {
     try {
       const list = { html: [], json: [] };

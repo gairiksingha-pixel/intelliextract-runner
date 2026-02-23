@@ -1111,7 +1111,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   </details>`;
 }
 
-const REPORT_TITLE = "IntelliExtract Operation Summary";
+const REPORT_TITLE = "Run Summary Report";
 
 function htmlReportFromHistory(
   historicalSummaries: HistoricalRunSummary[],
@@ -1224,60 +1224,38 @@ function htmlReportFromHistory(
       --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
     }
     * { box-sizing: border-box; }
-    html { scrollbar-gutter: stable; }
+    html { overflow-y: scroll; scrollbar-gutter: stable; }
     body {
       font-family: 'JetBrains Mono', 'Consolas', monospace;
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 1rem;
+      margin: 0;
+      padding: 0;
       background: var(--bg);
       color: var(--text);
       font-size: 13px;
-      scrollbar-gutter: stable;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
     }
-    .page-body { padding: 0.75rem 0; }
+    .page-body { padding: 1.25rem; }
     
     .report-header {
-      background: var(--surface);
-      padding: 1rem 2rem;
-      border-radius: 0 0 16px 16px;
-      margin-bottom: 1.25rem;
-      box-shadow: var(--shadow-md);
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius);
+      margin: 0.75rem auto 0.5rem auto;
+      max-width: 1820px;
+      width: calc(100% - 2.5rem);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border: 1px solid var(--border-light);
+      border: 1px solid rgba(176, 191, 201, 0.3);
       position: sticky;
       top: 0;
       z-index: 1000;
       min-height: 72px;
     }
-    .btn-back-main {
-      background: var(--header-bg) !important;
-      color: white !important;
-      border: none;
-      border-radius: 6px;
-      height: 34px;
-      padding: 0 1.25rem;
-      font-size: 0.82rem;
-      font-weight: 800;
-      font-family: 'JetBrains Mono', monospace !important;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 2px 6px rgba(33, 108, 109, 0.25);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .btn-back-main:hover {
-      background: var(--primary) !important;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(45, 157, 95, 0.3);
-    }
-    .btn-back-main svg { width: 14px; height: 14px; transition: transform 0.2s; stroke-width: 3.5px; }
-    .btn-back-main:hover svg { transform: translateX(-2px); }
     .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
     .report-header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
     .report-header-title {
@@ -1302,8 +1280,98 @@ function htmlReportFromHistory(
     h2 { color: var(--text-secondary); font-size: 1.1rem; font-weight: 500; margin-bottom: 1.5rem; text-align: center; }
     h3 { color: var(--header-bg); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 2rem 0 1rem; border-bottom: 2px solid var(--border-light); padding-bottom: 0.4rem; }
     
-    .meta { color: var(--text-secondary); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .meta { color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; opacity: 0.85; }
     .meta p { margin: 2px 0; }
+
+    @keyframes rowEntry {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    tr { animation: rowEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    tr:nth-child(1) { animation-delay: 0.05s; }
+    tr:nth-child(2) { animation-delay: 0.1s; }
+    tr:nth-child(3) { animation-delay: 0.15s; }
+    tr:nth-child(4) { animation-delay: 0.2s; }
+    tr:nth-child(5) { animation-delay: 0.25s; }
+
+    /* Filtering Styles */
+    .report-header-right { display: flex; align-items: center; justify-content: flex-end; }
+    .header-filter-row { display: flex; align-items: center; gap: 0.75rem; }
+    .header-field-wrap { display: flex; flex-direction: column; align-items: center; }
+    .filter-dropdown { position: relative; }
+    .filter-chip { 
+      display: flex; align-items: center; height: 34px; background: #fff; 
+      border: 1px solid rgba(176,191,201,0.6); border-radius: 8px; overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .filter-chip .header-label {
+      font-size: 0.7rem; color: var(--primary); font-weight: 800; background: var(--accent-light);
+      padding: 0 0.75rem; height: 100%; display: flex; align-items: center;
+      border-right: 1px solid rgba(45,157,95,0.2); text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .filter-dropdown-trigger {
+      border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
+      font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+    }
+    .brand-field-wrap .filter-dropdown-trigger { min-width: 185px; max-width: 185px; }
+    .purchaser-field-wrap .filter-dropdown-trigger { min-width: 185px; max-width: 185px; }
+
+    .filter-dropdown-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      min-width: 230px;
+      max-height: 400px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.05);
+      z-index: 2000;
+      padding: 0.5rem 0;
+      display: none;
+      transform-origin: top;
+    }
+    @keyframes slideDownPanel {
+      from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .filter-dropdown-panel.open { 
+      display: block; 
+      animation: slideDownPanel 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+      will-change: transform, opacity;
+    }
+    .filter-dropdown-option {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
+      font-size: 0.85rem; cursor: pointer; transition: background 0.1s;
+    }
+    .filter-dropdown-option:hover { background: #f8fafc; }
+    .filter-dropdown-option input { margin: 0; cursor: pointer; }
+    
+    .header-btn-reset {
+      height: 34px; 
+      padding: 0 1.1rem; 
+      width: 185px;
+      background: var(--header-bg); 
+      color: #fff;
+      border: none; 
+      border-radius: 6px; 
+      font-size: 0.82rem; 
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer; 
+      box-shadow: 0 2px 5px rgba(33,108,109,0.2); 
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-family: inherit;
+    }
     
     .table-responsive { width: 100%; overflow-x: auto; margin-bottom: 1.5rem; border-radius: var(--radius-sm); box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); background: var(--surface); }
     table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: auto; min-width: 800px; }
@@ -1378,31 +1446,44 @@ function htmlReportFromHistory(
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(10, 18, 32, 0.6);
+      background: rgba(2, 6, 23, 0.65);
+      backdrop-filter: blur(5px);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 5000;
-      animation: fadeIn 0.15s ease-out forwards;
+      animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes modalFadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
     }
     .modal-overlay.open { display: flex; }
     .modal-overlay.closing { animation: fadeOut 0.15s ease-in forwards; }
     
     .modal {
       background: var(--surface);
-      border-radius: calc(var(--radius) * 1.5);
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      border: 1px solid rgba(0,0,0,0.05);
+      border-radius: 16px;
+      box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.2),
+        0 10px 10px -5px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255,255,255,0.1);
       width: 420px;
       font-family: 'JetBrains Mono', monospace;
       max-width: 90vw;
       padding: 0;
       display: flex;
       flex-direction: column;
-      animation: modalSlideUp 0.18s cubic-bezier(0.2, 0, 0, 1) forwards;
+      animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       overflow: hidden;
     }
-    .modal-overlay.closing .modal { animation: modalSlideDown 0.15s ease-in forwards; }
+    .modal-overlay.closing .modal { animation: modalSlideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .modal-overlay.closing { animation: modalFadeOut 0.25s ease-in forwards; }
 
     .modal-header {
       padding: 1rem 1.5rem;
@@ -1449,14 +1530,113 @@ function htmlReportFromHistory(
       color: #475569;
       border: 1px solid #e2e8f0;
       border-radius: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      height: 42px;
-      padding: 0 1.5rem;
-      font-weight: 600;
-      cursor: pointer;
-      min-width: 110px;
+    }
+
+    /* Reports Toolbar */
+    .main-container {
+      padding: 0 0 1.25rem 0;
+      max-width: 1820px;
+      width: calc(100% - 2.5rem);
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+    .report-card-box {
+      background: var(--surface);
+      border: 1px solid rgba(176, 191, 201, 0.55);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .download-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 1.25rem;
+      background: #f8fafc;
+      border-bottom: 1px solid rgba(176, 191, 201, 0.45);
+      flex-wrap: wrap;
+    }
+    .download-chip {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      background: white;
+      border: 1px solid rgba(176, 191, 201, 0.6);
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .home-btn {
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      height: 100%;
+      width: 170px;
+      justify-content: center;
+      background: var(--header-bg) !important;
+      color: white !important;
+      text-transform: uppercase;
+      font-size: 0.73rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      border: none;
+      border-right: 1.2px solid rgba(255, 255, 255, 0.15);
+      text-decoration: none;
+      white-space: nowrap;
       transition: all 0.2s;
     }
+    .home-btn:hover {
+      background: var(--primary) !important;
+    }
+    .download-bar-btns {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      gap: 0;
+    }
+    .download-bar-btns a {
+      height: 100%;
+      width: 170px;
+      border: none;
+      border-radius: 0;
+      background: transparent !important;
+      color: var(--text-secondary) !important;
+      padding: 0 1rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      box-shadow: none;
+      border-right: 1px solid rgba(203, 213, 225, 0.5);
+      margin: 0;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .download-bar-btns a:hover {
+      background: #f1f5f9 !important;
+      color: var(--primary) !important;
+    }
+    .download-bar-btns a svg {
+      transition: transform 0.2s;
+    }
+    .download-bar-btns a:hover svg {
+      transform: translateY(-1px);
+      color: var(--primary);
+    }
+    .download-bar-btns a:last-child {
+      border-right: none;
+    }
+    .download-bar-btns a.active {
+      background: #f0fdf4 !important;
+      color: var(--primary) !important;
+    }
+
+
     .btn-alert-cancel:hover { background: #e2e8f0; }
 
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1491,8 +1671,12 @@ function htmlReportFromHistory(
     .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; background: rgba(176, 191, 201, 0.15); padding: 5px; border-radius: var(--radius); border: 1px solid var(--border-light); }
     .tab-btn { flex: 1; background: none; border: none; padding: 0.65rem 1.5rem; font-family: inherit; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer; color: var(--text-secondary); border-radius: calc(var(--radius) - 4px); transition: all 0.25s ease; }
     .tab-btn.active { background: var(--header-bg); color: white; box-shadow: 0 4px 12px rgba(33, 108, 109, 0.25); }
+    @keyframes tabFadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     .tab-content { display: none; }
-    .tab-content.active { display: block; }
+    .tab-content.active { display: block; animation: tabFadeIn 0.3s cubic-bezier(0.2, 0, 0, 1); }
 
     .dashboard-grid { 
       display: grid; 
@@ -1996,64 +2180,77 @@ function htmlReportFromHistory(
 </head>
 <body>
   <div class="report-header">
-    <div style="display: flex; align-items: center; gap: 1.5rem; width: 100%;">
+    <div class="report-header-left">
       <a href="javascript:void(0)" onclick="goToHome()" title="Go to Home" style="display: flex; align-items: center; height: 34px;">
         <img src="${logoDataUri}" alt="intellirevenue" class="logo">
       </a>
-      <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <button type="button" onclick="goToHome()" class="btn-back-main">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="15 18 9 12 15 6"></polyline></svg>
-              <span>Back</span>
-            </button>
-            <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
-          </div>
-          <div class="report-header-right">
-             <div class="header-filter-row" style="gap: 1.25rem;">
-                  <div class="header-field-wrap brand-field-wrap">
-                    <div id="brand-dropdown" class="filter-dropdown">
-                      <div class="filter-chip">
-                        <label class="header-label" for="brand-dropdown-trigger">Brand</label>
-                        <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
-                          Select brand
-                        </button>
-                      </div>
-                      <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
-                    </div>
-                  </div>
-                  <div class="header-field-wrap purchaser-field-wrap">
-                    <div id="purchaser-dropdown" class="filter-dropdown">
-                      <div class="filter-chip">
-                        <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
-                        <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
-                          Select purchaser
-                        </button>
-                      </div>
-                      <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
-                    </div>
-                  </div>
-                  <div class="header-field-wrap header-filter-reset-wrap">
-                    <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">
-                      Reset Filter
-                    </button>
-                  </div>
-                </div>
+      <h1 class="report-header-title">${escapeHtml(REPORT_TITLE)}</h1>
+      <div class="meta" style="opacity: 0.85;">
+        <p>${historicalSummaries.length} operation(s)</p>
+        <p>Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))}</p>
+      </div>
+    </div>
+    <div class="report-header-right">
+      <div class="header-filter-row" style="gap: 1.25rem;">
+        <div class="header-field-wrap brand-field-wrap">
+          <div id="brand-dropdown" class="filter-dropdown">
+            <div class="filter-chip">
+              <label class="header-label" for="brand-dropdown-trigger">Brand</label>
+              <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
+                Select brand
+              </button>
+            </div>
+            <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
           </div>
         </div>
-        <div class="meta" style="display: flex; gap: 1.25rem;">
-          <span>Generated: ${escapeHtml(formatDateHuman(new Date(generatedAt)))}</span>
-          <span id="operation-count-label" style="font-weight: 800; color: var(--header-bg);">${historicalSummaries.length} operation(s)</span>
+        <div class="header-field-wrap purchaser-field-wrap">
+          <div id="purchaser-dropdown" class="filter-dropdown">
+            <div class="filter-chip">
+              <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
+              <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
+                Select purchaser
+              </button>
+            </div>
+            <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+          </div>
+        </div>
+        <div class="header-field-wrap header-filter-reset-wrap">
+          <button type="button" id="filter-reset-btn" class="header-btn-reset" onclick="resetFilters()">Reset Filter</button>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="page-body">
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('dashboard')">Analytics Dashboard</button>
-      <button class="tab-btn" onclick="switchTab('history')">Operation History</button>
-    </div>
+  <main class="main-container">
+    <div class="report-card-box">
+      <div class="download-bar">
+        <div class="download-chip">
+          <a href="javascript:void(0)" onclick="goToHome()" class="home-btn" title="Back to Dashboard">
+            <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Home
+          </a>
+          <div class="download-bar-btns">
+            <a href="/api/sync-report" title="View staging inventory report">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+              <span>Staging Inventory</span>
+            </a>
+            <a href="/api/reports/html/latest" class="active" title="View latest operation summary report">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+              <span>Run Summary</span>
+            </a>
+            <a href="/api/extraction-data-page" title="Explore extraction data — view full JSON responses">
+              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              <span>Data Explorer</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-body">
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('dashboard')">Analytics Dashboard</button>
+          <button class="tab-btn" onclick="switchTab('history')">Operation History</button>
+        </div>
 
     <div id="dashboard" class="tab-content active">
       <div class="stats-grid">
@@ -2146,7 +2343,9 @@ function htmlReportFromHistory(
       </div>
     </div>
     <div id="history-pagination" class="history-pagination"></div>
-  </div>
+      </div>
+    </div>
+  </main>
 
   <script>
     function switchTab(tabId) {
