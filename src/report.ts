@@ -1113,7 +1113,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
 
 const REPORT_TITLE = "Run Summary Report";
 
-function htmlReportFromHistory(
+export function htmlReportFromHistory(
   historicalSummaries: HistoricalRunSummary[],
   generatedAt: string,
 ): string {
@@ -1286,6 +1286,49 @@ function htmlReportFromHistory(
     @keyframes rowEntry {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+    /* Page Loader Overlay */
+    #page-loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: fadeIn 0.3s ease;
+    }
+    .loader-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--primary);
+      border-bottom-color: transparent;
+      border-radius: 50%;
+      display: inline-block;
+      box-sizing: border-box;
+      animation: rotation 1s linear infinite;
+    }
+    .loader-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--header-bg);
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    @keyframes rotation {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
     tr { animation: rowEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
     tr:nth-child(1) { animation-delay: 0.05s; }
@@ -1579,8 +1622,8 @@ function htmlReportFromHistory(
       background: var(--header-bg) !important;
       color: white !important;
       text-transform: uppercase;
-      font-size: 0.73rem;
-      font-weight: 800;
+      font-size: 0.8rem;
+      font-weight: 700;
       letter-spacing: 0.05em;
       border: none;
       border-right: 1.2px solid rgba(255, 255, 255, 0.15);
@@ -2157,7 +2200,8 @@ function htmlReportFromHistory(
       }
     });
 
-    function goToHome() { 
+    function goToHome() {
+      if (typeof showLoader === 'function') showLoader();
       try {
         if (window.parent && typeof window.parent.closeReportView === 'function') {
           window.parent.closeReportView();
@@ -2228,20 +2272,20 @@ function htmlReportFromHistory(
       <div class="download-bar">
         <div class="download-chip">
           <a href="javascript:void(0)" onclick="goToHome()" class="home-btn" title="Back to Dashboard">
-            <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            Home
+            <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span>Home</span>
           </a>
           <div class="download-bar-btns">
-            <a href="/api/sync-report" title="View staging inventory report">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-              <span>Staging Inventory</span>
+            <a href="/reports/inventory" title="View staging inventory report">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+              <span>Inventory</span>
             </a>
-            <a href="/api/reports/html/latest" class="active" title="View latest operation summary report">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            <a href="/reports/summary" class="active" title="View latest operation summary report">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
               <span>Run Summary</span>
             </a>
-            <a href="/api/extraction-data-page" title="Explore extraction data — view full JSON responses">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <a href="/reports/explorer" title="Explore extraction data — view full JSON responses">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
               <span>Data Explorer</span>
             </a>
           </div>
@@ -2987,6 +3031,42 @@ function htmlReportFromHistory(
         }
       });
     }
+  </script>
+  <!-- Page Loader Overlay -->
+  <div id="page-loader">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Loading...</div>
+  </div>
+  <script>
+    function showLoader() {
+      var l = document.getElementById("page-loader");
+      if (l) l.style.display = "flex";
+    }
+    function hideLoader() {
+      var l = document.getElementById("page-loader");
+      if (l) l.style.display = "none";
+    }
+    (function () {
+      if (document.readyState === "complete") hideLoader(); window.addEventListener("pageshow", function(e) { hideLoader(); }); setTimeout(hideLoader, 5000);
+      window.addEventListener("load", hideLoader);
+      document.addEventListener("click", function (e) {
+        var t = e.target.closest("a");
+        if (
+          t &&
+          t.href &&
+          !t.href.startsWith("javascript:") &&
+          !t.href.startsWith("#") &&
+          t.target !== "_blank" &&
+          !e.ctrlKey &&
+          !e.metaKey
+        ) {
+          showLoader();
+        }
+      });
+      document.addEventListener("submit", function () {
+        showLoader();
+      });
+    })();
   </script>
 </body>
 </html>`;

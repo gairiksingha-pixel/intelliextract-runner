@@ -35,6 +35,11 @@ import {
   getRecordsForRun,
   closeCheckpointDb,
 } from "./dist/checkpoint.js";
+import { loadConfig } from "./dist/config.js";
+import {
+  loadHistoricalRunSummaries,
+  htmlReportFromHistory,
+} from "./dist/report.js";
 
 const require = createRequire(import.meta.url);
 const archiver = require("archiver");
@@ -63,6 +68,7 @@ function loadBrandPurchasers() {
   return {};
 }
 const BRAND_PURCHASERS = loadBrandPurchasers();
+const config = loadConfig(join(ROOT, "config", "config.yaml"));
 const REPORTS_DIR = join(ROOT, "output", "reports");
 const EXTRACTIONS_DIR = join(ROOT, "output", "extractions");
 const STAGING_DIR = join(ROOT, "output", "staging");
@@ -1134,8 +1140,8 @@ function buildExtractionDataPageHtml() {
       background: var(--header-bg) !important;
       color: white !important;
       text-transform: uppercase;
-      font-size: 0.7rem;
-      font-weight: 800;
+      font-size: 0.8rem;
+      font-weight: 700;
       letter-spacing: 0.05em;
       border: none;
       border-right: 1.2px solid rgba(255, 255, 255, 0.15);
@@ -1200,6 +1206,49 @@ function buildExtractionDataPageHtml() {
       background: #f0fdf4 !important;
       color: var(--primary) !important;
     }
+    /* Page Loader Overlay */
+    #page-loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: fadeIn 0.3s ease;
+    }
+    .loader-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--primary);
+      border-bottom-color: transparent;
+      border-radius: 50%;
+      display: inline-block;
+      box-sizing: border-box;
+      animation: rotation 1s linear infinite;
+    }
+    .loader-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--header-bg);
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    @keyframes rotation {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
   </style>
 
 
@@ -1252,20 +1301,20 @@ function buildExtractionDataPageHtml() {
       <div class="download-bar">
         <div class="download-chip">
           <a href="javascript:void(0)" onclick="goToHome()" class="home-btn" title="Back to Dashboard">
-            <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            Home
+            <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span>Home</span>
           </a>
           <div class="download-bar-btns">
-            <a href="/api/sync-report" title="View staging inventory report">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-              <span>Staging Inventory</span>
+            <a href="/reports/inventory" title="View staging inventory report">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+              <span>Inventory</span>
             </a>
-            <a href="/api/reports/html/latest" title="View latest operation summary report">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            <a href="/reports/summary" title="View latest operation summary report">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
               <span>Run Summary</span>
             </a>
-            <a href="/api/extraction-data-page" class="active" title="Explore extraction data — view full JSON responses">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <a href="/reports/explorer" class="active" title="Explore extraction data — view full JSON responses">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
               <span>Data Explorer</span>
             </a>
           </div>
@@ -1363,7 +1412,7 @@ function buildExtractionDataPageHtml() {
     var currentSortField = 'mtime';
     var currentSortOrder = 'desc'; // 'asc' or 'desc'
 
-    function goToHome() { 
+    function goToHome() { if (typeof showLoader === "function") showLoader(); 
       try {
         if (window.parent && typeof window.parent.closeReportView === 'function') {
           window.parent.closeReportView();
@@ -1797,6 +1846,42 @@ function buildExtractionDataPageHtml() {
     initFilters();
     updateSortUI();
     render();
+  </script>
+  <!-- Page Loader Overlay -->
+  <div id="page-loader">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Loading...</div>
+  </div>
+  <script>
+    function showLoader() {
+      var l = document.getElementById("page-loader");
+      if (l) l.style.display = "flex";
+    }
+    function hideLoader() {
+      var l = document.getElementById("page-loader");
+      if (l) l.style.display = "none";
+    }
+    (function () {
+      if (document.readyState === "complete") hideLoader(); window.addEventListener("pageshow", function(e) { hideLoader(); }); setTimeout(hideLoader, 5000);
+      window.addEventListener("load", hideLoader);
+      document.addEventListener("click", function (e) {
+        var t = e.target.closest("a");
+        if (
+          t &&
+          t.href &&
+          !t.href.startsWith("javascript:") &&
+          !t.href.startsWith("#") &&
+          t.target !== "_blank" &&
+          !e.ctrlKey &&
+          !e.metaKey
+        ) {
+          showLoader();
+        }
+      });
+      document.addEventListener("submit", function () {
+        showLoader();
+      });
+    })();
   </script>
 </body>
 </html>`;
@@ -2375,8 +2460,8 @@ function buildSyncReportHtml() {
       background: var(--header-bg) !important;
       color: white !important;
       text-transform: uppercase;
-      font-size: 0.7rem;
-      font-weight: 800;
+      font-size: 0.8rem;
+      font-weight: 700;
       letter-spacing: 0.05em;
       border: none;
       border-right: 1.2px solid rgba(255, 255, 255, 0.15);
@@ -2486,6 +2571,49 @@ function buildSyncReportHtml() {
       background: #f0fdf4 !important;
       color: var(--primary) !important;
     }
+    /* Page Loader Overlay */
+    #page-loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: fadeIn 0.3s ease;
+    }
+    .loader-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--primary);
+      border-bottom-color: transparent;
+      border-radius: 50%;
+      display: inline-block;
+      box-sizing: border-box;
+      animation: rotation 1s linear infinite;
+    }
+    .loader-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--header-bg);
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    @keyframes rotation {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
   </style>
 
 </head>
@@ -2537,20 +2665,20 @@ function buildSyncReportHtml() {
       <div class="download-bar">
         <div class="download-chip">
           <a href="javascript:void(0)" onclick="goToHome()" class="home-btn" title="Back to Dashboard">
-            <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            Home
+            <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span>Home</span>
           </a>
           <div class="download-bar-btns">
-            <a href="/api/sync-report" class="active" title="View staging inventory report">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-              <span>Staging Inventory</span>
+            <a href="/reports/inventory" class="active" title="View staging inventory report">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+              <span>Inventory</span>
             </a>
-            <a href="/api/reports/html/latest" title="View latest operation summary report">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            <a href="/reports/summary" title="View latest operation summary report">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
               <span>Run Summary</span>
             </a>
-            <a href="/api/extraction-data-page" title="View extraction data explorer">
-              <svg style="width:14px;height:14px;margin-right:6px;vertical-align:text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <a href="/reports/explorer" title="View extraction data explorer">
+              <svg style="width:14px;height:14px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
               <span>Data Explorer</span>
             </a>
           </div>
@@ -2638,7 +2766,7 @@ function buildSyncReportHtml() {
     let currentSortField = 'mtime';
     let currentSortOrder = 'desc'; // 'asc' or 'desc'
 
-    function goToHome() { 
+    function goToHome() { if (typeof showLoader === "function") showLoader(); 
       try {
         if (window.parent && typeof window.parent.closeReportView === 'function') {
           window.parent.closeReportView();
@@ -3107,6 +3235,42 @@ function buildSyncReportHtml() {
         if (grid) grid.appendChild(msg);
       }
     };
+  </script>
+  <!-- Page Loader Overlay -->
+  <div id="page-loader">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Loading...</div>
+  </div>
+  <script>
+    function showLoader() {
+      var l = document.getElementById("page-loader");
+      if (l) l.style.display = "flex";
+    }
+    function hideLoader() {
+      var l = document.getElementById("page-loader");
+      if (l) l.style.display = "none";
+    }
+    (function () {
+      if (document.readyState === "complete") hideLoader(); window.addEventListener("pageshow", function(e) { hideLoader(); }); setTimeout(hideLoader, 5000);
+      window.addEventListener("load", hideLoader);
+      document.addEventListener("click", function (e) {
+        var t = e.target.closest("a");
+        if (
+          t &&
+          t.href &&
+          !t.href.startsWith("javascript:") &&
+          !t.href.startsWith("#") &&
+          t.target !== "_blank" &&
+          !e.ctrlKey &&
+          !e.metaKey
+        ) {
+          showLoader();
+        }
+      });
+      document.addEventListener("submit", function () {
+        showLoader();
+      });
+    })();
   </script>
 </body>
 </html>`;
@@ -4098,14 +4262,43 @@ createServer(async (req, res) => {
     }
     return;
   }
-  if (req.method === "GET" && url === "/api/extraction-data-page") {
+  if (req.method === "GET" && url === "/reports/summary") {
+    try {
+      const summaries = loadHistoricalRunSummaries(config);
+      const html = htmlReportFromHistory(summaries, new Date().toISOString());
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Error generating summary report: " + e.message);
+    }
+    return;
+  }
+  if (
+    req.method === "GET" &&
+    (url === "/reports/explorer" || url === "/api/extraction-data-page")
+  ) {
     try {
       const html = buildExtractionDataPageHtml();
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(html);
     } catch (e) {
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end("Error generating page: " + e.message);
+      res.end("Error generating explorer page: " + e.message);
+    }
+    return;
+  }
+  if (
+    req.method === "GET" &&
+    (url === "/reports/inventory" || url === "/api/sync-report")
+  ) {
+    try {
+      const html = buildSyncReportHtml();
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Error generating inventory report: " + e.message);
     }
     return;
   }
@@ -4385,44 +4578,8 @@ createServer(async (req, res) => {
     return;
   }
   if (req.method === "GET" && url === "/api/reports/html/latest") {
-    try {
-      if (!existsSync(REPORTS_DIR)) {
-        res.writeHead(404);
-        res.end("No reports directory found");
-        return;
-      }
-      const files = readdirSync(REPORTS_DIR, { withFileTypes: true })
-        .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".html"))
-        .map((f) => ({
-          name: f.name,
-          mtime: statSync(join(REPORTS_DIR, f.name)).mtimeMs,
-        }))
-        .sort((a, b) => b.mtime - a.mtime);
-
-      if (files.length === 0) {
-        res.writeHead(404);
-        res.end("No HTML reports found");
-        return;
-      }
-
-      // Redirect to the actual latest report or just serve it?
-      // Serving it directly is easier for the toolbar.
-      const filePath = join(REPORTS_DIR, files[0].name);
-      let content = readFileSync(filePath, "utf-8");
-
-      const faviconHtml = REPORT_FAVICON_DATA_URI
-        ? `<link rel="icon" href="${REPORT_FAVICON_DATA_URI}" type="image/x-icon">`
-        : "";
-      if (content.includes("<head>")) {
-        content = content.replace("<head>", "<head>\n  " + faviconHtml);
-      }
-
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(content);
-    } catch (e) {
-      res.writeHead(500);
-      res.end(e.message);
-    }
+    res.writeHead(302, { Location: "/reports/summary" });
+    res.end();
     return;
   }
 
