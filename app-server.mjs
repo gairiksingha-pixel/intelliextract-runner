@@ -812,10 +812,10 @@ function buildExtractionDataPageHtml() {
       gap: 1.5rem;
       margin-bottom: 1rem;
       background: var(--surface);
-      border: 1px solid var(--border-light);
       border-radius: var(--radius-sm);
+      border: 1px solid rgba(176, 191, 201, 0.4);
       padding: 0.75rem 1.25rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
     .tab-group { display: flex; gap: 0.25rem; }
     .tab-btn {
@@ -848,16 +848,16 @@ function buildExtractionDataPageHtml() {
       width: 100%;
       height: 38px;
       padding: 0 1rem 0 2.5rem;
-      border: 1px solid var(--border-light);
-      border-radius: 6px;
+      border: 1px solid transparent;
+      border-radius: 8px;
       font-family: inherit;
       font-size: 0.85rem;
-      background: var(--bg);
+      background: #f1f5f9;
       color: var(--text);
       outline: none;
-      transition: border-color 0.15s;
+      transition: all 0.2s;
     }
-    .search-input:focus { border-color: var(--primary); background: white; }
+    .search-input:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 3px var(--accent-light); }
 
     .results-info { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
 
@@ -2369,8 +2369,8 @@ function buildSyncReportHtml() {
       background: #fff;
       padding: 0.75rem 1.25rem;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      border: 1px solid rgba(176, 191, 201, 0.4);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
       flex-wrap: wrap;
     }
     .search-wrap {
@@ -2391,15 +2391,17 @@ function buildSyncReportHtml() {
       height: 38px;
       padding: 0 1rem 0 2.5rem;
       border-radius: 8px;
-      border: 1px solid var(--border);
+      border: 1px solid transparent;
       font-family: inherit;
       font-size: 0.85rem;
+      background: #f1f5f9;
       color: var(--text);
       transition: all 0.2s;
     }
     .search-input:focus {
       outline: none;
       border-color: var(--primary);
+      background: white;
       box-shadow: 0 0 0 3px var(--accent-light);
     }
     .results-info { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); }

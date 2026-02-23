@@ -1941,8 +1941,8 @@ function htmlReportFromHistory(
       background: #fff;
       padding: 0.75rem 1.25rem;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow-sm);
+      border: 1px solid rgba(176, 191, 201, 0.4);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
       flex-wrap: wrap;
     }
     .status-group {
@@ -2003,15 +2003,17 @@ function htmlReportFromHistory(
       height: 38px;
       padding: 0 1.25rem 0 2.5rem;
       border-radius: 8px;
-      border: 1px solid var(--border);
+      border: 1px solid transparent;
       font-family: inherit;
       font-size: 0.82rem;
+      background: #f1f5f9;
       color: var(--text);
       transition: all 0.2s;
     }
     .search-input:focus {
       outline: none;
       border-color: var(--primary);
+      background: white;
       box-shadow: 0 0 0 3px var(--accent-light);
     }
     .results-info { font-size: 0.72rem; font-weight: 800; color: var(--header-bg); text-transform: uppercase; letter-spacing: 0.05em; }
