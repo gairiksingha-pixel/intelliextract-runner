@@ -2,6 +2,7 @@
 import { createServer } from "node:http";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdirSync } from "node:fs";
 import dotenv from "dotenv";
 
 // Clean Architecture Components
@@ -66,6 +67,15 @@ const CHECKPOINT_PATH =
   appConfig.run.checkpointPath ||
   join(ROOT, "output", "checkpoints", "checkpoint.sqlite");
 const SCHEDULE_LOG_PATH = join(ROOT, "output", "logs", "schedule.log");
+
+// Ensure directories exist
+[
+  REPORTS_DIR,
+  EXTRACTIONS_DIR,
+  STAGING_DIR,
+  dirname(CHECKPOINT_PATH),
+  dirname(SCHEDULE_LOG_PATH),
+].forEach((dir) => mkdirSync(dir, { recursive: true }));
 
 // 2. Initialize Repositories
 const checkpointRepo = new SqliteCheckpointRepository(CHECKPOINT_PATH);
