@@ -1,6 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" style="background-color: #f5f7f9">
   <head>
+    <script>
+      document.documentElement.style.backgroundColor = "#f5f7f9";
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IntelliExtract Runner — intellirevenue</title>
@@ -93,10 +96,13 @@
       button:active:not(:disabled) {
         transform: scale(0.97);
       }
-      html {
+      html,
+      body {
         height: 100%;
         margin: 0;
         padding: 0;
+        background: var(--bg);
+        color: var(--text);
         overflow-y: scroll;
         scrollbar-gutter: stable;
       }
@@ -1231,15 +1237,16 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(8px);
+        background: #f5f7f9;
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 10000;
         flex-direction: column;
         gap: 1.5rem;
-        animation: fadeIn 0.3s ease;
+        visibility: visible !important;
+        opacity: 1;
+        transition: opacity 0.3s ease;
       }
       .loader-spinner {
         width: 48px;
@@ -2361,6 +2368,7 @@
         flex-direction: row;
         min-height: 100vh;
         margin: 0;
+        animation: appFadeIn 0.4s ease-out;
       }
       .app-container {
         display: flex;
@@ -2378,8 +2386,26 @@
       }
     </style>
     <script src="/assets/js/sidebar-component.js"></script>
+    <style>
+      /* Prevent initial content flash */
+      body {
+        visibility: hidden;
+      }
+      body.ready {
+        visibility: visible;
+        animation: appFadeIn 0.4s ease-out;
+      }
+    </style>
   </head>
-  <body>
+  <body style="background-color: #f5f7f9">
+    <script>
+      document.body.className += " ready";
+    </script>
+    <!-- Page Loader Overlay -->
+    <div id="page-loader">
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Loading...</div>
+    </div>
     <div class="app-container">
       <app-sidebar active-tab="dashboard"></app-sidebar>
       <div class="content-wrapper">
@@ -6801,11 +6827,7 @@
             setInterval(checkConnection, 5000);
           })();
         </script>
-        <!-- Page Loader Overlay -->
-        <div id="page-loader">
-          <div class="loader-spinner"></div>
-          <div class="loader-text">Loading...</div>
-        </div>
+
         <script>
           function showLoader() {
             var l = document.getElementById("page-loader");
@@ -6813,7 +6835,12 @@
           }
           function hideLoader() {
             var l = document.getElementById("page-loader");
-            if (l) l.style.display = "none";
+            if (l) {
+              l.style.opacity = "0";
+              setTimeout(function () {
+                l.style.display = "none";
+              }, 300);
+            }
           }
           (function () {
             if (document.readyState === "complete") {

@@ -183,7 +183,7 @@
                     <nav class="sidebar-nav">
                         <a href="/" class="nav-item ${activeTab === "dashboard" ? "active" : ""}" data-tab="dashboard">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                            <span>Dashboard</span>
+                            <span>Operations</span>
                         </a>
                         <a href="/reports/inventory" class="nav-item ${activeTab === "inventory" ? "active" : ""}" data-tab="inventory">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>

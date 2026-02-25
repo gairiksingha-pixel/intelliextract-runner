@@ -1195,8 +1195,9 @@ export function htmlReportFromHistory(
   }
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background-color: #f5f7f9;">
 <head>
+  <script>document.documentElement.style.backgroundColor = '#f5f7f9';</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(REPORT_TITLE)}</title>
@@ -1229,12 +1230,17 @@ export function htmlReportFromHistory(
       font-family: 'JetBrains Mono', 'Consolas', monospace;
       margin: 0;
       padding: 0;
-      background: var(--bg);
+      background: #f5f7f9;
       color: var(--text);
       font-size: 13px;
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+      visibility: hidden;
+    }
+    body.ready {
+      visibility: visible;
+      animation: appFadeIn 0.4s ease-out;
     }
     .page-body { padding: 1.25rem; }
     
@@ -1336,6 +1342,10 @@ export function htmlReportFromHistory(
       100% { transform: rotate(360deg); }
     }
     @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes appFadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
     }
@@ -2157,7 +2167,13 @@ export function htmlReportFromHistory(
   </style>
   <script src="/assets/js/sidebar-component.js"></script>
 </head>
-<body>
+<body style="background-color: #f5f7f9;">
+  <script>document.body.className += ' ready';</script>
+  <!-- Page Loader Overlay -->
+  <div id="page-loader">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Loading...</div>
+  </div>
 <div class="app-container">
   <app-sidebar active-tab="summary" logo-uri="${logoDataUri}"></app-sidebar>
   <div class="content-wrapper">
@@ -2943,11 +2959,7 @@ export function htmlReportFromHistory(
       });
     }
   </script>
-  <!-- Page Loader Overlay -->
-  <div id="page-loader">
-    <div class="loader-spinner"></div>
-    <div class="loader-text">Loading...</div>
-  </div>
+
   <script>
     function showLoader() {
       var l = document.getElementById("page-loader");

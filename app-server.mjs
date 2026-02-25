@@ -619,8 +619,9 @@ function buildExtractionDataPageHtml() {
   );
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background-color: #f5f7f9;">
 <head>
+  <script>document.documentElement.style.backgroundColor = '#f5f7f9';</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Data Explorer — IntelliExtract</title>
@@ -1213,11 +1214,24 @@ function buildExtractionDataPageHtml() {
     .sidebar.collapsed .nav-item { padding: 0.85rem; justify-content: center; gap: 0; }
     .nav-item span { transition: opacity 0.2s, transform 0.2s; opacity: 1; }
     .sidebar.collapsed .nav-item span { opacity: 0; width: 0; pointer-events: none; transform: translateX(10px); }
+    @keyframes appFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
   </style>
   <script src="/assets/js/sidebar-component.js"></script>
+  <style>
+    body { visibility: hidden; }
+    body.ready { visibility: visible; animation: appFadeIn 0.4s ease-out; }
+  </style>
 
 </head>
-<body>
+<body style="background: #f5f7f9; color: var(--text);">
+  <script>document.body.className += ' ready';</script>
+  <div id="page-loader">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Loading...</div>
+  </div>
 <div class="app-container">
   <app-sidebar active-tab="explorer" logo-uri="${REPORT_LOGO_DATA_URI}" small-logo-uri="${REPORT_SMALL_LOGO_DATA_URI}"></app-sidebar>
   <div class="content-wrapper">
@@ -1789,11 +1803,7 @@ function buildExtractionDataPageHtml() {
     updateSortUI();
     render();
   </script>
-  <!-- Page Loader Overlay -->
-  <div id="page-loader">
-    <div class="loader-spinner"></div>
-    <div class="loader-text">Loading...</div>
-  </div>
+
   <script>
     function showLoader() {
       var l = document.getElementById("page-loader");
@@ -1801,7 +1811,12 @@ function buildExtractionDataPageHtml() {
     }
     function hideLoader() {
       var l = document.getElementById("page-loader");
-      if (l) l.style.display = "none";
+      if (l) {
+        l.style.opacity = "0";
+        setTimeout(function() {
+          l.style.display = "none";
+        }, 300);
+      }
     }
     (function () {
       if (document.readyState === 'complete') hideLoader();
@@ -1947,8 +1962,9 @@ function buildSyncReportHtml() {
   const filesJson = JSON.stringify(filesData);
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background-color: #f5f7f9;">
 <head>
+  <script>document.documentElement.style.backgroundColor = '#f5f7f9';</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staging Inventory Report</title>
@@ -2485,12 +2501,24 @@ function buildSyncReportHtml() {
     .sidebar.collapsed .logo-small { display: block; }
     .sidebar.collapsed .nav-item { padding: 0.85rem; justify-content: center; gap: 0; }
     .nav-item span { transition: opacity 0.2s, transform 0.2s; opacity: 1; }
-    .sidebar.collapsed .nav-item span { opacity: 0; width: 0; pointer-events: none; transform: translateX(10px); }
+    @keyframes appFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
   </style>
   <script src="/assets/js/sidebar-component.js"></script>
+  <style>
+    body { visibility: hidden; }
+    body.ready { visibility: visible; animation: appFadeIn 0.4s ease-out; }
+  </style>
 
 </head>
-<body>
+<body style="background: #f5f7f9; color: var(--text);">
+  <script>document.body.className += ' ready';</script>
+  <div id="page-loader">
+    <div class="loader-spinner"></div>
+    <div class="loader-text">Loading...</div>
+  </div>
 <div class="app-container">
   <app-sidebar active-tab="inventory" logo-uri="${REPORT_LOGO_DATA_URI}" small-logo-uri="${REPORT_SMALL_LOGO_DATA_URI}"></app-sidebar>
   <div class="content-wrapper">
@@ -2863,7 +2891,7 @@ function buildSyncReportHtml() {
 
       const label = document.getElementById('operation-count-label');
       if (label) {
-        label.innerText = 'Manifest: ${manifestEntries} | Staging: ' + filtered.length + ' file(s)';
+        label.innerText = 'Staging: ' + filtered.length + ' file(s)';
       }
 
       const pContainer = document.getElementById('pagination');
@@ -3087,11 +3115,7 @@ function buildSyncReportHtml() {
       }
     };
   </script>
-  <!-- Page Loader Overlay -->
-  <div id="page-loader">
-    <div class="loader-spinner"></div>
-    <div class="loader-text">Loading...</div>
-  </div>
+
   <script>
     function showLoader() {
       var l = document.getElementById("page-loader");
@@ -3099,7 +3123,12 @@ function buildSyncReportHtml() {
     }
     function hideLoader() {
       var l = document.getElementById("page-loader");
-      if (l) l.style.display = "none";
+      if (l) {
+        l.style.opacity = "0";
+        setTimeout(function() {
+          l.style.display = "none";
+        }, 300);
+      }
     }
     (function () {
       if (document.readyState === 'complete') hideLoader();
