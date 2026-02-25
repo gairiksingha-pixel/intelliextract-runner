@@ -18,29 +18,25 @@ import {
   openCheckpointDb,
   getRecordsForRun,
   closeCheckpointDb,
+  getCurrentRunId,
+  setMeta,
 } from "./checkpoint.js";
 import { clearPartialFileAndResumeState } from "./resume-state.js";
 import { computeMetrics } from "./metrics.js";
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 
 process.on("SIGTERM", () => {
   process.exit(143);
 });
 
-const LAST_RUN_FILE = "last-run-id.txt";
-
-function getLastRunIdPath(config: ReturnType<typeof loadConfig>): string {
-  const checkpointDir = dirname(config.run.checkpointPath);
-  return `${checkpointDir}/${LAST_RUN_FILE}`;
-}
-
-function saveLastRunId(
-  config: ReturnType<typeof loadConfig>,
-  runId: string,
-): void {
-  const path = getLastRunIdPath(config);
-  writeFileSync(path, runId, "utf-8");
+function saveLastRunId(config: Config, runId: string): void {
+  const db = openCheckpointDb(config.run.checkpointPath);
+  try {
+    setMeta(db, "current_run_id", runId); // Already set by startNewRun normally, but for safety
+  } finally {
+    closeCheckpointDb(db);
+  }
 }
 
 program
@@ -481,12 +477,13 @@ program
       const config = loadConfig(globalOpts.config ?? getConfigPath());
       let runId = cmdOpts.runId;
       if (!runId) {
-        const lastPath = getLastRunIdPath(config);
-        if (!existsSync(lastPath)) {
+        const db = openCheckpointDb(config.run.checkpointPath);
+        runId = getCurrentRunId(db) || undefined;
+        closeCheckpointDb(db);
+        if (!runId) {
           console.error('No last run found. Run "run" first or pass --run-id.');
           process.exit(1);
         }
-        runId = readFileSync(lastPath, "utf-8").trim();
       }
       if (runId === undefined) process.exit(1);
       const db = openCheckpointDb(config.run.checkpointPath);

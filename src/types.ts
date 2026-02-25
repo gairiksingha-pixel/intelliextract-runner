@@ -7,6 +7,12 @@ export interface ApiConfig {
   timeoutMs: number;
 }
 
+export interface EmailConfig {
+  recipientEmail?: string;
+  senderEmail?: string;
+  appPassword?: string;
+}
+
 export interface S3BucketConfig {
   name: string;
   bucket: string;
@@ -23,8 +29,6 @@ export interface S3Config {
   region: string;
   /** Max number of files to download per sync (optional). Skipped (checksum match) do not count. */
   syncLimit?: number;
-  /** Path to JSON file storing key -> SHA-256 for skip-on-checksum. Default: output/checkpoints/sync-manifest.json */
-  syncManifestPath?: string;
 }
 
 export interface RunConfig {
@@ -170,4 +174,34 @@ export interface ExecutiveSummary {
   generatedAt: string;
   metrics: RunMetrics;
   runDurationSeconds: number;
+}
+
+export interface SyncHistoryEntry {
+  timestamp: string;
+  synced: number;
+  skipped: number;
+  errors: number;
+  brands: string[];
+  /** Purchaser folder names involved in this sync entry, parallel to brands. */
+  purchasers?: string[];
+}
+
+export interface ManifestEntry {
+  sha256: string;
+  etag: string;
+  size: number;
+}
+
+export interface Schedule {
+  id: string;
+  createdAt: string;
+  brands: string[];
+  purchasers: string[];
+  cron: string;
+  timezone: string;
+}
+
+export interface ResumeState {
+  syncInProgressPath?: string;
+  syncInProgressManifestKey?: string;
 }

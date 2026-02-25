@@ -1,53 +1,48 @@
 import nodemailer from "nodemailer";
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import dotenv from "dotenv";
-import type { Config, RunMetrics } from "./types.js";
+import type { Config, RunMetrics, EmailConfig } from "./types.js";
+import {
+  openCheckpointDb,
+  getEmailConfig as dbGetEmailConfig,
+  saveEmailConfig as dbSaveEmailConfig,
+  closeCheckpointDb,
+} from "./checkpoint.js";
 
 dotenv.config();
 
-export interface EmailConfig {
-  recipientEmail?: string;
-  senderEmail?: string;
-  appPassword?: string;
+export { EmailConfig };
+
+/**
+ * Returns a function that gets email config from the DB.
+ * We pass the checkpoint path to keep it decoupled from a specific db instance.
+ */
+export function getEmailConfig(checkpointPath: string): EmailConfig {
+  const db = openCheckpointDb(checkpointPath);
+  try {
+    return dbGetEmailConfig(db);
+  } finally {
+    closeCheckpointDb(db);
+  }
 }
 
-const CONFIG_PATH = join(
-  process.cwd(),
-  "output",
-  "checkpoints",
-  "notification-config.json",
-);
+export function saveEmailConfig(checkpointPath: string, config: EmailConfig) {
+  const db = openCheckpointDb(checkpointPath);
+  try {
+    dbSaveEmailConfig(db, config);
+  } finally {
+    closeCheckpointDb(db);
+  }
+}
 
 const LOGO_PATH = join(process.cwd(), "assets", "logo.png");
-
-export function getEmailConfig(): EmailConfig {
-  try {
-    if (existsSync(CONFIG_PATH)) {
-      return JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-    }
-  } catch (e) {
-    // console.error("Failed to read email config:", e);
-  }
-  return {};
-}
-
-export function saveEmailConfig(config: EmailConfig) {
-  try {
-    const current = getEmailConfig();
-    const data = { ...current, ...config };
-    const dir = dirname(CONFIG_PATH);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Failed to save email config:", e);
-  }
-}
 
 /**
  * Send a consolidated failure notification email for a batch.
  */
 export async function sendConsolidatedFailureEmail(
+  checkpointPath: string,
   runId: string,
   failures: Array<{
     filePath: string;
@@ -61,7 +56,7 @@ export async function sendConsolidatedFailureEmail(
 ) {
   if (failures.length === 0) return;
 
-  const config = getEmailConfig();
+  const config = getEmailConfig(checkpointPath);
   const senderEmail = process.env.MAILER_EMAIL || config.senderEmail;
   const appPassword = process.env.MAILER_PASSWORD || config.appPassword;
   const recipientEmail = config.recipientEmail;
@@ -89,7 +84,7 @@ export async function sendConsolidatedFailureEmail(
     tests: failures.map((f) => ({
       name: f.filePath,
       status: "Failed" as const,
-      duration: "N/A", // We don't track per-file duration in this array yet
+      duration: "N/A",
     })),
   };
 
@@ -99,18 +94,6 @@ export async function sendConsolidatedFailureEmail(
     if (status === "Passed") return "#216869";
     if (status === "Skipped") return "#888";
     return "#d93025";
-  };
-
-  const formatDurationInMinutes = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes > 0 && remainingSeconds > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m`;
-    } else {
-      return `${remainingSeconds}s`;
-    }
   };
 
   const overallStatus = "Failed";
@@ -230,6 +213,7 @@ export async function sendConsolidatedFailureEmail(
  * Send a failure notification email.
  */
 export async function sendFailureEmail(params: {
+  checkpointPath: string;
   filePath: string;
   brand: string;
   purchaser?: string;
@@ -238,9 +222,8 @@ export async function sendFailureEmail(params: {
   statusCode?: number;
   runId: string;
 }) {
-  const config = getEmailConfig();
+  const config = getEmailConfig(params.checkpointPath);
 
-  // SMTP credentials from env (preferred) or saved config if we decide to allow UI entry
   const senderEmail = process.env.MAILER_EMAIL || config.senderEmail;
   const appPassword = process.env.MAILER_PASSWORD || config.appPassword;
   const recipientEmail = config.recipientEmail;

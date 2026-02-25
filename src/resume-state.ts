@@ -1,46 +1,36 @@
 /**
  * Resume state for sync-extract pipeline: tracks the file currently being
  * downloaded so that on resume we can delete the partial file and re-run from that file.
+ * Uses SQLite (via checkpoint.js) for storage.
  */
+import { existsSync, unlinkSync } from "node:fs";
+import type { Config, ResumeState } from "./types.js";
+import {
+  openCheckpointDb,
+  getResumeState as dbGetResumeState,
+  saveResumeState as dbSaveResumeState,
+  deleteSyncManifestEntry,
+  closeCheckpointDb,
+} from "./checkpoint.js";
 
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import type { Config } from './types.js';
-
-export interface ResumeState {
-  syncInProgressPath?: string;
-  syncInProgressManifestKey?: string;
-}
-
-function getResumeStatePath(config: Config): string {
-  const checkpointDir = dirname(config.run.checkpointPath);
-  return join(checkpointDir, 'resume-state.json');
-}
-
-function getManifestPath(config: Config): string {
-  return (
-    config.s3.syncManifestPath ??
-    join(dirname(config.run.checkpointPath), 'sync-manifest.json')
-  );
-}
+export { ResumeState };
 
 export function loadResumeState(config: Config): ResumeState {
-  const path = getResumeStatePath(config);
-  if (!existsSync(path)) return {};
+  const db = openCheckpointDb(config.run.checkpointPath);
   try {
-    const raw = readFileSync(path, 'utf-8');
-    const data = JSON.parse(raw) as ResumeState;
-    return typeof data === 'object' && data !== null ? data : {};
-  } catch {
-    return {};
+    return dbGetResumeState(db);
+  } finally {
+    closeCheckpointDb(db);
   }
 }
 
 export function saveResumeState(config: Config, state: ResumeState): void {
-  const path = getResumeStatePath(config);
-  const dir = dirname(path);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify(state, null, 0), 'utf-8');
+  const db = openCheckpointDb(config.run.checkpointPath);
+  try {
+    dbSaveResumeState(db, state);
+  } finally {
+    closeCheckpointDb(db);
+  }
 }
 
 export function clearResumeState(config: Config): void {
@@ -53,33 +43,26 @@ export function clearResumeState(config: Config): void {
  * pipeline can run and re-download that file.
  */
 export function clearPartialFileAndResumeState(config: Config): void {
-  const state = loadResumeState(config);
-  const path = state.syncInProgressPath;
-  const manifestKey = state.syncInProgressManifestKey;
+  const db = openCheckpointDb(config.run.checkpointPath);
+  try {
+    const state = dbGetResumeState(db);
+    const path = state.syncInProgressPath;
+    const manifestKey = state.syncInProgressManifestKey;
 
-  if (path && existsSync(path)) {
-    try {
-      unlinkSync(path);
-    } catch (_) {
-      // ignore
-    }
-  }
-
-  if (manifestKey) {
-    const manifestPath = getManifestPath(config);
-    if (existsSync(manifestPath)) {
+    if (path && existsSync(path)) {
       try {
-        const raw = readFileSync(manifestPath, 'utf-8');
-        const manifest = JSON.parse(raw) as Record<string, string>;
-        if (typeof manifest === 'object' && manifest !== null && manifestKey in manifest) {
-          delete manifest[manifestKey];
-          writeFileSync(manifestPath, JSON.stringify(manifest, null, 0), 'utf-8');
-        }
+        unlinkSync(path);
       } catch (_) {
         // ignore
       }
     }
-  }
 
-  clearResumeState(config);
+    if (manifestKey) {
+      deleteSyncManifestEntry(db, manifestKey);
+    }
+
+    dbSaveResumeState(db, {});
+  } finally {
+    closeCheckpointDb(db);
+  }
 }

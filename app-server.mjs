@@ -17,6 +17,7 @@ import {
   statSync,
   createReadStream,
   mkdirSync,
+  unlinkSync,
 } from "node:fs";
 import {
   join,
@@ -34,6 +35,14 @@ import {
   openCheckpointDb,
   getRecordsForRun,
   closeCheckpointDb,
+  getCurrentRunId as getCheckpointRunId,
+  getAllCheckpoints,
+  getSyncManifest,
+  getSyncHistory,
+  getSchedules,
+  saveSchedules as dbSaveSchedules,
+  getMeta,
+  setMeta,
 } from "./dist/checkpoint.js";
 import { loadConfig } from "./dist/config.js";
 import {
@@ -72,40 +81,8 @@ const config = loadConfig(join(ROOT, "config", "config.yaml"));
 const REPORTS_DIR = join(ROOT, "output", "reports");
 const EXTRACTIONS_DIR = join(ROOT, "output", "extractions");
 const STAGING_DIR = join(ROOT, "output", "staging");
-const SYNC_MANIFEST_PATH = join(
-  ROOT,
-  "output",
-  "checkpoints",
-  "sync-manifest.json",
-);
 const CHECKPOINT_PATH = join(ROOT, "output", "checkpoints", "checkpoint.db");
-const CHECKPOINT_JSON_PATH = join(
-  ROOT,
-  "output",
-  "checkpoints",
-  "checkpoint.json",
-);
-const LAST_PIPE_PARAMS_PATH = join(
-  ROOT,
-  "output",
-  "checkpoints",
-  "last-pipe-params.json",
-);
-const LAST_RUN_COMPLETED_PATH = join(
-  ROOT,
-  "output",
-  "checkpoints",
-  "last-run-completed.txt",
-);
 const ALLOWED_EXT = new Set([".html", ".json"]);
-
-const SCHEDULES_PATH = join(ROOT, "output", "checkpoints", "schedules.json");
-const LAST_RUN_STATE_PATH = join(
-  ROOT,
-  "output",
-  "checkpoints",
-  "last-run-state.json",
-);
 
 // Active process tracking
 const ACTIVE_RUNS = new Map();
@@ -140,11 +117,11 @@ try {
 const RESUME_CAPABLE_CASES = new Set(["P1", "P2", "PIPE", "P5", "P6"]);
 
 function loadSchedules() {
-  if (!existsSync(SCHEDULES_PATH)) return [];
   try {
-    const raw = readFileSync(SCHEDULES_PATH, "utf-8");
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    const list = getSchedules(db);
+    closeCheckpointDb(db);
+    return list;
   } catch (_) {
     return [];
   }
@@ -152,9 +129,9 @@ function loadSchedules() {
 
 function saveSchedules(list) {
   try {
-    const dir = dirname(SCHEDULES_PATH);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(SCHEDULES_PATH, JSON.stringify(list, null, 2), "utf-8");
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    dbSaveSchedules(db, list);
+    closeCheckpointDb(db);
   } catch (_) {}
 }
 
@@ -291,23 +268,22 @@ function readScheduleLogEntries() {
 }
 
 function getCurrentRunIdFromCheckpoint() {
-  const path = existsSync(CHECKPOINT_JSON_PATH)
-    ? CHECKPOINT_JSON_PATH
-    : CHECKPOINT_PATH;
-  if (!existsSync(path)) return null;
   try {
-    const raw = readFileSync(path, "utf-8");
-    const data = JSON.parse(raw);
-    return data?.run_meta?.current_run_id ?? null;
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    const runId = getCheckpointRunId(db);
+    closeCheckpointDb(db);
+    return runId;
   } catch (_) {
     return null;
   }
 }
 
 function getLastCompletedRunId() {
-  if (!existsSync(LAST_RUN_COMPLETED_PATH)) return null;
   try {
-    return readFileSync(LAST_RUN_COMPLETED_PATH, "utf-8").trim() || null;
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    const val = getMeta(db, "last_run_completed");
+    closeCheckpointDb(db);
+    return val;
   } catch (_) {
     return null;
   }
@@ -316,9 +292,9 @@ function getLastCompletedRunId() {
 function markRunCompleted(runId) {
   if (!runId) return;
   try {
-    const dir = dirname(LAST_RUN_COMPLETED_PATH);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(LAST_RUN_COMPLETED_PATH, runId, "utf-8");
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    setMeta(db, "last_run_completed", runId);
+    closeCheckpointDb(db);
   } catch (_) {}
 }
 
@@ -334,29 +310,22 @@ function getRunStatusFromCheckpoint() {
       syncLimit: 0,
     };
   const lastCompleted = getLastCompletedRunId();
-  const path = existsSync(CHECKPOINT_JSON_PATH)
-    ? CHECKPOINT_JSON_PATH
-    : CHECKPOINT_PATH;
   try {
-    const raw = readFileSync(path, "utf-8");
-    const data = JSON.parse(raw);
-    const checkpoints = Array.isArray(data?.checkpoints)
-      ? data.checkpoints
-      : [];
-    const forRun = checkpoints.filter((c) => c.run_id === runId);
-    const done = forRun.filter((c) => c.status === "done").length;
-    const failed = forRun.filter((c) => c.status === "error").length;
-    const canResume = forRun.length > 0 && runId !== lastCompleted;
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    const records = getRecordsForRun(db, runId);
+    const pipeParamsRaw = getMeta(db, "last_pipe_params");
+    closeCheckpointDb(db);
+    const done = records.filter((c) => c.status === "done").length;
+    const failed = records.filter((c) => c.status === "error").length;
+    const canResume = records.length > 0 && runId !== lastCompleted;
     let syncLimit = 0;
-    if (existsSync(LAST_PIPE_PARAMS_PATH)) {
+    if (pipeParamsRaw) {
       try {
-        const pipeParams = JSON.parse(
-          readFileSync(LAST_PIPE_PARAMS_PATH, "utf-8"),
-        );
+        const pipeParams = JSON.parse(pipeParamsRaw);
         syncLimit = Math.max(0, Number(pipeParams.syncLimit) || 0);
       } catch (_) {}
     }
-    return { canResume, runId, done, failed, total: forRun.length, syncLimit };
+    return { canResume, runId, done, failed, total: records.length, syncLimit };
   } catch (_) {
     return {
       canResume: false,
@@ -384,10 +353,12 @@ function spawnReportForRunId(runId) {
 
 // State management functions
 function loadRunStates() {
-  if (!existsSync(LAST_RUN_STATE_PATH)) return {};
   try {
-    const raw = readFileSync(LAST_RUN_STATE_PATH, "utf-8");
-    return JSON.parse(raw);
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    const val = getMeta(db, "last_run_state");
+    closeCheckpointDb(db);
+    if (!val) return {};
+    return JSON.parse(val);
   } catch (_) {
     return {};
   }
@@ -395,13 +366,9 @@ function loadRunStates() {
 
 function saveRunStates(states) {
   try {
-    const dir = dirname(LAST_RUN_STATE_PATH);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      LAST_RUN_STATE_PATH,
-      JSON.stringify(states, null, 2),
-      "utf-8",
-    );
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    setMeta(db, "last_run_state", JSON.stringify(states));
+    closeCheckpointDb(db);
   } catch (_) {}
 }
 
@@ -445,13 +412,6 @@ function listStagingFiles(dir, baseDir, list) {
   return list;
 }
 
-const SYNC_HISTORY_PATH = join(
-  ROOT,
-  "output",
-  "checkpoints",
-  "sync-history.json",
-);
-
 function buildExtractionDataPageHtml() {
   const succDir = join(EXTRACTIONS_DIR, "succeeded");
   const failDir = join(EXTRACTIONS_DIR, "failed");
@@ -460,25 +420,26 @@ function buildExtractionDataPageHtml() {
     if (!existsSync(dir)) return [];
 
     // Load checkpoint DB to recover source paths for existing JSONs that don't have _relativePath
-    const checkpointData = existsSync(CHECKPOINT_PATH)
-      ? JSON.parse(readFileSync(CHECKPOINT_PATH, "utf8"))
-      : { checkpoints: [] };
+    let cpRecords = [];
+    try {
+      const cpDb = openCheckpointDb(CHECKPOINT_PATH);
+      cpRecords = getAllCheckpoints(cpDb);
+      closeCheckpointDb(cpDb);
+    } catch (_) {}
     const filenameToMetadata = {};
-    if (checkpointData.checkpoints) {
-      checkpointData.checkpoints.forEach((c) => {
-        const safe = (c.relative_path || "")
-          .replaceAll("/", "_")
-          .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
-        const base = c.brand + "_" + (safe || "file");
-        const jsonName = base.endsWith(".json") ? base : base + ".json";
-        filenameToMetadata[jsonName] = {
-          relativePath: c.relative_path,
-          brand: c.brand,
-          purchaser: c.purchaser,
-          runId: c.run_id,
-        };
-      });
-    }
+    cpRecords.forEach((c) => {
+      const safe = (c.relativePath || "")
+        .replaceAll("/", "_")
+        .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+      const base = c.brand + "_" + (safe || "file");
+      const jsonName = base.endsWith(".json") ? base : base + ".json";
+      filenameToMetadata[jsonName] = {
+        relativePath: c.relativePath,
+        brand: c.brand,
+        purchaser: c.purchaser,
+        runId: c.runId,
+      };
+    });
 
     return readdirSync(dir)
       .filter((f) => f.endsWith(".json"))
@@ -1848,16 +1809,17 @@ function buildSyncReportHtml() {
   files.sort((a, b) => b.mtime - a.mtime);
 
   // Load checkpoint mapping
-  const checkpointData = existsSync(CHECKPOINT_PATH)
-    ? JSON.parse(readFileSync(CHECKPOINT_PATH, "utf8"))
-    : { checkpoints: [] };
+  let cpRecordsForSync = [];
+  try {
+    const cpDb = openCheckpointDb(CHECKPOINT_PATH);
+    cpRecordsForSync = getAllCheckpoints(cpDb);
+    closeCheckpointDb(cpDb);
+  } catch (_) {}
   const pathToRunId = {};
-  if (checkpointData.checkpoints) {
-    checkpointData.checkpoints.forEach((c) => {
-      const key = (c.brand + "/" + (c.relative_path || "")).replace(/\\/g, "/");
-      pathToRunId[key] = c.run_id;
-    });
-  }
+  cpRecordsForSync.forEach((c) => {
+    const key = (c.brand + "/" + (c.relativePath || "")).replace(/\\/g, "/");
+    pathToRunId[key] = c.runId;
+  });
 
   const filesData = files.map((f) => {
     const parts = f.path.split("/");
@@ -1910,25 +1872,17 @@ function buildSyncReportHtml() {
   const totalSizeStr = (totalSize / (1024 * 1024)).toFixed(1) + " MB";
 
   let manifestEntries = 0;
-  if (existsSync(SYNC_MANIFEST_PATH)) {
-    try {
-      const raw = readFileSync(SYNC_MANIFEST_PATH, "utf-8");
-      const data = JSON.parse(raw);
-      manifestEntries =
-        typeof data === "object" && data !== null
-          ? Object.keys(data).length
-          : 0;
-    } catch (_) {}
-  }
-
   let history = [];
-  if (existsSync(SYNC_HISTORY_PATH)) {
-    try {
-      history = JSON.parse(readFileSync(SYNC_HISTORY_PATH, "utf-8"));
-      // Limit to last 30 entries
-      if (history.length > 30) history = history.slice(-30);
-    } catch (_) {}
-  }
+
+  try {
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    const manifest = getSyncManifest(db);
+    manifestEntries = Object.keys(manifest).length;
+    history = getSyncHistory(db);
+    closeCheckpointDb(db);
+    // Limit to last 30 entries for UI
+    if (history.length > 30) history = history.slice(-30);
+  } catch (_) {}
 
   const formatDateHuman = (d) => {
     const months = [
@@ -3165,9 +3119,14 @@ function escapeHtml(s) {
 }
 
 function getLastRunId() {
-  const path = join(ROOT, "output", "checkpoints", "last-run-id.txt");
-  if (!existsSync(path)) return null;
-  return readFileSync(path, "utf-8").trim();
+  try {
+    const db = openCheckpointDb(CHECKPOINT_PATH);
+    const val = getMeta(db, "current_run_id");
+    closeCheckpointDb(db);
+    return val;
+  } catch (_) {
+    return null;
+  }
 }
 
 function addPairArgs(base, p) {
@@ -3262,12 +3221,15 @@ const CASE_COMMANDS = {
   N3: (p, runOpts) => syncArgs(p, runOpts),
   E1: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts),
   E2: (p) => {
-    const cp = join(ROOT, "output", "checkpoints", "checkpoint.json");
-    if (existsSync(cp)) {
-      try {
-        copyFileSync(cp, cp + ".bak");
-      } catch (_) {}
-      writeFileSync(cp, "{}", "utf-8");
+    // Clear checkpoint SQLite database for fresh extraction
+    const cpSqlite = join(ROOT, "output", "checkpoints", "checkpoint.sqlite");
+    for (const f of [cpSqlite, CHECKPOINT_PATH]) {
+      if (existsSync(f)) {
+        try {
+          copyFileSync(f, f + ".bak");
+          unlinkSync(f);
+        } catch (_) {}
+      }
     }
     return runArgs(p, ["--no-sync"]);
   },
@@ -3719,13 +3681,13 @@ createServer(async (req, res) => {
 
       if (caseId === "PIPE") {
         try {
-          const dir = dirname(LAST_PIPE_PARAMS_PATH);
-          if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-          writeFileSync(
-            LAST_PIPE_PARAMS_PATH,
+          const db = openCheckpointDb(CHECKPOINT_PATH);
+          setMeta(
+            db,
+            "last_pipe_params",
             JSON.stringify({ syncLimit: params.syncLimit ?? 0 }),
-            "utf-8",
           );
+          closeCheckpointDb(db);
         } catch (_) {}
       }
 
@@ -4186,7 +4148,7 @@ createServer(async (req, res) => {
   }
   if (req.method === "GET" && url === "/api/email-config") {
     try {
-      const config = getEmailConfig();
+      const config = getEmailConfig(CHECKPOINT_PATH);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(config));
     } catch (e) {
@@ -4215,7 +4177,7 @@ createServer(async (req, res) => {
           }
         }
       }
-      saveEmailConfig(data);
+      saveEmailConfig(CHECKPOINT_PATH, data);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ success: true }));
     } catch (e) {

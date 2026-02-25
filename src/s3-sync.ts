@@ -14,15 +14,19 @@ import {
   createReadStream,
   mkdirSync,
   existsSync,
-  readFileSync,
-  writeFileSync,
   statSync,
 } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
-import type { Config, S3BucketConfig } from "./types.js";
+import type { Config, S3BucketConfig, ManifestEntry } from "./types.js";
+import {
+  openCheckpointDb,
+  getSyncManifest,
+  upsertSyncManifestEntry,
+  closeCheckpointDb,
+} from "./checkpoint.js";
 
 function getS3Client(region: string): S3Client {
   return new S3Client({ region });
@@ -67,34 +71,6 @@ function manifestKey(brand: string, key: string): string {
  */
 export function getStagingSubdir(bucket: S3BucketConfig): string {
   return bucket.name;
-}
-
-interface ManifestEntry {
-  sha256: string;
-  etag: string;
-  size: number;
-}
-
-function loadSyncManifest(
-  manifestPath: string,
-): Record<string, ManifestEntry | string> {
-  if (!existsSync(manifestPath)) return {};
-  try {
-    const raw = readFileSync(manifestPath, "utf-8");
-    const data = JSON.parse(raw) as Record<string, ManifestEntry | string>;
-    return typeof data === "object" && data !== null ? data : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveSyncManifest(
-  manifestPath: string,
-  data: Record<string, ManifestEntry | string>,
-): void {
-  const dir = dirname(manifestPath);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(manifestPath, JSON.stringify(data, null, 0), "utf-8");
 }
 
 async function computeFileSha256(filePath: string): Promise<string> {
@@ -180,7 +156,6 @@ export async function syncBucket(
   stagingDir: string,
   options: {
     manifest: Record<string, ManifestEntry | string>;
-    manifestPath: string;
     limitRemaining: { value: number };
     /** When set, called after each file. done = new downloads so far; total = limit or 0 (unknown). */
     onProgress?: (done: number, total: number) => void;
@@ -198,6 +173,8 @@ export async function syncBucket(
     onStartDownload?: (destPath: string, manifestKey: string) => void;
     /** When set, paths in this set are treated as already extracted; skip file read/SHA check and count as skipped. */
     alreadyExtractedPaths?: Set<string>;
+    /** Called when a manifest entry needs to be updated in the database. */
+    onManifestUpdate?: (key: string, entry: ManifestEntry) => void;
   },
 ): Promise<{
   brand: string;
@@ -265,7 +242,10 @@ export async function syncBucket(
         // or we just reuse the old string if it was legacy.
         // skipIfUnchanged already updated its entry if it was recovery.
         // We only save if it's been updated.
-        saveSyncManifest(options.manifestPath, options.manifest);
+        const entry = options.manifest[mk];
+        if (typeof entry === "object") {
+          options.onManifestUpdate?.(mk, entry);
+        }
       }
       if (options.onFileSynced) {
         const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
@@ -279,14 +259,10 @@ export async function syncBucket(
       options.onStartDownload?.(destPath, mk);
       await downloadToFile(client, bucketConfig.bucket, key, destPath);
       const sha = await computeFileSha256(destPath);
-      options.manifest[mk] = { sha256: sha, etag, size };
+      const entry = { sha256: sha, etag, size };
+      options.manifest[mk] = entry;
+      options.onManifestUpdate?.(mk, entry);
       synced++;
-      options.onSyncSkipProgress?.(skipped, skipped + synced);
-      options.limitRemaining.value--;
-      // Throttle manifest writes: save every 20 downloads to reduce I/O pressure
-      if (synced % 20 === 0) {
-        saveSyncManifest(options.manifestPath, options.manifest);
-      }
       if (options.onFileSynced) {
         const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
         options.onFileSynced({ filePath: destPath, relativePath, brand });
@@ -346,17 +322,14 @@ export async function syncAllBuckets(
   };
   const initialLimit = limit !== undefined && limit > 0 ? limit : 0;
 
-  const manifestPath =
-    config.s3.syncManifestPath ??
-    join(dirname(config.run.checkpointPath), "sync-manifest.json");
-  const manifest = loadSyncManifest(manifestPath);
+  const db = openCheckpointDb(config.run.checkpointPath);
+  const manifest = getSyncManifest(db);
 
   const buckets = overrides?.buckets ?? config.s3.buckets;
   const results: SyncResult[] = [];
   for (const bucket of buckets) {
     const result = await syncBucket(client, bucket, stagingDir, {
       manifest,
-      manifestPath,
       limitRemaining,
       onProgress: overrides?.onProgress,
       initialLimit,
@@ -364,11 +337,12 @@ export async function syncAllBuckets(
       onFileSynced: overrides?.onFileSynced,
       onStartDownload: overrides?.onStartDownload,
       alreadyExtractedPaths: overrides?.alreadyExtractedPaths,
+      onManifestUpdate: (key, entry) => upsertSyncManifestEntry(db, key, entry),
     });
     results.push(result);
   }
 
-  saveSyncManifest(manifestPath, manifest);
+  closeCheckpointDb(db);
 
   // Record history
   try {

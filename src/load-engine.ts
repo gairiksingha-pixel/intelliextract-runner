@@ -29,6 +29,8 @@ import {
   getRecordsForRun,
   closeCheckpointDb,
   getCumulativeStats,
+  getErrorPaths,
+  findCheckpointRow,
 } from "./checkpoint.js";
 import {
   initRequestResponseLogger,
@@ -299,9 +301,7 @@ export async function extractOneFile(
 ): Promise<void> {
   // Already handled in this run (done or error). Do not re-process or overwrite so the report
   // counts success/failed correctly.
-  const existingRow = db._data.checkpoints.find(
-    (c) => c.file_path === job.filePath && c.run_id === runId,
-  );
+  const existingRow = findCheckpointRow(db, runId, job.filePath);
   if (
     existingRow &&
     (existingRow.status === "done" || existingRow.status === "error")
@@ -466,13 +466,7 @@ export async function runExtraction(
     : new Set<string>();
 
   // If retryFailed is on, we ALSO want to know which files have "error" status
-  const errorPaths = options?.retryFailed
-    ? new Set(
-        db._data.checkpoints
-          .filter((c) => c.status === "error")
-          .map((c) => c.file_path),
-      )
-    : null;
+  const errorPaths = options?.retryFailed ? getErrorPaths(db) : null;
 
   initRequestResponseLogger(config, runId);
 
@@ -777,7 +771,12 @@ export async function runExtraction(
 
   // Send consolidated failure email if any failures occurred
   if (failures.length > 0) {
-    void sendConsolidatedFailureEmail(runIdToUse, failures, metrics);
+    void sendConsolidatedFailureEmail(
+      config.run.checkpointPath,
+      runIdToUse,
+      failures,
+      metrics,
+    );
   }
 
   const cumStats = getCumulativeStats(db, {

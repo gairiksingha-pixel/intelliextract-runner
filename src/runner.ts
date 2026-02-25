@@ -16,12 +16,13 @@ import {
 import {
   openCheckpointDb,
   getCurrentRunId,
-  startRun,
+  startNewRun,
   getCompletedPaths,
   upsertCheckpoints,
   getRecordsForRun,
   closeCheckpointDb,
   getCumulativeStats,
+  getErrorPaths,
 } from "./checkpoint.js";
 import { saveResumeState, clearResumeState } from "./resume-state.js";
 import {
@@ -194,7 +195,9 @@ export async function runSyncExtractPipeline(
   const db = openCheckpointDb(config.run.checkpointPath);
   const runId =
     options.runId ??
-    (options.resume ? (getCurrentRunId(db) ?? startRun(db)) : startRun(db));
+    (options.resume
+      ? (getCurrentRunId(db) ?? startNewRun(db))
+      : startNewRun(db));
   initRequestResponseLogger(config, runId);
 
   const stdoutPiped = !process.stdout.isTTY;
@@ -222,13 +225,7 @@ export async function runSyncExtractPipeline(
   const extractionQueue = new PQueue({ concurrency });
 
   // If retryFailed is on, we ONLY want to extract files that previously failed
-  const errorPaths = options.retryFailed
-    ? new Set(
-        db._data.checkpoints
-          .filter((c) => c.status === "error")
-          .map((c) => c.file_path),
-      )
-    : null;
+  const errorPaths = options.retryFailed ? getErrorPaths(db) : null;
 
   const startedAt = new Date();
   let syncResults: SyncResult[] = [];
@@ -327,7 +324,12 @@ export async function runSyncExtractPipeline(
 
   // Send consolidated failure email if any failures occurred
   if (failures.length > 0) {
-    void sendConsolidatedFailureEmail(runId, failures, metrics);
+    void sendConsolidatedFailureEmail(
+      config.run.checkpointPath,
+      runId,
+      failures,
+      metrics,
+    );
   }
 
   if (stdoutPiped) {

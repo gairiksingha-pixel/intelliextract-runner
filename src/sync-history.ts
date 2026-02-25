@@ -1,48 +1,30 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import {
+  openCheckpointDb,
+  appendSyncHistory as dbAppendSyncHistory,
+  getSyncHistory as dbGetSyncHistory,
+  closeCheckpointDb,
+} from "./checkpoint.js";
+import type { SyncHistoryEntry } from "./types.js";
 
-export interface SyncHistoryEntry {
-  timestamp: string;
-  synced: number;
-  skipped: number;
-  errors: number;
-  brands: string[];
-  /** Purchaser folder names involved in this sync entry, parallel to brands. */
-  purchasers?: string[];
-}
-
-const HISTORY_FILE = "sync-history.json";
-
-export function getSyncHistoryPath(checkpointDir: string): string {
-  return join(checkpointDir, HISTORY_FILE);
-}
+export { SyncHistoryEntry };
 
 export function appendSyncHistory(
-  checkpointDir: string,
+  checkpointPath: string,
   entry: SyncHistoryEntry,
 ): void {
-  if (!existsSync(checkpointDir)) mkdirSync(checkpointDir, { recursive: true });
-  const path = getSyncHistoryPath(checkpointDir);
-  let history: SyncHistoryEntry[] = [];
-  if (existsSync(path)) {
-    try {
-      history = JSON.parse(readFileSync(path, "utf-8"));
-    } catch {
-      history = [];
-    }
+  const db = openCheckpointDb(checkpointPath);
+  try {
+    dbAppendSyncHistory(db, entry);
+  } finally {
+    closeCheckpointDb(db);
   }
-  history.push(entry);
-  // Keep only last 100 entries to avoid bloating
-  if (history.length > 100) history = history.slice(-100);
-  writeFileSync(path, JSON.stringify(history, null, 2), "utf-8");
 }
 
-export function readSyncHistory(checkpointDir: string): SyncHistoryEntry[] {
-  const path = getSyncHistoryPath(checkpointDir);
-  if (!existsSync(path)) return [];
+export function readSyncHistory(checkpointPath: string): SyncHistoryEntry[] {
+  const db = openCheckpointDb(checkpointPath);
   try {
-    return JSON.parse(readFileSync(path, "utf-8"));
-  } catch {
-    return [];
+    return dbGetSyncHistory(db);
+  } finally {
+    closeCheckpointDb(db);
   }
 }
