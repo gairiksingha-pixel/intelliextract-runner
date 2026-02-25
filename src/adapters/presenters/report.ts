@@ -18,14 +18,14 @@ import type {
   RunMetrics,
   ExecutiveSummary,
   CheckpointRecord,
-} from "./types.js";
+} from "../../core/domain/types.js";
 import {
   openCheckpointDb,
   getRecordsForRun,
   getAllRunIdsOrdered,
   closeCheckpointDb,
-} from "./checkpoint.js";
-import { computeMetrics } from "./metrics.js";
+} from "../../checkpoint.js";
+import { computeMetrics } from "../../metrics.js";
 
 export interface ExtractionResultEntry {
   filename: string;

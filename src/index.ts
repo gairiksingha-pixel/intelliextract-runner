@@ -1,525 +1,229 @@
 #!/usr/bin/env node
 /**
  * IntelliExtract Runner – CLI
- * Commands: sync | run | report
+ * Refactored to use Clean Architecture Use Cases.
  */
 
 import { program } from "commander";
 import { loadConfig, getConfigPath } from "./config.js";
-import { syncAllBuckets, printSyncResults } from "./s3-sync.js";
+import { Config } from "./core/domain/entities/Config.js";
+import { SqliteCheckpointRepository } from "./infrastructure/database/SqliteCheckpointRepository.js";
+import { SqliteSyncRepository } from "./infrastructure/database/SqliteSyncRepository.js";
+import { SyncBrandUseCase } from "./core/use-cases/SyncBrandUseCase.js";
+import { RunExtractionUseCase } from "./core/use-cases/RunExtractionUseCase.js";
+import { ReportingUseCase } from "./core/use-cases/ReportingUseCase.js";
+import { AwsS3Service } from "./infrastructure/services/AwsS3Service.js";
+import { IntelliExtractService } from "./infrastructure/services/IntelliExtractService.js";
+import { JsonLogger } from "./infrastructure/services/JsonLogger.js";
+import { DiscoverFilesUseCase } from "./core/use-cases/DiscoverFilesUseCase.js";
+import { RunStatusStore } from "./infrastructure/services/RunStatusStore.js";
 import {
-  runFull,
-  runExtractionOnly,
-  runSyncExtractPipeline,
-} from "./runner.js";
-import type { Config } from "./types.js";
-import { buildSummary, writeReports, writeReportsForRunId } from "./report.js";
-import {
-  openCheckpointDb,
-  getRecordsForRun,
-  closeCheckpointDb,
-  getCurrentRunId,
-  setMeta,
-} from "./checkpoint.js";
-import { clearPartialFileAndResumeState } from "./resume-state.js";
-import { computeMetrics } from "./metrics.js";
-import { existsSync } from "node:fs";
-import { dirname } from "node:path";
+  buildSummary,
+  writeReportsForRunId,
+} from "./adapters/presenters/report.js";
+import { join } from "node:path";
 
-process.on("SIGTERM", () => {
-  process.exit(143);
-});
-
-function saveLastRunId(config: Config, runId: string): void {
-  const db = openCheckpointDb(config.run.checkpointPath);
-  try {
-    setMeta(db, "current_run_id", runId); // Already set by startNewRun normally, but for safety
-  } finally {
-    closeCheckpointDb(db);
-  }
-}
+const EXTRACTIONS_DIR = join(process.cwd(), "output", "extractions");
+const STAGING_DIR = join(process.cwd(), "output", "staging");
 
 program
   .name("intelliextract-runner")
-  .description(
-    "Test automation for IntelliExtract API: S3 sync, extraction run with checkpointing, and executive report",
-  )
+  .description("IntelliExtract CLI - Clean Architecture Edition")
   .option("-c, --config <path>", "Config file path", getConfigPath());
 
-function filterBucketsForTenantPurchaser(
-  config: Config,
-  tenant?: string,
-  purchaser?: string,
-): Config["s3"]["buckets"] {
-  if (!tenant || !purchaser) return config.s3.buckets;
-  return config.s3.buckets.filter(
-    (b) => b.tenant === tenant && b.purchaser === purchaser,
-  );
-}
-
+// Shared filters
 type TenantPurchaserPair = { tenant: string; purchaser: string };
-function filterBucketsForPairs(
-  config: Config,
-  pairs: TenantPurchaserPair[],
-): Config["s3"]["buckets"] {
-  if (!pairs || pairs.length === 0) return config.s3.buckets;
-  const set = new Set(
-    pairs.map(({ tenant, purchaser }) => `${tenant}\0${purchaser}`),
-  );
-  return config.s3.buckets.filter(
-    (b) =>
-      b.tenant != null &&
-      b.purchaser != null &&
-      set.has(`${b.tenant}\0${b.purchaser}`),
-  );
-}
-
 function parsePairs(
   pairsJson: string | undefined,
 ): TenantPurchaserPair[] | undefined {
-  if (!pairsJson || typeof pairsJson !== "string") return undefined;
+  if (!pairsJson) return undefined;
   try {
-    const arr = JSON.parse(pairsJson) as unknown;
-    if (!Array.isArray(arr)) return undefined;
-    return arr.filter(
-      (x): x is TenantPurchaserPair =>
-        x != null &&
-        typeof x === "object" &&
-        typeof (x as TenantPurchaserPair).tenant === "string" &&
-        typeof (x as TenantPurchaserPair).purchaser === "string",
-    );
+    return JSON.parse(pairsJson);
   } catch {
     return undefined;
   }
 }
 
+function filterBuckets(
+  config: Config,
+  tenant?: string,
+  purchaser?: string,
+  pairs?: TenantPurchaserPair[],
+) {
+  if (pairs && pairs.length > 0) {
+    const set = new Set(pairs.map((p) => `${p.tenant}\0${p.purchaser}`));
+    return config.s3.buckets.filter(
+      (b) => b.tenant && b.purchaser && set.has(`${b.tenant}\0${b.purchaser}`),
+    );
+  }
+  if (tenant && purchaser) {
+    return config.s3.buckets.filter(
+      (b) => b.tenant === tenant && b.purchaser === purchaser,
+    );
+  }
+  return config.s3.buckets;
+}
+
 program
   .command("sync")
-  .description("Sync S3 bucket (tenant/purchaser folders) to staging")
-  .option(
-    "--limit <n>",
-    "Max number of files to download (0 = no limit). Skipped (unchanged SHA-256) do not count.",
-    Number.parseInt,
-  )
-  .option(
-    "--tenant <name>",
-    "Sync only this tenant folder (requires --purchaser)",
-  )
-  .option(
-    "--purchaser <name>",
-    "Sync only this purchaser folder (requires --tenant)",
-  )
-  .option(
-    "--pairs <json>",
-    'JSON array of {tenant, purchaser} to scope (e.g. \'[{"tenant":"a","purchaser":"p"}]\')',
-  )
-  .action(
-    async (cmdOpts: {
-      limit?: number;
-      tenant?: string;
-      purchaser?: string;
-      pairs?: string;
-    }) => {
-      try {
-        const opts = program.opts() as { config?: string };
-        const config = loadConfig(opts.config ?? getConfigPath());
-        const syncLimit =
-          cmdOpts.limit === undefined || Number.isNaN(cmdOpts.limit)
-            ? undefined
-            : cmdOpts.limit;
-        const pairs = parsePairs(cmdOpts.pairs);
-        const buckets =
-          pairs && pairs.length > 0
-            ? filterBucketsForPairs(config, pairs)
-            : cmdOpts.tenant && cmdOpts.purchaser
-              ? filterBucketsForTenantPurchaser(
-                  config,
-                  cmdOpts.tenant,
-                  cmdOpts.purchaser,
-                )
-              : undefined;
-        if (buckets && buckets.length === 0) {
-          if (pairs?.length) {
-            console.error("No bucket config matches the given --pairs.");
-          } else {
-            console.error(
-              `No bucket config for tenant "${cmdOpts.tenant}" / purchaser "${cmdOpts.purchaser}".`,
-            );
-          }
-          process.exit(1);
-        }
-        const stdoutPiped =
-          typeof process !== "undefined" && process.stdout?.isTTY !== true;
-        const syncLimitNum =
-          syncLimit !== undefined && syncLimit > 0 ? syncLimit : 0;
-        if (stdoutPiped)
-          process.stdout.write(`SYNC_PROGRESS\t0\t${syncLimitNum}\n`);
-        const results = await syncAllBuckets(config, {
-          syncLimit,
-          buckets,
-          onProgress: stdoutPiped
-            ? (done, total) => {
-                process.stdout.write(`SYNC_PROGRESS\t${done}\t${total}\n`);
-              }
-            : undefined,
-        });
-        printSyncResults(results, syncLimit);
-        if (typeof process !== "undefined" && process.stdout?.writable) {
-          await new Promise<void>((resolve, reject) => {
-            process.stdout!.write("", (err) => (err ? reject(err) : resolve()));
-          });
-        }
-      } catch (e) {
-        console.error(
-          "Sync failed:",
-          e instanceof Error ? e.message : String(e),
-        );
-        process.exit(1);
-      }
-    },
-  );
+  .description("Sync S3 bucket to staging")
+  .option("--limit <n>", "Max files to download", Number.parseInt)
+  .option("--tenant <name>", "Tenant filter")
+  .option("--purchaser <name>", "Purchaser filter")
+  .option("--pairs <json>", "JSON pairs filter")
+  .action(async (opts) => {
+    const config = loadConfig(program.opts().config);
+    const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
+    const checkpointRepo = new SqliteCheckpointRepository(
+      config.run.checkpointPath,
+    );
+    await checkpointRepo.initialize();
+    const s3Service = new AwsS3Service(config.s3.region, syncRepo);
+    const syncUseCase = new SyncBrandUseCase(s3Service, syncRepo);
+
+    const buckets = filterBuckets(
+      config,
+      opts.tenant,
+      opts.purchaser,
+      parsePairs(opts.pairs),
+    );
+
+    console.log(`Starting sync for ${buckets.length} bucket configs...`);
+    const results = await syncUseCase.execute({
+      buckets,
+      stagingDir: STAGING_DIR,
+      limit: opts.limit,
+      onProgress: (done, total) => {
+        process.stdout.write(`\rProgress: ${done}/${total}`);
+      },
+    });
+    console.log("\nSync completed.");
+    console.table(
+      results.map((r) => ({
+        brand: r.brand,
+        synced: r.synced,
+        skipped: r.skipped,
+        errors: r.errors,
+      })),
+    );
+  });
 
 program
   .command("run")
-  .description(
-    "Run extraction against staging files (with optional S3 sync). Optionally scope to tenant/purchaser.",
-  )
-  .option("--no-sync", "Skip S3 sync; use existing staging files")
-  .option("--no-report", "Do not write report after run")
-  .option(
-    "--sync-limit <n>",
-    "Max files to download when syncing (0 = no limit).",
-    Number.parseInt,
-  )
-  .option(
-    "--extract-limit <n>",
-    "Max files to extract in this run (0 = no limit).",
-    Number.parseInt,
-  )
-  .option("--tenant <name>", "Run only for this tenant (requires --purchaser)")
-  .option(
-    "--purchaser <name>",
-    "Run only for this purchaser (requires --tenant)",
-  )
-  .option(
-    "--pairs <json>",
-    'JSON array of {tenant, purchaser} to scope (e.g. \'[{"tenant":"a","purchaser":"p"}]\')',
-  )
-  .option("-r, --run-id <id>", "Resume with existing run ID")
-  .option(
-    "--retry-failed",
-    "Only retry files that previously failed (status 'error')",
-  )
-  .action(
-    async (opts: {
-      sync: boolean;
-      report: boolean;
-      syncLimit?: number;
-      extractLimit?: number;
-      tenant?: string;
-      purchaser?: string;
-      pairs?: string;
-      runId?: string;
-      retryFailed?: boolean;
-    }) => {
-      try {
-        const globalOpts = program.opts() as { config?: string };
-        const config = loadConfig(globalOpts.config ?? getConfigPath());
-        const doSync = opts.sync === true || opts.sync === undefined;
-        const doReport = opts.report === true || opts.report === undefined;
-        const syncLimit =
-          opts.syncLimit === undefined || Number.isNaN(opts.syncLimit)
-            ? undefined
-            : opts.syncLimit;
-        const extractLimit =
-          opts.extractLimit === undefined || Number.isNaN(opts.extractLimit)
-            ? undefined
-            : opts.extractLimit;
-        const pairs = parsePairs(opts.pairs);
-        const tenant = !pairs?.length ? opts.tenant?.trim() : undefined;
-        const purchaser = !pairs?.length ? opts.purchaser?.trim() : undefined;
-        if (!pairs?.length && tenant && !purchaser) {
-          console.error("--purchaser is required when --tenant is set.");
-          process.exit(1);
-        }
-        if (!pairs?.length && purchaser && !tenant) {
-          console.error("--tenant is required when --purchaser is set.");
-          process.exit(1);
-        }
-        if (pairs?.length)
-          console.log(
-            `Scoped to ${pairs.length} pair(s): ${pairs.map(({ tenant: t, purchaser: p }) => `${t}/${p}`).join(", ")}`,
-          );
-        else if (tenant && purchaser)
-          console.log(`Scoped to tenant: ${tenant}, purchaser: ${purchaser}`);
-        const result = await (doSync
-          ? runFull({
-              configPath: globalOpts.config,
-              syncLimit,
-              extractLimit,
-              tenant,
-              purchaser,
-              pairs,
-              runId: opts.runId,
-              retryFailed: opts.retryFailed,
-              onFileComplete: doReport
-                ? (runId) => writeReportsForRunId(config, runId)
-                : undefined,
-            })
-          : runExtractionOnly({
-              configPath: globalOpts.config,
-              extractLimit,
-              tenant,
-              purchaser,
-              pairs,
-              runId: opts.runId,
-              retryFailed: opts.retryFailed,
-              onFileComplete: doReport
-                ? (runId) => writeReportsForRunId(config, runId)
-                : undefined,
-            }));
-        if (doSync && result.syncResults && result.syncResults.length > 0) {
-          printSyncResults(result.syncResults, syncLimit);
-        }
-        if (result.metrics.success === 0 && result.metrics.failed === 0) {
-          console.log(
-            "All files in the stage are extracted. Please sync new files.",
-          );
-        }
-        if (result.metrics.success > 0) {
-          const extractionsDir = `${dirname(config.report.outputDir)}/extractions`;
-          console.log(
-            `Extraction result(s): ${extractionsDir} (full API response JSON per file)`,
-          );
-        }
-        console.log(
-          `Extraction metrics: success=${result.metrics.success}, skipped=${result.metrics.skipped}, failed=${result.metrics.failed}`,
-        );
-        saveLastRunId(config, result.run.runId);
-        if (doReport) {
-          const summary = buildSummary(result.metrics);
-          writeReports(config, summary);
-          console.log(`Reports path: ${config.report.outputDir}`);
-        }
-      } catch (e) {
-        console.error(
-          "Run failed:",
-          e instanceof Error ? e.message : String(e),
-        );
-        process.exit(1);
-      }
-    },
-  );
+  .description("Run extraction")
+  .option("--no-sync", "Skip sync")
+  .option("--sync-limit <n>", "Sync limit", Number.parseInt)
+  .option("--concurrency <n>", "Concurrency", Number.parseInt)
+  .option("--rps <n>", "Requests per second", Number.parseInt)
+  .option("--tenant <name>", "Tenant filter")
+  .option("--purchaser <name>", "Purchaser filter")
+  .option("--pairs <json>", "JSON pairs filter")
+  .action(async (opts) => {
+    const config = loadConfig(program.opts().config);
+    const checkpointRepo = new SqliteCheckpointRepository(
+      config.run.checkpointPath,
+    );
+    await checkpointRepo.initialize();
+    const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
+    const logger = new JsonLogger(
+      config.logging.dir,
+      config.logging.requestResponseLog,
+    );
+    const extractionService = new IntelliExtractService(
+      config,
+      EXTRACTIONS_DIR,
+    );
+    const discoverFiles = new DiscoverFilesUseCase();
+    const runExtraction = new RunExtractionUseCase(
+      extractionService,
+      checkpointRepo,
+      logger,
+    );
 
-program
-  .command("sync-extract")
-  .description(
-    "Pipeline: sync up to N files; as each file is synced, extract it in the background. One count for both sync and extract.",
-  )
-  .option(
-    "--limit <n>",
-    "Max number of files to sync (and extract). Each synced file is extracted automatically.",
-    Number.parseInt,
-  )
-  .option(
-    "--resume",
-    "Resume from last run: remove partial file (if any) and continue with same run ID",
-  )
-  .option(
-    "--tenant <name>",
-    "Sync/extract only for this tenant (requires --purchaser)",
-  )
-  .option(
-    "--purchaser <name>",
-    "Sync/extract only for this purchaser (requires --tenant)",
-  )
-  .option("--pairs <json>", "JSON array of {tenant, purchaser} to scope")
-  .option("--no-report", "Do not write report after run")
-  .option("-r, --run-id <id>", "Resume with existing run ID")
-  .option(
-    "--retry-failed",
-    "Only retry files that previously failed (status 'error')",
-  )
-  .action(
-    async (cmdOpts: {
-      limit?: number;
-      resume?: boolean;
-      tenant?: string;
-      purchaser?: string;
-      pairs?: string;
-      report?: boolean;
-      runId?: string;
-      retryFailed?: boolean;
-    }) => {
-      try {
-        const globalOpts = program.opts() as { config?: string };
-        const config = loadConfig(globalOpts.config ?? getConfigPath());
-        const doReport =
-          cmdOpts.report === true || cmdOpts.report === undefined;
-        const limit =
-          cmdOpts.limit === undefined || Number.isNaN(cmdOpts.limit)
-            ? undefined
-            : cmdOpts.limit;
-        const pairs = parsePairs(cmdOpts.pairs);
-        const tenant = !pairs?.length ? cmdOpts.tenant?.trim() : undefined;
-        const purchaser = !pairs?.length
-          ? cmdOpts.purchaser?.trim()
-          : undefined;
-        if (!pairs?.length && tenant && !purchaser) {
-          console.error("--purchaser is required when --tenant is set.");
-          process.exit(1);
-        }
-        if (!pairs?.length && purchaser && !tenant) {
-          console.error("--tenant is required when --purchaser is set.");
-          process.exit(1);
-        }
-        if (pairs?.length)
-          console.log(
-            `Scoped to ${pairs.length} pair(s): ${pairs.map(({ tenant: t, purchaser: p }) => `${t}/${p}`).join(", ")}`,
-          );
-        else if (tenant && purchaser)
-          console.log(`Scoped to tenant: ${tenant}, purchaser: ${purchaser}`);
-        if (cmdOpts.resume) {
-          clearPartialFileAndResumeState(config);
-          console.log(
-            "Resume: cleared partial file (if any). Continuing with same run.",
-          );
-        } else {
-          clearPartialFileAndResumeState(config);
-        }
-        const stdoutPiped =
-          typeof process !== "undefined" && process.stdout?.isTTY !== true;
-        const limitNum = limit !== undefined && limit > 0 ? limit : 0;
-        if (stdoutPiped) {
-          process.stdout.write(`SYNC_PROGRESS\t0\t${limitNum}\n`);
-        }
-        if (stdoutPiped) process.stdout.write("EXTRACTION_PROGRESS\t0\t0\n");
-        const pipelineConfig = loadConfig(globalOpts.config ?? getConfigPath());
-        const result = await runSyncExtractPipeline({
-          configPath: globalOpts.config,
-          limit,
-          resume: cmdOpts.resume === true,
-          tenant,
-          purchaser,
-          pairs,
-          runId: cmdOpts.runId,
-          retryFailed: cmdOpts.retryFailed,
-          onProgress: stdoutPiped
-            ? (done, total) => {
-                process.stdout.write(`SYNC_PROGRESS\t${done}\t${total}\n`);
-              }
-            : undefined,
-          onExtractionProgress: stdoutPiped
-            ? (done, total) => {
-                process.stdout.write(
-                  `EXTRACTION_PROGRESS\t${done}\t${total}\n`,
-                );
-              }
-            : undefined,
-          onResumeSkip: stdoutPiped
-            ? (skipped, total) => {
-                process.stdout.write(`RESUME_SKIP\t${skipped}\t${total}\n`);
-              }
-            : undefined,
-          onSyncSkipProgress: stdoutPiped
-            ? (skipped, total) => {
-                process.stdout.write(
-                  `RESUME_SKIP_SYNC\t${skipped}\t${total}\n`,
-                );
-              }
-            : undefined,
-          onFileComplete: doReport
-            ? (runId) => writeReportsForRunId(pipelineConfig, runId)
-            : undefined,
-        });
-        if (result.syncResults && result.syncResults.length > 0) {
-          printSyncResults(result.syncResults, limit ?? undefined);
-        }
-        if (result.metrics.success === 0 && result.metrics.failed === 0) {
-          console.log(
-            "All files in the stage are extracted. Please sync new files.",
-          );
-        }
-        if (result.metrics.success > 0) {
-          const extractionsDir = `${dirname(result.config.report.outputDir)}/extractions`;
-          console.log(
-            `Extraction result(s): ${extractionsDir} (full API response JSON per file)`,
-          );
-        }
-        console.log(
-          `Extraction metrics: success=${result.metrics.success}, skipped=${result.metrics.skipped}, failed=${result.metrics.failed}`,
+    const runId = await checkpointRepo.startNewRun();
+    console.log(`Starting Run: ${runId}`);
+
+    let filesToExtract: any[] = [];
+
+    if (opts.sync) {
+      const s3Service = new AwsS3Service(config.s3.region, syncRepo);
+      const syncUseCase = new SyncBrandUseCase(s3Service, syncRepo);
+      const buckets = filterBuckets(
+        config,
+        opts.tenant,
+        opts.purchaser,
+        parsePairs(opts.pairs),
+      );
+      console.log("Syncing...");
+      const syncResults = await syncUseCase.execute({
+        buckets,
+        stagingDir: STAGING_DIR,
+        limit: opts.syncLimit,
+      });
+      for (const res of syncResults) {
+        filesToExtract.push(
+          ...res.files.map((f) => ({
+            filePath: f,
+            relativePath: f.split("staging")[1] || f,
+            brand: res.brand,
+            purchaser: res.purchaser,
+          })),
         );
-        saveLastRunId(result.config, result.run.runId);
-        if (doReport) {
-          const summary = buildSummary(result.metrics);
-          writeReports(result.config, summary);
-          console.log(`Reports path: ${result.config.report.outputDir}`);
-        }
-      } catch (e) {
-        console.error(
-          "Sync-extract failed:",
-          e instanceof Error ? e.message : String(e),
-        );
-        process.exit(1);
       }
-    },
-  );
+    }
+
+    if (filesToExtract.length === 0) {
+      console.log("Discovering files...");
+      const pairs =
+        parsePairs(opts.pairs) ||
+        (opts.tenant && opts.purchaser
+          ? [{ brand: opts.tenant, purchaser: opts.purchaser }]
+          : undefined);
+      filesToExtract = discoverFiles.execute({
+        stagingDir: STAGING_DIR,
+        pairs: pairs
+          ? pairs.map((p) => ({
+              brand: (p as any).tenant || (p as any).brand,
+              purchaser: p.purchaser,
+            }))
+          : undefined,
+      });
+    }
+
+    console.log(`Extracting ${filesToExtract.length} files...`);
+    await runExtraction.execute({
+      files: filesToExtract,
+      runId,
+      concurrency: opts.concurrency || config.run.concurrency,
+      requestsPerSecond: opts.rps || config.run.requestsPerSecond,
+      onProgress: (done, total) => {
+        process.stdout.write(`\rProgress: ${done}/${total}`);
+      },
+    });
+
+    console.log("\nExtraction completed. Generating report...");
+    await writeReportsForRunId(config, runId);
+    console.log("Report generated.");
+  });
 
 program
   .command("report")
-  .description(
-    "Generate executive summary report from last run (or specified run-id)",
-  )
-  .option("-r, --run-id <id>", "Run ID to report (default: last run)")
-  .action(async (cmdOpts: { runId?: string }) => {
-    try {
-      const globalOpts = program.opts() as { config?: string };
-      const config = loadConfig(globalOpts.config ?? getConfigPath());
-      let runId = cmdOpts.runId;
-      if (!runId) {
-        const db = openCheckpointDb(config.run.checkpointPath);
-        runId = getCurrentRunId(db) || undefined;
-        closeCheckpointDb(db);
-        if (!runId) {
-          console.error('No last run found. Run "run" first or pass --run-id.');
-          process.exit(1);
-        }
-      }
-      if (runId === undefined) process.exit(1);
-      const db = openCheckpointDb(config.run.checkpointPath);
-      const records = getRecordsForRun(db, runId);
-      closeCheckpointDb(db);
-      if (records.length === 0) {
-        console.error(`No records found for run ${runId}`);
-        process.exit(1);
-      }
-      let startedAt = records.reduce((min, r) => {
-        const t = r.startedAt ? new Date(r.startedAt).getTime() : Infinity;
-        return Math.min(t, min);
-      }, Infinity);
-      let finishedAt = records.reduce((max, r) => {
-        const t = r.finishedAt ? new Date(r.finishedAt).getTime() : 0;
-        return Math.max(t, max);
-      }, 0);
-      if (!Number.isFinite(startedAt) || startedAt === Infinity) startedAt = 0;
-      if (!Number.isFinite(finishedAt) || finishedAt < startedAt)
-        finishedAt = startedAt || Date.now();
-      const metrics = computeMetrics(
-        runId,
-        records,
-        new Date(startedAt),
-        new Date(finishedAt),
-      );
-      const summary = buildSummary(metrics);
-      writeReports(config, summary);
-      console.log(`Reports path: ${config.report.outputDir}`);
-    } catch (e) {
-      console.error(
-        "Report failed:",
-        e instanceof Error ? e.message : String(e),
-      );
+  .description("Generate report for a run")
+  .option("--run-id <id>", "Run ID")
+  .action(async (opts) => {
+    const config = loadConfig(program.opts().config);
+    const checkpointRepo = new SqliteCheckpointRepository(
+      config.run.checkpointPath,
+    );
+    await checkpointRepo.initialize();
+    const runId = opts.runId || (await checkpointRepo.getCurrentRunId());
+    if (!runId) {
+      console.error("No run ID specified and no current run found.");
       process.exit(1);
     }
+    console.log(`Generating report for ${runId}...`);
+    await writeReportsForRunId(config, runId);
+    console.log("Done.");
   });
 
 program.parse();

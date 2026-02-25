@@ -150,6 +150,35 @@
         opacity: 1;
         transform: scale(1.1);
       }
+      .sidebar-footer {
+        padding: 1rem;
+        border-top: 1px solid rgba(176, 191, 201, 0.2);
+        margin-top: auto;
+      }
+      .footer-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.85rem 1.25rem;
+        border-radius: 12px;
+        color: #64748b;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      .footer-item:hover {
+        background: #f1f5f9;
+        color: var(--header-bg);
+      }
+      .sidebar.collapsed .footer-item {
+        padding: 0.85rem;
+        justify-content: center;
+      }
+      .sidebar.collapsed .footer-item span {
+        display: none;
+      }
 `;
     document.head.appendChild(style);
   }
@@ -198,6 +227,12 @@
                             <span>Data Explorer</span>
                         </a>
                     </nav>
+                    <div class="sidebar-footer">
+                        <div class="footer-item" onclick="window.openNotificationSettings()" title="Notification Settings">
+                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                             <span>Secrets & Notifications</span>
+                        </div>
+                    </div>
                 </aside>
             `;
     }

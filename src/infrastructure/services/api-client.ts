@@ -8,11 +8,11 @@
 import { config as loadEnv } from "dotenv";
 import { basename } from "node:path";
 import { fetch, Agent, FormData } from "undici";
-import type { Config } from "./types.js";
-import { loadSecrets } from "./secrets.js";
+import type { Config } from "../../core/domain/types.js";
+// import { loadSecrets } from "./secrets.js";
 
 loadEnv();
-loadSecrets();
+// loadSecrets() removed - secrets are handled by ConfigService or env directly
 
 export interface ExtractRequest {
   filePath: string;

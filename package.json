@@ -11,7 +11,7 @@
     "sync": "npm run build && node dist/index.js sync",
     "extract": "npm run build && node dist/index.js run",
     "report": "npm run build && node dist/index.js report",
-    "app": "node app-server.mjs"
+    "app": "node dist/server.js"
   },
   "keywords": [
     "intelliextract",
