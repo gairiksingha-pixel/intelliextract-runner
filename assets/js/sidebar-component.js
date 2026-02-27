@@ -150,35 +150,6 @@
         opacity: 1;
         transform: scale(1.1);
       }
-      .sidebar-footer {
-        padding: 1rem;
-        border-top: 1px solid rgba(176, 191, 201, 0.2);
-        margin-top: auto;
-      }
-      .footer-item {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 0.85rem 1.25rem;
-        border-radius: 12px;
-        color: #64748b;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 0.85rem;
-        cursor: pointer;
-        transition: all 0.3s;
-      }
-      .footer-item:hover {
-        background: #f1f5f9;
-        color: var(--header-bg);
-      }
-      .sidebar.collapsed .footer-item {
-        padding: 0.85rem;
-        justify-content: center;
-      }
-      .sidebar.collapsed .footer-item span {
-        display: none;
-      }
 `;
     document.head.appendChild(style);
   }
@@ -212,7 +183,7 @@
                     <nav class="sidebar-nav">
                         <a href="/" class="nav-item ${activeTab === "dashboard" ? "active" : ""}" data-tab="dashboard">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                            <span>Operations</span>
+                            <span>Dashboard</span>
                         </a>
                         <a href="/reports/inventory" class="nav-item ${activeTab === "inventory" ? "active" : ""}" data-tab="inventory">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>
@@ -227,12 +198,6 @@
                             <span>Data Explorer</span>
                         </a>
                     </nav>
-                    <div class="sidebar-footer">
-                        <div class="footer-item" onclick="window.openNotificationSettings()" title="Notification Settings">
-                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                             <span>Secrets & Notifications</span>
-                        </div>
-                    </div>
                 </aside>
             `;
     }

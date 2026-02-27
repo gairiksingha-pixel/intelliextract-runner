@@ -219,7 +219,7 @@ export class DashboardController {
         brands: brands,
         purchasers: allPurchasers,
       }),
-      activeTab: "home",
+      activeTab: "dashboard",
       logo: context.logo,
       smallLogo: context.smallLogo,
       favIcon: context.favIcon,

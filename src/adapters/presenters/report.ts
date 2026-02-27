@@ -1216,13 +1216,27 @@ export function htmlReportFromHistory(
       --header-bg: #216c6d;
       --header-text: #ffffff;
       --header-border: #1a5758;
-      --primary: #2d9d5f;
       --accent: #2d9d5f;
       --accent-light: #e8f5ee;
-      --radius: 12px;
-      --radius-sm: 8px;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+      --primary: #2d9d5f;
+      --primary-hover: #248f54;
+      --pass: #248f54;
+      --pass-bg: #e8f5ee;
+      --fail: #c62828;
+      --fail-bg: #ffebee;
+      --muted: #6b7c85;
+      --row-alt: #fafbfc;
+      --cell-pad: 0.722rem 0.85rem;
+      --radius: 6.8px;
+      --radius-sm: 5.1px;
+      --radius-xs: 3.4px;
+      --shadow-sm: 0 0.85px 2.55px rgba(0, 0, 0, 0.08);
+      --shadow-md: 0 1.7px 6.8px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 12px 30px -10px rgba(0, 0, 0, 0.15), 0 4px 15px -5px rgba(0, 0, 0, 0.1);
+      --shadow-inset: inset 0 0.85px 1.7px rgba(0, 0, 0, 0.06);
+      --shadow-btn: 0 0.85px 2.55px rgba(0, 0, 0, 0.12);
+      --warning: #f59e0b;
+      --warning-hover: #d97706;
     }
     * { box-sizing: border-box; }
     html { overflow-y: scroll; scrollbar-gutter: stable; }
@@ -1256,7 +1270,7 @@ export function htmlReportFromHistory(
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border: 1px solid rgba(176, 191, 201, 0.3);
+      border: 1px solid rgba(176, 191, 201, 0.45);
       position: sticky;
       top: 0;
       z-index: 1000;
@@ -1622,7 +1636,7 @@ export function htmlReportFromHistory(
       to { opacity: 0; transform: translateY(16px); } 
     }
     
-    .batch-id { background: rgba(255,255,255,0.2) !important; color: white !important; border: 1px solid rgba(255,255,255,0.3) !important; padding: 0.1rem 0.4rem !important; font-family: monospace; }
+    .batch-id { background: rgba(255,255,255,0.2) !important; color: white !important; border: 1px solid rgba(255,255,255,0.3) !important; padding: 0.1rem 0.4rem !important; font-family: 'JetBrains Mono', monospace; }
     .badge-brand { opacity: 0.85; }
     .badge-purchaser { background: #ffffff !important; color: var(--header-bg) !important; padding: 0.1rem 0.5rem !important; border-radius: 4px; font-weight: 800; }
     .run-time { font-weight: 400; opacity: 0.9; margin-left: auto; }

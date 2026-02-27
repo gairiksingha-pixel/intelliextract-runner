@@ -10,67 +10,74 @@ export const DashboardBody = () => `
       </div>
     </div>
     <div class="report-header-right">
+      <div id="header-actions" class="header-actions-wrap"></div>
       <div class="header-filter-row">
         <div class="header-field-wrap brand-field-wrap">
           <div id="brand-dropdown" class="filter-dropdown">
             <div class="filter-chip">
               <label class="header-label" for="brand-dropdown-trigger">Brand</label>
-              <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="true" title="Select one or more brands">
+              <button type="button" id="brand-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more brands">
                 Select brand
               </button>
             </div>
-            <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+            <div id="brand-dropdown-panel" class="filter-dropdown-panel" role="listbox">
+              <!-- brand options populated dynamically from /api/config -->
+            </div>
           </div>
+          <div id="brand-error" class="header-field-error" role="alert"></div>
         </div>
         <div class="header-field-wrap purchaser-field-wrap">
           <div id="purchaser-dropdown" class="filter-dropdown">
             <div class="filter-chip">
               <label class="header-label" for="purchaser-dropdown-trigger">Purchaser</label>
-              <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="true" title="Select one or more purchasers">
+              <button type="button" id="purchaser-dropdown-trigger" class="filter-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" title="Select one or more purchasers">
                 Select purchaser
               </button>
             </div>
-            <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox"></div>
+            <div id="purchaser-dropdown-panel" class="filter-dropdown-panel" role="listbox">
+              <!-- options filled by JS based on selected brands -->
+            </div>
           </div>
+          <div id="purchaser-error" class="header-field-error" role="alert"></div>
         </div>
-        <div class="header-field-wrap">
-          <button type="button" id="filter-reset-btn" class="header-btn-reset" title="Reset Filters"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg></button>
+        <div class="header-field-wrap header-filter-reset-wrap">
+          <button type="button" id="filter-reset-btn" class="header-btn-reset" title="Clear brand and purchaser filter">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <polyline points="3 3 3 8 8 8"></polyline>
+            </svg>
+          </button>
+          <div class="header-field-error"></div>
         </div>
       </div>
     </div>
   </header>
   <main class="main">
     <div class="table-section">
-      <table id="operation-table">
+      <table>
         <thead>
           <tr>
-            <th class="op-header">Operation</th>
-            <th class="limits-header">Limits</th>
-            <th class="params-header">Run Parameters</th>
-            <th class="actions-header">Actions</th>
-            <th class="result-header">Progress & Result</th>
+            <th class="op-name">Operations</th>
+            <th class="limits-col">Operation limits</th>
+            <th class="run-cell">Operation controls</th>
+            <th class="result-header">Operation output</th>
           </tr>
         </thead>
-        <tbody id="rows">
-          <!-- Rows will be populated by JS -->
-        </tbody>
+        <tbody id="rows"></tbody>
       </table>
     </div>
-
-    <!-- Job Scheduling Modal (Custom to Dashboard) -->
-    <div id="schedule-modal-overlay" class="modal-overlay" aria-hidden="true">
-      <div class="modal-content wide">
-        <div class="modal-header">
-           <h2 class="modal-title">Job Scheduling</h2>
-           <button type="button" class="modal-close-icon" onclick="window.closeScheduleModal()">&times;</button>
-        </div>
-        <div id="schedule-modal-body" class="modal-body no-pad">
-          <!-- Populated by JS -->
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-secondary" onclick="window.closeScheduleModal()">Close</button>
-        </div>
-      </div>
-    </div>
   </main>
+
+  <div id="schedule-modal-overlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
+      <div class="modal-header">
+        <div class="modal-title" id="schedule-modal-title">
+          <span class="title-badge">SCHEDULE</span>
+          <span id="modal-title-text">Dashboard</span>
+        </div>
+        <button type="button" id="schedule-modal-close-icon" class="modal-close-icon" aria-label="Close schedule dialog">&#10005;</button>
+      </div>
+      <div class="modal-body" id="schedule-modal-body"></div>
+    </div>
+  </div>
 `;

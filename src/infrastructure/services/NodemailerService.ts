@@ -56,7 +56,7 @@ export class NodemailerService implements INotificationService {
     const html = `
 <!DOCTYPE html>
 <html>
-  <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:'JetBrains Mono', 'Courier New', Courier, monospace;">
     <div style="background-color:#f4f4f5;padding:40px 0;">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
         <tr>

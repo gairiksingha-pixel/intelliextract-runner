@@ -3,148 +3,6 @@ import { DataExplorerBody, DataExplorerBodyProps } from "./DataExplorerBody.js";
 export class DataExplorerView {
   static getStyles(): string {
     return `
-    .header {
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(10px);
-      padding: 0.6rem 1.25rem;
-      border-radius: var(--radius);
-      margin: 0.75rem auto 0.5rem auto;
-      max-width: 1820px;
-      width: calc(100% - 2.5rem);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border: 1px solid rgba(176, 191, 201, 0.3);
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-      min-height: 72px;
-    }
-    .system-status-pill {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: white;
-      padding: 0.4rem 0.85rem;
-      border-radius: 100px;
-      border: 1px solid rgba(203, 213, 225, 0.5);
-      margin-left: 1.25rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--text-secondary);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .report-header-left { display: flex; align-items: center; gap: 1.25rem; }
-    .header .logo { height: 32px; width: auto; object-fit: contain; cursor: pointer; }
-    .header-title-area { display: flex; flex-direction: column; gap: 2px; }
-    .header-main-title {
-      margin: 0;
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: var(--text);
-      letter-spacing: -0.01em;
-      line-height: 1.2;
-    }
-    .meta { color: var(--text-secondary); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-left: auto; }
-    .meta p { margin: 2px 0; }
-
-    /* Filtering Styles */
-    .report-header-right { display: flex; align-items: center; justify-content: flex-end; }
-    .header-filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-    .header-field-wrap { display: flex; align-items: center; margin-right: 0.5rem; height: 34px; }
-    .filter-dropdown { position: relative; }
-    .filter-chip { 
-      display: flex; align-items: center; height: 34px; background: #fff; 
-      border: 1px solid rgba(176,191,201,0.6); border-radius: 8px; overflow: hidden;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    .filter-chip .header-label {
-      font-size: 0.7rem; color: var(--primary); font-weight: 800; background: var(--accent-light);
-      padding: 0 0.75rem; height: 100%; display: flex; align-items: center;
-      border-right: 1px solid rgba(45,157,95,0.2); text-transform: uppercase; letter-spacing: 0.04em;
-    }
-    .filter-dropdown-trigger {
-      border: none; background: transparent; height: 100%; padding: 0 1.5rem 0 0.75rem;
-      font-size: 0.85rem; font-family: inherit; cursor: pointer; color: var(--text-secondary);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23505050' d='M2.5 4.5L6 8l3.5-3.5H2.5z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 8px center;
-    }
-    .brand-field-wrap .filter-dropdown-trigger { min-width: 185px; max-width: 185px; }
-    .purchaser-field-wrap .filter-dropdown-trigger { min-width: 185px; max-width: 185px; }
-
-    .filter-dropdown-panel {
-      position: absolute;
-      top: calc(100% + 8px);
-      left: 0;
-      min-width: 230px;
-      max-height: 400px;
-      overflow-y: auto;
-      background: white;
-      border: 1px solid var(--border-light);
-      border-radius: 10px;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.05);
-      z-index: 2000;
-      padding: 0.5rem 0;
-      display: none;
-      transform-origin: top;
-    }
-    @keyframes slideDownPanel {
-      from { opacity: 0; transform: translateY(-8px) scale(0.97); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .filter-dropdown-panel.open { 
-      display: block; 
-      animation: slideDownPanel 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
-      will-change: transform, opacity;
-    }
-    .filter-dropdown-option {
-      display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
-      font-size: 0.85rem; cursor: pointer; transition: background 0.1s;
-    }
-    .filter-dropdown-option:hover { background: #f8fafc; }
-    .filter-dropdown-option input { margin: 0; cursor: pointer; }
-    
-    .header-btn-reset {
-      height: 34px; 
-      width: 34px;
-      padding: 0; 
-      background: var(--header-bg); 
-      color: #fff;
-      border: none; 
-      border-radius: 6px; 
-      cursor: pointer; 
-      box-shadow: 0 2px 5px rgba(33,108,109,0.2); 
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-      font-family: inherit;
-    }
-    .report-header:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
-
-    /* Reports Toolbar */
-    .main-container {
-      padding: 0 0 1.25rem 0;
-      max-width: 1820px;
-      width: calc(100% - 2.5rem);
-      margin: 0 auto;
-      box-sizing: border-box;
-    }
-    .report-card-box {
-      background: var(--surface);
-      border: 1px solid rgba(176,191,201,0.55);
-      border-radius: var(--radius);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
     .page-body { padding: 1.5rem; }
 
     .stats-grid {
@@ -203,7 +61,6 @@ export class DataExplorerView {
       font-weight: 700;
       color: var(--muted);
       cursor: pointer;
-      font-family: inherit;
       transition: all 0.15s;
     }
     .tab-btn:hover { background: var(--bg); color: var(--text); }
@@ -226,7 +83,6 @@ export class DataExplorerView {
       padding: 0 1rem 0 2.5rem;
       border: 1px solid transparent;
       border-radius: 8px;
-      font-family: inherit;
       font-size: 0.85rem;
       background: #f1f5f9;
       color: var(--text);
@@ -385,7 +241,7 @@ export class DataExplorerView {
       font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
-      font-family: inherit;
+      font-family: 'JetBrains Mono', monospace;
       transition: all 0.15s;
       padding: 0 0.5rem;
     }
