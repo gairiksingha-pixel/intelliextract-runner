@@ -4,7 +4,7 @@ import { ServerResponse } from "node:http";
 import { DashboardController } from "./DashboardController.js";
 import { IRunStatusStore } from "../../core/domain/services/IRunStatusStore.js";
 import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
-import { RunStateService } from "../../infrastructure/services/RunStateService.js";
+import { IRunStateService } from "../../core/domain/services/IRunStateService.js";
 import { INotificationService } from "../../core/domain/services/INotificationService.js";
 import { ProcessOrchestrator } from "../../infrastructure/services/ProcessOrchestrator.js";
 import { listStagingFiles } from "../../infrastructure/utils/StorageUtils.js";
@@ -25,7 +25,7 @@ export class ProjectController {
     private dashboardController: DashboardController,
     private runStatusStore: IRunStatusStore,
     private checkpointRepo: ICheckpointRepository,
-    private runStateService: RunStateService,
+    private runStateService: IRunStateService,
     private notificationService: INotificationService,
     private orchestrator: ProcessOrchestrator,
     private rootDir: string,

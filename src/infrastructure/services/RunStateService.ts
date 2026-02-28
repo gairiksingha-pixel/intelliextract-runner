@@ -1,28 +1,35 @@
-import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
+import { IAppConfigStore } from "../../core/domain/repositories/IAppConfigStore.js";
+import {
+  IRunStateService,
+  RunState,
+} from "../../core/domain/services/IRunStateService.js";
 
-export class RunStateService {
-  constructor(private checkpointRepo: ICheckpointRepository) {}
+export class RunStateService implements IRunStateService {
+  constructor(private configStore: IAppConfigStore) {}
 
-  async loadRunStates(): Promise<any> {
+  private async loadRunStates(): Promise<Record<string, RunState>> {
     try {
-      const val = await this.checkpointRepo.getMeta("last_run_state");
+      const val = await this.configStore.getMeta("last_run_state");
       if (!val) return {};
-      return JSON.parse(val);
-    } catch (_) {
+      return JSON.parse(val) as Record<string, RunState>;
+    } catch (err) {
+      console.error("[RunStateService] Failed to load run states:", err);
       return {};
     }
   }
 
-  async saveRunStates(states: any): Promise<void> {
+  private async saveRunStates(states: Record<string, RunState>): Promise<void> {
     try {
-      await this.checkpointRepo.setMeta(
-        "last_run_state",
-        JSON.stringify(states),
-      );
-    } catch (_) {}
+      await this.configStore.setMeta("last_run_state", JSON.stringify(states));
+    } catch (err) {
+      console.error("[RunStateService] Failed to save run states:", err);
+    }
   }
 
-  async updateRunState(caseId: string, stateUpdate: any): Promise<void> {
+  async updateRunState(
+    caseId: string,
+    stateUpdate: Partial<RunState>,
+  ): Promise<void> {
     const states = await this.loadRunStates();
     states[caseId] = { ...states[caseId], ...stateUpdate };
     await this.saveRunStates(states);
@@ -34,8 +41,8 @@ export class RunStateService {
     await this.saveRunStates(states);
   }
 
-  async getRunState(caseId: string): Promise<any> {
+  async getRunState(caseId: string): Promise<RunState | null> {
     const states = await this.loadRunStates();
-    return states[caseId] || null;
+    return states[caseId] ?? null;
   }
 }

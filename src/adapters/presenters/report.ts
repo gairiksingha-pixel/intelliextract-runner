@@ -168,18 +168,7 @@ export async function loadHistoricalRunSummaries(
 ): Promise<HistoricalRunSummary[]> {
   const runIds = await repo.getAllRunIdsOrdered();
 
-  // 1. Build a global latency map to enrich skipped records later
-  const globalLatencyMap = new Map<string, number>();
-  for (const rid of runIds) {
-    const recs = await repo.getRecordsForRun(rid);
-    for (const r of recs) {
-      if (r.status === "done" && r.latencyMs) {
-        globalLatencyMap.set(r.filePath, r.latencyMs);
-      }
-    }
-  }
-
-  // 2. Collect raw data for all runs
+  // 1. Collect raw data for all runs (with caching)
   const rawSummaries: Array<{
     runId: string;
     records: any[];
@@ -191,6 +180,17 @@ export async function loadHistoricalRunSummaries(
   }> = [];
 
   for (const runId of runIds) {
+    const cached = await repo.getRunSummary(runId).catch(() => null);
+    if (cached && (cached as any).rawChunks) {
+      const chunks = (cached as any).rawChunks.map((c: any) => ({
+        ...c,
+        start: new Date(c.start),
+        end: new Date(c.end),
+      })) as typeof rawSummaries;
+      rawSummaries.push(...chunks);
+      continue;
+    }
+
     const records = await repo.getRecordsForRun(runId);
     if (records.length === 0) continue;
 
@@ -214,12 +214,10 @@ export async function loadHistoricalRunSummaries(
         };
       });
 
-    // Group records in this run by (brand, purchaser)
     const recordsByGroup = new Map<string, CheckpointRecord[]>();
     for (const r of records) {
       let p = r.purchaser;
       if (!p && r.relativePath) {
-        // Try to infer purchaser from path if missing in metadata
         const parts = r.relativePath.split(/[\\/]/);
         if (
           parts.length > 1 ||
@@ -233,18 +231,10 @@ export async function loadHistoricalRunSummaries(
       }
       const key = `${r.brand}|${p || ""}`;
       if (!recordsByGroup.has(key)) recordsByGroup.set(key, []);
-
-      // Enrich skipped records with previous latency if available
-      if (r.status === "skipped" && !r.latencyMs) {
-        const prevLatency = globalLatencyMap.get(r.filePath);
-        if (prevLatency) {
-          (r as any).latencyMs = prevLatency;
-        }
-      }
-
       recordsByGroup.get(key)!.push(r);
     }
 
+    const currentRunChunks: typeof rawSummaries = [];
     for (const [key, groupRecords] of recordsByGroup) {
       const { start, end } = minMaxDatesFromRecords(groupRecords);
       let [brand, purchaser] = key.split("|");
@@ -254,7 +244,7 @@ export async function loadHistoricalRunSummaries(
         allResultsForRun,
       );
 
-      rawSummaries.push({
+      const chunk = {
         runId,
         records: groupRecords,
         start,
@@ -262,8 +252,14 @@ export async function loadHistoricalRunSummaries(
         brand: brand || undefined,
         purchaser: purchaser || undefined,
         results,
-      });
+      };
+      rawSummaries.push(chunk);
+      currentRunChunks.push(chunk);
     }
+    // Cache the raw chunks for this RUN ID to speed up next time
+    await repo
+      .saveRunSummary(runId, { rawChunks: currentRunChunks })
+      .catch(() => {});
   }
 
   // 2. Group by Brand + Purchaser

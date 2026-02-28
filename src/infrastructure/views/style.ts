@@ -52,8 +52,8 @@ export const commonStyles = `
 
     @keyframes appFadeIn { from { opacity: 0; } to { opacity: 1; } }
     body {
-      font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
       margin: 0; padding: 0; background: var(--bg); color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
       line-height: 1.4; font-size: 13px; display: flex; flex-direction: column;
       animation: appFadeIn 0.6s ease-out both;
     }
@@ -149,11 +149,12 @@ export const commonStyles = `
       min-width: 100%; max-height: 400px; overflow-y: auto;
       border: 1px solid rgba(176, 191, 201, 0.4); border-radius: var(--radius-sm);
       background: var(--surface); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-      z-index: 100; padding: 0.5rem 0; opacity: 0;
-      transform: scale(0.96) translateY(4px); transform-origin: top; will-change: transform, opacity;
+      z-index: 10000; padding: 0.5rem 0;
+      transform-origin: top; will-change: transform, opacity;
     }
     .filter-dropdown-panel.open {
-      display: block; animation: dropdownScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; pointer-events: all;
+      display: block; opacity: 1; transform: scale(1) translateY(0);
+      animation: dropdownScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: all;
     }
     @keyframes dropdownScaleIn { from { opacity: 0; transform: scale(0.96) translateY(4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     .filter-dropdown-option { display: flex; align-items: center; gap: 0.425rem; padding: 0.34rem 0.51rem; font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
@@ -227,7 +228,7 @@ export const commonStyles = `
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05);
       width: 1152px; max-width: 90vw; height: 786px; max-height: 85vh;
       padding: 0; box-sizing: border-box; display: flex; flex-direction: column;
-      animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; overflow: hidden;
+      animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; overflow: visible;
     }
     @keyframes modalSlideUp { from { opacity: 0; transform: scale(0.96) translateY(24px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     @keyframes modalSlideDown { from { opacity: 1; transform: scale(1) translateY(0); } to { opacity: 0; transform: scale(0.96) translateY(24px); } }

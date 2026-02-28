@@ -20,8 +20,10 @@ import { ExtractionController } from "./adapters/controllers/ExtractionControlle
 import { ExecuteWorkflowUseCase } from "./core/use-cases/ExecuteWorkflowUseCase.js";
 import { ScheduleController } from "./adapters/controllers/ScheduleController.js";
 import { NodemailerEmailService } from "./infrastructure/services/NodemailerEmailService.js";
-import { ReportController } from "./adapters/controllers/ReportController.js";
+import { ReportPageController } from "./adapters/controllers/ReportPageController.js";
+import { ReportDataController } from "./adapters/controllers/ReportDataController.js";
 import { ProjectController } from "./adapters/controllers/ProjectController.js";
+import { ExportController } from "./adapters/controllers/ExportController.js";
 import { Router } from "./adapters/Router.js";
 
 // Infrastructure Services
@@ -34,6 +36,7 @@ import { SqliteLogger } from "./infrastructure/services/SqliteLogger.js";
 import { RunStateService } from "./infrastructure/services/RunStateService.js";
 import { ProcessOrchestrator } from "./infrastructure/services/ProcessOrchestrator.js";
 import { CronManager } from "./infrastructure/services/CronManager.js";
+import { NodeReportGenerationService } from "./infrastructure/services/NodeReportGenerationService.js";
 
 // Utilities
 import { loadBrandPurchasers } from "./infrastructure/utils/TenantUtils.js";
@@ -101,6 +104,8 @@ const runExtractionUseCase = new RunExtractionUseCase(
   emailService,
 );
 
+const reportGenerationService = new NodeReportGenerationService(ROOT);
+
 const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
   syncBrandUseCase,
   runExtractionUseCase,
@@ -108,12 +113,15 @@ const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
   discoverFilesUseCase,
   runStatusStore,
   STAGING_DIR,
+  reportGenerationService,
+  checkpointRepo,
 );
 
 const caseCommands = getCaseCommands(ROOT, async () => {
   try {
     return await checkpointRepo.getCurrentRunId();
-  } catch (_) {
+  } catch (err) {
+    console.error("[server] Failed to get current run ID:", err);
     return null;
   }
 });
@@ -151,16 +159,16 @@ const scheduleController = new ScheduleController(
   cronManager,
   checkpointRepo,
 );
-const reportController = new ReportController(
+const reportPageController = new ReportPageController(
   dashboardController,
-  REPORTS_DIR,
-  EXTRACTIONS_DIR,
-  STAGING_DIR,
-  ROOT,
   checkpointRepo,
   appConfig,
   staticAssets,
   BRAND_PURCHASERS,
+);
+const reportDataController = new ReportDataController(
+  checkpointRepo,
+  appConfig,
 );
 const projectController = new ProjectController(
   dashboardController,
@@ -176,12 +184,22 @@ const projectController = new ProjectController(
   staticAssets,
 );
 
+const exportController = new ExportController(
+  checkpointRepo,
+  ROOT,
+  EXTRACTIONS_DIR,
+  STAGING_DIR,
+  REPORTS_DIR,
+);
+
 // 6. Initialize Router
 const router = new Router(
   extractionController,
   scheduleController,
-  reportController,
+  reportPageController,
+  reportDataController,
   projectController,
+  exportController,
 );
 
 // 7. Start the HTTP Server

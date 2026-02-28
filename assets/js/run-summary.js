@@ -1,5 +1,6 @@
 // run-summary.js — Dynamic Run Summary page
 // SUMMARY_DATA is injected by the server as window.SUMMARY_DATA
+import { AppIcons } from "./icons.js";
 
 const MONTH_NAMES = [
   "Jan",
@@ -23,6 +24,40 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+function getRecordFilename(r) {
+  const safe = String(r.relativePath || r.filename || "")
+    .replace(/[\\\/]/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
+  const base = (r.brand || "") + "_" + (safe || "file");
+  return base.endsWith(".json") ? base : base + ".json";
+}
+
+async function downloadFile(path, btn) {
+  if (!path) return;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = "...";
+  btn.style.pointerEvents = "none";
+  try {
+    const checkUrl = "/api/download-file?file=" + encodeURIComponent(path);
+    const response = await fetch(checkUrl, { method: "HEAD" });
+    if (response.status === 404) {
+      alert("The requested file was not found on the server.");
+    } else if (!response.ok) {
+      throw new Error("Download check failed");
+    } else {
+      window.location.href = checkUrl;
+    }
+  } catch (e) {
+    alert("Failed to retrieve file: " + e.message);
+  } finally {
+    setTimeout(() => {
+      btn.innerHTML = originalHtml;
+      btn.style.pointerEvents = "auto";
+    }, 300);
+  }
+}
+window.downloadFile = downloadFile;
 
 function formatDuration(ms) {
   const sec = Math.floor(ms / 1000);
@@ -315,6 +350,18 @@ function updateStatusCounts() {
 // ─────────────────────────────────────────────────────────────
 function buildRunSections() {
   const container = document.getElementById("history-items-container");
+  if (!container) return;
+  if (ALL_DATA.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 4rem 2rem; text-align: center; background: white; border-radius: 12px; border: 1px dashed #cbd5e1; margin: 1rem 0;">
+        <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📊</div>
+        <h3 style="margin: 0 0 0.5rem 0; color: #1e293b; border-bottom: none;">No operation history found</h3>
+        <p style="margin: 0; color: #64748b; font-size: 0.9rem;">Runs will appear here once you start synchronization or extraction from the dashboard.</p>
+        <button class="pg-btn" style="margin-top: 1.5rem;" onclick="window.location.href='/'">Go to Dashboard</button>
+      </div>
+    `;
+    return;
+  }
   container.innerHTML = ALL_DATA.map(buildRunSection).join("");
 }
 
@@ -348,15 +395,28 @@ function buildRunSection(s) {
 
   // Top slowest files
   const topSlowRows = (m.topSlowestFiles || [])
-    .map(
-      (f) => `
+    .map((f) => {
+      const jsonName = getRecordFilename(f);
+      const sourcePath = `output/staging/${f.brand}/${f.relativePath}`;
+      const jsonPath = `output/extractions/succeeded/${jsonName}`;
+      return `
     <tr>
       <td class="file-path">${escapeHtml(f.filePath)}</td>
       <td>${f.latencyMs?.toFixed(0)}</td>
       <td>${escapeHtml(f.patternKey || "—")}</td>
+      <td class="action-cell">
+        <div style="display:flex;gap:4px;">
+          <a href="javascript:void(0)" onclick="downloadFile('${sourcePath}', this)" class="action-btn" title="Download Source File">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </a>
+          <a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Response">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          </a>
+        </div>
+      </td>
     </tr>
-  `,
-    )
+  `;
+    })
     .join("");
   const topSlowSection =
     m.topSlowestFiles?.length > 0
@@ -364,7 +424,7 @@ function buildRunSection(s) {
     <h3>Top ${m.topSlowestFiles.length} slowest files (by processing time)</h3>
     <div class="table-responsive">
       <table>
-        <tr><th>File</th><th>Latency (ms)</th><th>Pattern Key</th></tr>
+        <tr><th>File</th><th>Latency (ms)</th><th>Pattern Key</th><th class="action-cell">Action</th></tr>
         ${topSlowRows}
       </table>
     </div>
@@ -443,19 +503,58 @@ function buildRunSection(s) {
       : '<p class="muted">No notable anomalies detected.</p>';
 
   // Extraction log rows
-  const logRows = (s.extractionResults || [])
-    .map((f) => {
-      const statusIcon = f.extractionSuccess
-        ? '<span class="status-icon success">✅</span> SUCCESS'
-        : '<span class="status-icon error">❌</span> FAILED';
-      const searchData = `${escapeHtml(f.filename)} ${f.extractionSuccess ? "success" : "failed"}`;
+  const logRows = (s.records || [])
+    .map((rec) => {
+      const statusIcon =
+        rec.status === "done"
+          ? '<span class="status-icon success">✅</span> SUCCESS'
+          : rec.status === "error"
+            ? '<span class="status-icon error">❌</span> FAILED'
+            : '<span class="status-icon skipped">⏭️</span> SKIPPED';
+
+      const jsonName = getRecordFilename(rec);
+      const er = (s.extractionResults || []).find(
+        (e) => e.filename === jsonName,
+      );
+      const resp = rec.fullResponse || er?.response;
+
+      let patternKey = rec.patternKey || resp?.pattern?.pattern_key || "—";
+      let latency = rec.latencyMs || resp?.latency_ms || resp?.meta?.latency_ms;
+      const latencyDisplay = latency ? latency.toFixed(0) + " ms" : "—";
+
+      const searchData = `${escapeHtml(rec.filePath)} ${rec.status} ${escapeHtml(patternKey)}`;
+
+      const sourcePath = `output/staging/${rec.brand}/${rec.relativePath}`;
+      let jsonDir = "output/extractions/failed";
+      if (rec.status === "done" || (rec.status === "skipped" && er)) {
+        jsonDir =
+          er?.extractionSuccess !== false
+            ? "output/extractions/succeeded"
+            : "output/extractions/failed";
+      }
+      const jsonPath = `${jsonDir}/${jsonName}`;
+
       return `
       <tr class="log-row" data-search="${searchData.toLowerCase()}">
         <td>${statusIcon}</td>
-        <td class="file-path">${escapeHtml(f.filename)}</td>
-        <td>—</td>
-        <td><span class="chip">${f.latencyMs ? f.latencyMs.toFixed(0) + " ms" : "—"}</span></td>
-        <td class="action-cell">—</td>
+        <td class="file-path">${escapeHtml(rec.filePath)}</td>
+        <td>${escapeHtml(patternKey)}</td>
+        <td><span class="chip">${latencyDisplay}</span></td>
+        <td class="action-cell">
+          <div style="display:flex;gap:4px;">
+            <a href="javascript:void(0)" onclick="downloadFile('${sourcePath}', this)" class="action-btn" title="Download Source File">
+              ${AppIcons.FILE}
+            </a>
+            ${
+              rec.status !== "skipped" || er
+                ? `
+            <a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Response">
+              ${AppIcons.DOWNLOAD}
+            </a>`
+                : ""
+            }
+          </div>
+        </td>
       </tr>
     `;
     })

@@ -3,10 +3,11 @@ import { ProcessOrchestrator } from "./ProcessOrchestrator.js";
 import { IRunStatusStore } from "../../core/domain/services/IRunStatusStore.js";
 import { IScheduleRepository } from "../../core/domain/repositories/IScheduleRepository.js";
 import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
-import { RunStateService } from "./RunStateService.js";
+import { IRunStateService } from "../../core/domain/services/IRunStateService.js";
 import { getPairsForSchedule } from "../utils/TenantUtils.js";
 import { SCHEDULE_TIMEZONES } from "../views/Constants.js";
 import { ChildProcess } from "node:child_process";
+import { hasOverlap } from "../utils/ConcurrencyUtils.js";
 
 export class CronManager {
   private activeCronJobs = new Map<string, any>();
@@ -16,7 +17,7 @@ export class CronManager {
     private orchestrator: ProcessOrchestrator,
     private runStatusStore: IRunStatusStore,
     private scheduleRepo: IScheduleRepository,
-    private runStateService: RunStateService,
+    private runStateService: IRunStateService,
     private checkpointRepo: ICheckpointRepository,
     private brandPurchaserMap: Record<string, string[]>,
     private resumeCapableCases: Set<string>,
@@ -60,22 +61,33 @@ export class CronManager {
     const task = cron.schedule(
       schedule.cron,
       async () => {
-        const caseId = "PIPE";
         const start = new Date().toISOString();
-
+        const caseId = "PIPE";
         const activeRuns = this.runStatusStore.getActiveRuns();
-        const manualRunning = activeRuns.find(
-          (r: any) => !r.scheduled && r.origin !== "scheduled",
+
+        // Calculate the scope for this scheduled job
+        const jobPairs = getPairsForSchedule(
+          schedule.brands || [],
+          schedule.purchasers || [],
+          this.brandPurchaserMap,
+        );
+        const jobScope = { pairs: jobPairs };
+
+        // Check for any overlapping active run
+        const overlappingRun = activeRuns.find((r) =>
+          hasOverlap(jobScope, r.params || {}),
         );
 
-        if (manualRunning) {
+        if (overlappingRun) {
+          const runType =
+            overlappingRun.origin === "manual" ? "manual" : "scheduled";
           this.checkpointRepo.appendScheduleLog({
+            timestamp: start,
             outcome: "skipped",
             level: "warn",
-            message: `Scheduled job skipped — a manual process (${manualRunning.caseId}) is currently running`,
+            message: `Scheduled job skipped — a ${runType} process (${overlappingRun.caseId}) for overlapping brands/purchasers is already running`,
             scheduleId: schedule.id,
-            skippedAt: start,
-            activeManualCase: manualRunning.caseId,
+            overlappingRun: overlappingRun.caseId,
           });
           return;
         }
@@ -101,12 +113,14 @@ export class CronManager {
           return;
         }
 
+        const now = new Date().toISOString();
         this.checkpointRepo.appendScheduleLog({
+          timestamp: now,
           outcome: "executed",
           level: "info",
           message: "Scheduled job started",
           scheduleId: schedule.id,
-          start,
+          start: now,
         });
 
         const pairs = getPairsForSchedule(
@@ -123,7 +137,7 @@ export class CronManager {
         const runInfo: any = {
           caseId,
           params,
-          startTime: start,
+          startTime: now,
           status: "running",
           scheduled: true,
           origin: "scheduled",
@@ -157,22 +171,28 @@ export class CronManager {
           this.childProcesses.delete(activeRunKey);
 
           this.checkpointRepo.appendScheduleLog({
+            timestamp: new Date().toISOString(),
             outcome: "executed",
             level: "info",
             message: "Scheduled job finished",
             scheduleId: schedule.id,
             exitCode: result.exitCode,
+            start: now,
+            finishedAt: new Date().toISOString(),
           });
         } catch (e: any) {
           this.runStatusStore.unregisterRun(caseId);
           this.childProcesses.delete(activeRunKey);
 
           this.checkpointRepo.appendScheduleLog({
+            timestamp: new Date().toISOString(),
             outcome: "executed",
             level: "error",
             message: "Scheduled job failed",
             scheduleId: schedule.id,
             error: e && e.message ? e.message : String(e),
+            start: now,
+            finishedAt: new Date().toISOString(),
           });
         }
       },

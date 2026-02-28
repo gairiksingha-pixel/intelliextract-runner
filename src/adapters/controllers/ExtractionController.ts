@@ -1,31 +1,40 @@
 import { ServerResponse } from "node:http";
 import { ProcessOrchestrator } from "../../infrastructure/services/ProcessOrchestrator.js";
 import { IRunStatusStore } from "../../core/domain/services/IRunStatusStore.js";
-import { RunStateService } from "../../infrastructure/services/RunStateService.js";
+import {
+  IRunStateService,
+  RunState,
+} from "../../core/domain/services/IRunStateService.js";
 import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
 import { Checkpoint } from "../../core/domain/entities/Checkpoint.js";
+import { hasOverlap } from "../../infrastructure/utils/ConcurrencyUtils.js";
 
-export interface RunRequest {
-  caseId: string;
-  syncLimit?: number;
-  extractLimit?: number;
-  tenant?: string;
-  purchaser?: string;
-  pairs?: { tenant: string; purchaser: string }[];
-  retryFailed?: boolean;
-  skipCompleted?: boolean;
-}
+import { z } from "zod";
+import { RunRequestSchema } from "../validation.js";
+
+export type RunRequest = z.infer<typeof RunRequestSchema>;
 
 export class ExtractionController {
   constructor(
     private orchestrator: ProcessOrchestrator,
     private runStatusStore: IRunStatusStore,
-    private runStateService: RunStateService,
+    private runStateService: IRunStateService,
     private checkpointRepo: ICheckpointRepository,
     private resumeCapableCases: Set<string>,
   ) {}
 
-  async handleRunRequest(body: RunRequest, res: ServerResponse) {
+  async handleRunRequest(body: unknown, res: ServerResponse) {
+    const parseRes = RunRequestSchema.safeParse(body);
+    if (!parseRes.success) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: parseRes.error.issues[0]?.message || "Invalid input",
+        }),
+      );
+      return;
+    }
+    const validatedBody = parseRes.data;
     const {
       caseId,
       syncLimit,
@@ -34,17 +43,25 @@ export class ExtractionController {
       purchaser,
       pairs,
       retryFailed,
-    } = body;
-
-    if (!caseId) {
-      res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Missing caseId" }));
-      return;
-    }
+    } = validatedBody;
 
     if (this.runStatusStore.isActive(caseId)) {
       res.writeHead(409, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: `Case ${caseId} is already running` }));
+      return;
+    }
+
+    const requestedScope = { tenant, purchaser, pairs };
+    const overlappingRun = this.runStatusStore
+      .getActiveRuns()
+      .find((r) => hasOverlap(requestedScope, r.params || {}));
+    if (overlappingRun) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: `Scope Conflict: Another operation (${overlappingRun.caseId}) is already processing some of these brands/purchasers. Please wait for it to finish.`,
+        }),
+      );
       return;
     }
 
@@ -132,38 +149,42 @@ export class ExtractionController {
 
         // Fetch real stats from DB
         const status = await this.checkpointRepo.getRunStatus();
-        const records = await this.checkpointRepo.getRecordsForRun(
-          status.runId,
-        );
-        const doneRecords = records.filter(
-          (r: Checkpoint) => r.status === "done",
-        );
-        const avgLat =
-          doneRecords.length > 0
-            ? Math.round(
-                doneRecords.reduce(
-                  (a: number, b: Checkpoint) => a + (b.latencyMs || 0),
-                  0,
-                ) / doneRecords.length,
-              )
-            : 0;
+        if (status.runId) {
+          const records = await this.checkpointRepo.getRecordsForRun(
+            status.runId,
+          );
+          const doneRecords = records.filter(
+            (r: Checkpoint) => r.status === "done",
+          );
+          const avgLat =
+            doneRecords.length > 0
+              ? Math.round(
+                  doneRecords.reduce(
+                    (a: number, b: Checkpoint) => a + (b.latencyMs || 0),
+                    0,
+                  ) / doneRecords.length,
+                )
+              : 0;
 
-        writeLine({
-          type: "report",
-          message: "Operation completed successfully.",
-          successCount: status.done,
-          avgLatency: avgLat,
-          stdout: result.stdout,
-          stderr: result.stderr,
-        });
+          writeLine({
+            type: "report",
+            message: "Operation completed successfully.",
+            successCount: status.done,
+            avgLatency: avgLat,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          });
+        }
       } else {
         // Save state for resume if interrupted
         if (this.resumeCapableCases.has(caseId) && result.exitCode !== 0) {
           const s = await this.checkpointRepo.getRunStatus();
-          await this.runStateService.updateRunState(caseId, {
-            status: "stopped",
-            runId: s.runId,
-          });
+          if (s.runId) {
+            await this.runStateService.updateRunState(caseId, {
+              status: "stopped",
+              runId: s.runId,
+            });
+          }
         }
         writeLine({
           type: "error",

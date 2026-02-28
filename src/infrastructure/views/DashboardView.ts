@@ -275,8 +275,9 @@ export class DashboardView {
       }
       .schedule-form-grid {
         display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.68rem 0.85rem; margin-top: 0.34rem;
+        overflow: visible;
       }
-      .schedule-field { display: flex; flex-direction: column; gap: 0.21rem; }
+      .schedule-field { display: flex; flex-direction: column; gap: 0.21rem; overflow: visible; }
       .schedule-label {
         font-size: 0.65rem; font-weight: 800; color: white; background: var(--header-bg);
         padding: 0.25rem 1.1rem 0.25rem 0.65rem; width: fit-content; text-transform: uppercase;

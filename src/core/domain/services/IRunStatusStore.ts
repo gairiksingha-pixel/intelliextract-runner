@@ -1,8 +1,13 @@
 export interface RunInfo {
   caseId: string;
-  runId: string;
-  startedAt: string;
+  runId?: string;
+  startTime: string;
   origin?: "manual" | "scheduled";
+  params?: any;
+  status: string;
+  progress?: any;
+  syncProgress?: any;
+  extractProgress?: any;
 }
 
 export interface IRunStatusStore {

@@ -42,7 +42,6 @@ document.addEventListener("DOMContentLoaded", () => {
     ROWS.forEach((c) => tbody.appendChild(renderRow(c)));
   }
 
-  // Sync configuration from window
   BRAND_PURCHASERS = window.BRAND_PURCHASERS || {};
 
   const set = new Set();
@@ -50,6 +49,10 @@ document.addEventListener("DOMContentLoaded", () => {
     arr.forEach((p) => set.add(p)),
   );
   ALL_PURCHASERS = Array.from(set).sort();
+
+  // Expose to window for schedule-modal
+  window.BRAND_PURCHASERS = BRAND_PURCHASERS;
+  window.ALL_PURCHASERS = ALL_PURCHASERS;
 
   // Initialize standalone components
   initDropdowns();

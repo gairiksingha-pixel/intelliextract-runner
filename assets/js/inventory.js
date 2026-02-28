@@ -200,6 +200,32 @@ function getFilteredFiles() {
   return filtered;
 }
 
+async function downloadFile(path, btn) {
+  if (!path) return;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = "...";
+  btn.style.pointerEvents = "none";
+  try {
+    const checkUrl = "/api/download-file?file=" + encodeURIComponent(path);
+    const response = await fetch(checkUrl, { method: "HEAD" });
+    if (response.status === 404) {
+      alert("The requested file was not found on the server.");
+    } else if (!response.ok) {
+      throw new Error("Download check failed");
+    } else {
+      window.location.href = checkUrl;
+    }
+  } catch (e) {
+    alert("Failed to retrieve file: " + e.message);
+  } finally {
+    setTimeout(() => {
+      btn.innerHTML = originalHtml;
+      btn.style.pointerEvents = "auto";
+    }, 300);
+  }
+}
+window.downloadFile = downloadFile;
+
 function renderTable() {
   const tbody = document.getElementById("files-body");
   if (!tbody) return;
@@ -246,7 +272,7 @@ function renderTable() {
       <td>${f.size.toLocaleString()}</td>
       <td>${AppUtils.formatTimeIST(f.mtime)}</td>
       <td class="action-cell">
-        <a href="/api/download-file?file=${encodeURIComponent("output/staging/" + f.path)}" class="action-btn" title="Download File">
+        <a href="javascript:void(0)" onclick="downloadFile('output/staging/${f.path}', this)" class="action-btn" title="Download File">
           ${AppIcons.DOWNLOAD}
         </a>
       </td>

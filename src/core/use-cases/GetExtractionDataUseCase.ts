@@ -7,8 +7,12 @@ export class GetExtractionDataUseCase {
 
   async execute(
     brandPurchasers: Record<string, string[]>,
+    options?: { limit?: number; offset?: number },
   ): Promise<ExtractionFileDetails[]> {
-    const allCheckpoints = await this.checkpointRepo.getAllCheckpoints();
+    const allCheckpoints = await this.checkpointRepo.getAllCheckpoints(
+      options?.limit,
+      options?.offset,
+    );
 
     return allCheckpoints
       .filter((c) => c.status === "done" || c.status === "error")

@@ -3,31 +3,55 @@ import { RunExtractionUseCase } from "./RunExtractionUseCase.js";
 import { ReportingUseCase } from "./ReportingUseCase.js";
 import { DiscoverFilesUseCase } from "./DiscoverFilesUseCase.js";
 import { IRunStatusStore } from "../domain/services/IRunStatusStore.js";
-import { spawn } from "node:child_process";
+import { IReportGenerationService } from "../domain/services/IReportGenerationService.js";
+import { ICheckpointRepository } from "../domain/repositories/ICheckpointRepository.js";
+
+export type WorkflowCaseId = "PIPE" | "SYNC" | "EXTRACT" | "P1" | "P2";
+
+export interface WorkflowPair {
+  tenant: string;
+  purchaser: string;
+}
 
 export interface WorkflowRequest {
-  caseId: string;
+  caseId: WorkflowCaseId | string;
   syncLimit?: number;
   extractLimit?: number;
   tenant?: string;
   purchaser?: string;
-  pairs?: { tenant: string; purchaser: string }[];
+  pairs?: WorkflowPair[];
   resume?: boolean;
   concurrency?: number;
   requestsPerSecond?: number;
   skipCompleted?: boolean;
 }
 
+export type WorkflowProgressType =
+  | "run_id"
+  | "log"
+  | "progress"
+  | "report"
+  | "error";
+export type WorkflowPhase = "sync" | "extract";
+export type WorkflowLogLevel = "info" | "warn" | "error";
+
 export interface WorkflowProgress {
-  type: "run_id" | "log" | "progress" | "report" | "error";
+  type: WorkflowProgressType;
   runId?: string;
   message?: string;
-  phase?: "sync" | "extract";
+  phase?: WorkflowPhase;
   done?: number;
   total?: number;
   percent?: number;
-  level?: "info" | "warn" | "error";
-  [key: string]: any;
+  level?: WorkflowLogLevel;
+  [key: string]: unknown;
+}
+
+export interface WorkflowFile {
+  filePath: string;
+  relativePath: string;
+  brand: string;
+  purchaser?: string;
 }
 
 export class ExecuteWorkflowUseCase {
@@ -38,6 +62,8 @@ export class ExecuteWorkflowUseCase {
     private discoverFiles: DiscoverFilesUseCase,
     private runStatusStore: IRunStatusStore,
     private stagingDir: string,
+    private reportGenerationService: IReportGenerationService,
+    private checkpointRepo: ICheckpointRepository,
   ) {}
 
   async execute(
@@ -52,18 +78,20 @@ export class ExecuteWorkflowUseCase {
     this.runStatusStore.registerRun({
       caseId,
       runId,
-      startedAt: new Date().toISOString(),
+      startTime: new Date().toISOString(),
       origin: "manual",
+      status: "running",
+      params: { tenant, purchaser, pairs },
     });
 
     try {
-      let filesToExtract: any[] = [];
+      let filesToExtract: WorkflowFile[] = [];
 
       // 1. Sync Phase
       if (caseId === "PIPE" || caseId === "SYNC" || caseId === "P1") {
         onUpdate({ type: "log", message: "Starting synchronization..." });
 
-        const syncPairs =
+        const syncPairs: WorkflowPair[] =
           pairs || (tenant && purchaser ? [{ tenant, purchaser }] : []);
 
         for (const pair of syncPairs) {
@@ -114,7 +142,7 @@ export class ExecuteWorkflowUseCase {
               : tenant && purchaser
                 ? [{ brand: tenant, purchaser }]
                 : undefined,
-          });
+          }) as WorkflowFile[];
           onUpdate({
             type: "log",
             message: `Found ${filesToExtract.length} files to process.`,
@@ -146,31 +174,23 @@ export class ExecuteWorkflowUseCase {
         }
       }
 
-      // 3. Reporting Phase
+      // 3. Report Phase — delegated to injected service (no spawn in domain)
       onUpdate({ type: "log", message: "Generating report..." });
-
-      // Execute legacy report generation for physical files
-      await new Promise((resolve) => {
-        const child = spawn(
-          "node",
-          ["dist/index.js", "report", "--run-id", runId],
-          { shell: false },
-        );
-        child.on("close", resolve);
-        child.on("error", () => resolve(1));
-      });
+      await this.reportGenerationService.generate(runId);
 
       const report = await this.reporting.execute(runId);
       onUpdate({ type: "report", ...report });
 
+      // Save summary to cache for 10/10 performance
+      await this.checkpointRepo
+        .saveRunSummary(runId, { metrics: report })
+        .catch(() => {});
+
       onUpdate({ type: "log", message: "Operation completed successfully." });
-    } catch (e: any) {
-      onUpdate({
-        type: "log",
-        message: `Error: ${e.message}`,
-        level: "error",
-      });
-      onUpdate({ type: "error", message: e.message });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      onUpdate({ type: "log", message: `Error: ${message}`, level: "error" });
+      onUpdate({ type: "error", message });
       throw e;
     } finally {
       this.runStatusStore.unregisterRun(caseId);

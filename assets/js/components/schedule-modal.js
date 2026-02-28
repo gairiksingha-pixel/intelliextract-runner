@@ -237,39 +237,42 @@ function refreshSchedulePurchaserOptions() {
   var trigger = document.getElementById("sched-purchaser-dropdown-trigger");
   if (!panel || !trigger) return;
   var brands = getSelectedScheduleBrands();
+  var allPurchasers = window.ALL_PURCHASERS || [];
+  var brandPurchasers = window.BRAND_PURCHASERS || {};
+
   var opts =
     brands.length === 0
-      ? window.ALL_PURCHASERS
+      ? allPurchasers
       : (function () {
           var set = new Set();
           brands.forEach(function (b) {
-            (window.BRAND_PURCHASERS[b] || []).forEach(function (p) {
+            (brandPurchasers[b] || []).forEach(function (p) {
               set.add(p);
             });
           });
           return Array.from(set).sort(function (a, b) {
             var nameA = AppUtils.formatPurchaserName(a).toLowerCase();
             var nameB = AppUtils.formatPurchaserName(b).toLowerCase();
-            var isTempA = nameA.includes("temp");
-            var isTempB = nameB.includes("temp");
-            if (isTempA && !isTempB) return 1;
-            if (!isTempA && isTempB) return -1;
             return nameA.localeCompare(nameB);
           });
         })();
+
   var currentChecked = getSelectedSchedulePurchasers();
   var allChecked =
+    opts &&
     opts.length > 0 &&
     opts.every(function (p) {
       return currentChecked.indexOf(p) !== -1;
     });
+
   var allHtml =
     '<label class="filter-dropdown-option"><input type="checkbox" value="ALL"' +
     (allChecked ? " checked" : "") +
     "> <strong>All</strong></label>";
+
   panel.innerHTML =
     allHtml +
-    opts
+    (opts || [])
       .map(function (p) {
         var checked = currentChecked.indexOf(p) !== -1 ? " checked" : "";
         return (
@@ -430,6 +433,12 @@ function renderScheduleCreateForm(timezones, schedule, direction) {
     if (purchaserPanel) purchaserPanel.classList.remove("open");
     if (cronPanel) cronPanel.classList.remove("open");
     if (tzPanel) tzPanel.classList.remove("open");
+
+    if (brandTrigger) brandTrigger.setAttribute("aria-expanded", "false");
+    if (purchaserTrigger)
+      purchaserTrigger.setAttribute("aria-expanded", "false");
+    if (cronTrigger) cronTrigger.setAttribute("aria-expanded", "false");
+    if (tzTrigger) tzTrigger.setAttribute("aria-expanded", "false");
   }
 
   function toggleScheduleDropdown(panel, trigger) {
@@ -466,8 +475,12 @@ function renderScheduleCreateForm(timezones, schedule, direction) {
     });
   }
 
-  [brandPanel, purchaserPanel, cronPanel, tzPanel].forEach((p) => {
-    p?.addEventListener("click", (e) => e.stopPropagation());
+  [brandPanel, purchaserPanel, cronPanel, tzPanel].forEach(function (p) {
+    if (p) {
+      p.addEventListener("click", function (e) {
+        e.stopPropagation();
+      });
+    }
   });
 
   // Close dropdowns when clicking anywhere else in the modal body
@@ -686,7 +699,9 @@ function renderScheduleRunHistoryView(direction, page) {
         html +=
           '<table class="schedule-list"><thead><tr><th>Time</th><th>Schedule ID</th><th>Outcome</th><th>Message</th></tr></thead><tbody>';
         entries.forEach(function (e) {
-          var time = AppUtils.formatTimeIST(e.timestamp);
+          // Use e.timestamp; if missing, fall back to other possible fields like e.start
+          var ts = e.timestamp || e.start || e.finishedAt;
+          var time = AppUtils.formatTimeIST(ts);
           var schedId =
             e.scheduleId != null ? String(e.scheduleId).slice(0, 20) : "";
           var outcome = (e.outcome || "executed").toLowerCase();
