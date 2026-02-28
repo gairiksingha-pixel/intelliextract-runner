@@ -1,6 +1,9 @@
 import { Checkpoint, CheckpointStatus } from "../entities/checkpoint.entity.js";
 import { IAppConfigStore } from "./app-config-store.repository.js";
-import { IFileRegistry } from "./file-registry.repository.js";
+import {
+  IFileRegistry,
+  UnextractedFile,
+} from "./file-registry.repository.js";
 import { IRunStore } from "./run-store.repository.js";
 import { IExtractionLogStore } from "./extraction-log-store.repository.js";
 
@@ -26,6 +29,12 @@ export interface ICheckpointRepository
   getCompletedPaths(runId?: string): Promise<Set<string>>;
   getGlobalSkipCount(): Promise<number>;
   getErrorPaths(runId: string): Promise<Set<string>>;
+  /** Files that have status 'error' in any run (for retry failed). */
+  getFailedFiles(filter?: {
+    brand?: string;
+    purchaser?: string;
+    pairs?: { brand: string; purchaser: string }[];
+  }): Promise<UnextractedFile[]>;
 
   // Schedule audit log (DB-backed replacement for flat-file schedule.log)
   appendScheduleLog(entry: Record<string, unknown>): void;

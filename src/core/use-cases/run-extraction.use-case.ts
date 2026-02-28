@@ -52,18 +52,11 @@ export class RunExtractionUseCase {
       request.skipCompleted ? undefined : runId,
     );
 
-    // If retryFailed is on, we only want to process files that have status "error" in the DB
-    let errorPaths: Set<string> | null = null;
-    if (request.retryFailed) {
-      errorPaths = await this.checkpointRepo.getErrorPaths(runId);
-    }
-
-    const toProcess = request.files.filter((f) => {
-      if (request.retryFailed && errorPaths) {
-        return errorPaths.has(f.relativePath);
-      }
-      return !completedPaths.has(f.filePath);
-    });
+    // When retryFailed is true, the CLI passed only failed files. Process those that are not yet completed.
+    // Otherwise we process all request.files that are not completed.
+    const toProcess = request.files.filter(
+      (f) => !completedPaths.has(f.filePath),
+    );
 
     const total = toProcess.length;
     let done = 0;
@@ -77,11 +70,7 @@ export class RunExtractionUseCase {
 
     // 3. Mark skipped records for this run so metrics are accurate
     const skippedRecords = request.files
-      .filter(
-        (f) =>
-          completedPaths.has(f.relativePath) ||
-          (errorPaths && !errorPaths.has(f.relativePath)),
-      )
+      .filter((f) => !toProcess.includes(f))
       .map((f) => ({
         ...f,
         status: "skipped" as const,

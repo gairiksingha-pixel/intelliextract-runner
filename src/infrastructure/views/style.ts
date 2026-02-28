@@ -228,7 +228,7 @@ export const commonStyles = `
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05);
       width: 1152px; max-width: 90vw; height: 786px; max-height: 85vh;
       padding: 0; box-sizing: border-box; display: flex; flex-direction: column;
-      animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; overflow: visible;
+      animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; overflow: hidden;
     }
     @keyframes modalSlideUp { from { opacity: 0; transform: scale(0.96) translateY(24px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     @keyframes modalSlideDown { from { opacity: 1; transform: scale(1) translateY(0); } to { opacity: 0; transform: scale(0.96) translateY(24px); } }
@@ -254,7 +254,7 @@ export const commonStyles = `
     .modal-body::-webkit-scrollbar { width: 6px; }
     .modal-body::-webkit-scrollbar-track { background: transparent; }
     .modal-body::-webkit-scrollbar-thumb { background-color: rgba(176, 191, 201, 0.6); border-radius: 20px; }
-    .modal-footer { padding: 1.25rem 1.8rem; background: #f8fafc; border-top: 1px solid rgba(203, 213, 225, 0.45); display: flex; justify-content: flex-end; gap: 0.75rem; }
+     .modal-footer { padding: 1.25rem 1.8rem; background: #f8fafc; border-top: 1px solid rgba(203, 213, 225, 0.45); display: flex; justify-content: flex-end; gap: 0.75rem; border-radius: 0 0 16px 16px; }
     .modal-close-icon { border: none; background: transparent; cursor: pointer; font-size: 1rem; color: var(--muted); padding: 0.17rem; }
     .modal-close-icon:hover { color: var(--fail); }
 
@@ -336,7 +336,7 @@ export const commonStyles = `
     tbody tr.row-inactive td { border-color: rgba(33, 108, 109, 0.45); }
     tbody tr.row-inactive td:not(.op-name) { background: var(--row-alt); }
 
-    .op-name { width: 181.9px; min-width: 181.9px; max-width: 181.9px; font-weight: 700; }
+    .op-name { width: 25%; min-width: 25%; max-width: 25%; font-weight: 700; }
     tbody td.op-name { background: var(--header-bg); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); }
     .op-content-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.425rem; line-height: 1.25; text-align: center; width: 100%; margin: 0 auto; }
     .op-icon-wrap { width: 1.8rem; height: 1.8rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--primary); }
@@ -344,7 +344,7 @@ export const commonStyles = `
     .op-title { font-size: 1.1rem; font-weight: 700; margin-top: 0.2rem; display: block; }
     .op-description { font-size: 0.85rem; font-weight: 400; opacity: 0.9; display: block; }
 
-    .limits-col { width: 143px; min-width: 143px; max-width: 143px; }
+    .limits-col { width: 25%; min-width: 25%; max-width: 25%; }
     .limits-cell { font-size: 0.85rem; color: var(--text-secondary); overflow: hidden; vertical-align: top; }
     .limits-cell .limit-row { display: flex; flex-direction: column; gap: 0.425rem; min-height: 1.87rem; }
     .limit-chip {
@@ -365,7 +365,7 @@ export const commonStyles = `
       border: 0.85px solid rgba(45, 157, 95, 0.25); display: flex; align-items: center; justify-content: center; height: 38px;
     }
 
-    .run-cell { width: 143px; min-width: 143px; max-width: 143px; text-align: center; vertical-align: top; }
+    .run-cell { width: 25%; min-width: 25%; max-width: 25%; text-align: center; vertical-align: top; }
     .run-cell .btn-group { display: grid; grid-template-columns: 1fr; gap: 0.425rem; width: 100%; }
     button.run {
       background: var(--primary); color: #fff; border: 1px solid rgba(45, 157, 95, 0.25);
@@ -387,7 +387,7 @@ export const commonStyles = `
     button.reset-during-resume { display: none !important; }
     button.reset-during-resume.show-during-resume { display: block !important; width: 100%; min-height: 2.337rem; box-sizing: border-box; padding: 0.552rem 1.062rem; font-size: 0.9rem; }
 
-    .result-header, .result-cell { width: 402.9px; min-width: 402.9px; max-width: 402.9px; vertical-align: top; overflow: hidden; position: relative; }
+    .result-header, .result-cell { width: 25%; min-width: 25%; max-width: 25%; vertical-align: top; overflow: hidden; position: relative; }
     .result {
       position: absolute; top: 0.722rem; left: 0.85rem; right: 0.85rem; bottom: 0.722rem;
       font-family: inherit; font-size: 0.8rem; padding: 0.51rem 0.637rem; border: 1px solid rgba(203, 213, 225, 0.25);
@@ -532,7 +532,7 @@ export const commonStyles = `
     /* Report Header */
     .report-header {
       background: var(--surface); color: var(--header-bg); padding: 1.25rem 1.75rem;
-      border-radius: var(--radius) var(--radius) 0 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      border-radius: 16px 16px 0 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
       display: flex; align-items: center; justify-content: space-between;
       border-bottom: 1px solid var(--border-light); min-height: 64px;
     }

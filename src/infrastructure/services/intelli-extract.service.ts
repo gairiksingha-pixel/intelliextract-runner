@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import {
   extract,
   type ExtractResult,
@@ -12,7 +13,10 @@ import {
 import { Config } from "../../core/domain/entities/config.entity.js";
 
 export class IntelliExtractService implements IExtractionService {
-  constructor(private appConfig: Config) {}
+  constructor(
+    private appConfig: Config,
+    private extractionsDir?: string,
+  ) {}
 
   async extractFile(
     filePath: string,
@@ -57,13 +61,11 @@ export class IntelliExtractService implements IExtractionService {
       } catch (_) {}
     }
 
-    // Write result to disk
-    // DISABLED: Now stored in DB via fullResponse
-
     const finalSuccess = isAppSuccess;
     const baseErrorSnippet = finalSuccess
       ? undefined
       : result.body?.slice(0, 500) || "";
+
     const errorMessage =
       finalSuccess || (!baseErrorSnippet && !appErrorMessage)
         ? undefined
@@ -78,6 +80,28 @@ export class IntelliExtractService implements IExtractionService {
         fullResponse = JSON.parse(result.body);
       } catch (_) {
         fullResponse = { raw: result.body };
+      }
+    }
+
+    // Write result to disk if directory is provided
+    if (this.extractionsDir && fullResponse) {
+      try {
+        const statusDir = finalSuccess ? "succeeded" : "failed";
+        const targetDir = join(this.extractionsDir, statusDir);
+        mkdirSync(targetDir, { recursive: true });
+
+        const safe = (relativePath || "")
+          .replace(/[\\\/]/g, "_")
+          .replace(/[^a-zA-Z0-9._-]/g, "_");
+        const base = brand + "_" + (safe || "file");
+        const jsonName = base.endsWith(".json") ? base : base + ".json";
+
+        writeFileSync(
+          join(targetDir, jsonName),
+          JSON.stringify(fullResponse, null, 2),
+        );
+      } catch (e) {
+        console.error("Failed to write extraction result to disk:", e);
       }
     }
 

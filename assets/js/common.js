@@ -342,6 +342,7 @@ document.addEventListener("click", function (e) {
     !t.href ||
     t.href.startsWith("javascript:") ||
     t.href.startsWith("#") ||
+    t.hasAttribute("download") ||
     t.target === "_blank" ||
     e.ctrlKey ||
     e.metaKey ||

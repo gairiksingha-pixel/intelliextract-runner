@@ -48,7 +48,15 @@ document.addEventListener("DOMContentLoaded", () => {
   Object.values(BRAND_PURCHASERS).forEach((arr) =>
     arr.forEach((p) => set.add(p)),
   );
-  ALL_PURCHASERS = Array.from(set).sort();
+  ALL_PURCHASERS = Array.from(set).sort((a, b) => {
+    const nameA = AppUtils.formatPurchaserName(a).toLowerCase();
+    const nameB = AppUtils.formatPurchaserName(b).toLowerCase();
+    const isTempA = nameA.includes("temp");
+    const isTempB = nameB.includes("temp");
+    if (isTempA && !isTempB) return 1;
+    if (!isTempA && isTempB) return -1;
+    return nameA.localeCompare(nameB);
+  });
 
   // Expose to window for schedule-modal
   window.BRAND_PURCHASERS = BRAND_PURCHASERS;
@@ -409,7 +417,7 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     if (!line) return false;
     // Filter out protocol markers (handle both tabs and spaces)
     if (
-      /^(SYNC_PROGRESS|EXTRACTION_PROGRESS|RESUME_SKIP|RESUME_SKIP_SYNC|RUN_ID|RUN_PROTOCOL)\b/.test(
+      /^(SYNC_PROGRESS|SYNC_SUMMARY|EXTRACTION_PROGRESS|RESUME_SKIP|RESUME_SKIP_SYNC|RUN_ID|RUN_PROTOCOL)\b/.test(
         line,
       )
     )
@@ -466,14 +474,28 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
 
     // 2. Capture Identity and Limits
     let m;
-    if ((m = /^Download limit:\s*(.+)$/.exec(line)))
-      parsed.downloadLimit = m[1].trim();
-    else if ((m = /^Downloaded \(new\):\s*(\d+)\s*$/.exec(line)))
+    if (line.startsWith("Sync Summary")) {
+      parsed.syncSummaryLine = line;
+    } else if (
+      line.startsWith("------------") &&
+      parsed.syncSummaryLine === "Sync Summary"
+    ) {
+      // ignore divider
+    } else if (
+      (m = /^(?:Downloaded|Synced)\s*\(new\):\s*(\d+)\s*/i.exec(line)) ||
+      (m = /^Downloaded:\s*(\d+)\s*/i.exec(line))
+    ) {
       parsed.downloadedNew = m[1];
-    else if ((m = /^Skipped \(already present[^:]*:\s*(\d+)\s*$/.exec(line)))
+    } else if (
+      (m = /^Skipped\s*\(already\s*present[^:]*:\s*(\d+)\s*/i.exec(line)) ||
+      (m = /^Skipped:\s*(\d+)\s*/i.exec(line))
+    ) {
       parsed.skipped = m[1];
-    else if ((m = /^Errors:\s*(\d+)\s*$/.exec(line))) parsed.errors = m[1];
-    else if ((m = /^\s+Staging path:\s*(.+)$/.exec(line))) {
+    } else if ((m = /^Errors:\s*(\d+)\s*/i.exec(line))) {
+      parsed.errors = m[1];
+    } else if ((m = /^Download limit:\s*(.+)$/.exec(line))) {
+      parsed.downloadLimit = m[1];
+    } else if ((m = /^\s+Staging path:\s*(.+)$/.exec(line))) {
       if (!parsed.stagingPaths) parsed.stagingPaths = [];
       parsed.stagingPaths.push(m[1].trim());
     } else if (
@@ -481,22 +503,45 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     ) {
       parsed.brandAndPurchaser = (m[1].trim() + " / " + m[2].trim()).trim();
     } else if (
-      (m = /^\s{2}([^:\s][^:]*)$/.exec(line)) &&
+      (m = /^\s{2}([^:\s][^:/]*\/[^:\s][^:]*)(?::\s*(.*))?$/.exec(line)) &&
       line.indexOf("/") !== -1 &&
-      !/Staging path|Downloaded:|Skipped:|Errors:/.test(line)
+      !/Staging path|Downloaded:|Skipped:|Errors:|Sync Summary|Limit:/.test(
+        line,
+      )
     ) {
+      if (!parsed.syncBucketDetails) parsed.syncBucketDetails = [];
       if (!parsed.brandAndPurchaserList) parsed.brandAndPurchaserList = [];
-      parsed.brandAndPurchaserList.push(line.trim());
+
+      const fullLine = line.trim();
+      const identityPart = m[1].trim();
+
+      if (!parsed.syncBucketDetails.includes(fullLine)) {
+        parsed.syncBucketDetails.push(fullLine);
+      }
+      if (!parsed.brandAndPurchaserList.includes(identityPart)) {
+        parsed.brandAndPurchaserList.push(identityPart);
+      }
+    } else if (
+      (m = /^ {4}(Downloaded:\s*\d+,\s*Skipped:\s*\d+,\s*Errors:\s*\d+)$/.exec(
+        line,
+      ))
+    ) {
+      if (parsed.syncBucketDetails && parsed.syncBucketDetails.length > 0) {
+        parsed.syncBucketDetails[parsed.syncBucketDetails.length - 1] +=
+          ": " + m[1];
+      }
     } else if (
       (m =
-        /^Extraction metrics:\s*success=(\d+),\s*skipped=(\d+),\s*failed=(\d+)\s*$/.exec(
+        /^Extraction (?:metrics|metrics|results):\s*(?:success|done)=(\d+),\s*skipped=(\d+),\s*(?:failed|errors)=(\d+)\s*$/.exec(
           line,
         ))
     ) {
       parsed.extractSuccess = m[1];
       parsed.extractSkipped = m[2];
       parsed.extractFailed = m[3];
-    } else if ((m = /^Extraction result\(s\):\s*(.+?)\s*\(full/.exec(line))) {
+    } else if (
+      (m = /^(?:Extraction result\(s\)|Results):\s*(.+?)\s*\(full/.exec(line))
+    ) {
       parsed.extractionResultsPath = m[1].trim();
     } else if ((m = /^Reports path:\s*(.+)$/.exec(line))) {
       parsed.reportsPath = m[1].trim();
@@ -510,6 +555,16 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
       parsed.cumFailed = m[2];
       parsed.cumTotal = m[3];
     }
+  }
+
+  // Apply server-provided sync summary so run output always shows counts (e.g. P1 sync-only)
+  if (data && data.syncSummary && typeof data.syncSummary === "object") {
+    const s = data.syncSummary;
+    if (parsed.downloadedNew == null) parsed.downloadedNew = String(s.downloaded ?? 0);
+    if (parsed.skipped == null) parsed.skipped = String(s.skipped ?? 0);
+    if (parsed.errors == null) parsed.errors = String(s.errors ?? 0);
+    if (!parsed.syncSummaryLine) parsed.syncSummaryLine = "Sync Summary";
+    if (!parsed.downloadLimit) parsed.downloadLimit = "no limit";
   }
 
   const stdoutFiltered = stdoutStr
@@ -526,16 +581,8 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     // unless they are also in the data. For now, we only set success if missing.
   }
 
-  const hasSync =
-    caseId &&
-    SYNC_CASES.indexOf(caseId) !== -1 &&
-    (parsed.downloadLimit != null || parsed.downloadedNew != null);
-  const hasExtract =
-    caseId &&
-    EXTRACT_CASES.indexOf(caseId) !== -1 &&
-    (parsed.extractSuccess != null ||
-      parsed.extractionResultsPath != null ||
-      parsed.reportsPath != null);
+  const hasSync = !!caseId && SYNC_CASES.indexOf(caseId) !== -1;
+  const hasExtract = !!caseId && EXTRACT_CASES.indexOf(caseId) !== -1;
 
   const allNewExtractZero =
     (parsed.extractSuccess === "0" ||
@@ -608,58 +655,99 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
         parsed.cumTotal !== 0);
 
     let msg = hasExistingKnown
-      ? "No new files found to sync or extract. All files in the selected folder are already being synced or extracted."
+      ? "All files up to date. No new processing required."
       : "No files found to sync or extract.";
 
     if (row && row._isRetryFailed) {
       msg = "No failed files found to retry.";
     }
     rows.push(["Message", msg]);
-  } else {
-    if (hasSync) {
-      const overview = [];
-      if (parsed.downloadedNew != null)
-        overview.push("Downloaded: " + AppUtils.esc(parsed.downloadedNew));
-      if (parsed.skipped != null) {
-        const skippedHtml =
-          'Skipped<span class="info-icon" title="These files were already synced in a previous run and are unchanged, so they were skipped.">i</span>: ' +
-          AppUtils.esc(parsed.skipped);
-        overview.push(skippedHtml);
-      }
-      if (parsed.errors != null)
-        overview.push("Errors: " + AppUtils.esc(parsed.errors));
-      if (overview.length)
-        rows.push(["Download overview", overview.join(", ")]);
+  }
+
+  const hasSyncDetails =
+    parsed.syncSummaryLine ||
+    parsed.downloadLimit ||
+    parsed.downloadedNew ||
+    (parsed.syncBucketDetails && parsed.syncBucketDetails.length);
+
+  if (hasSync && hasSyncDetails) {
+    let output = "";
+    if (parsed.syncSummaryLine) output += "Sync Summary\n";
+    if (parsed.downloadLimit)
+      output += "Download limit: " + parsed.downloadLimit + "\n";
+    if (parsed.downloadedNew != null)
+      output += "Downloaded (new): " + parsed.downloadedNew + "\n";
+    if (parsed.skipped != null)
+      output +=
+        "Skipped (already present, unchanged): " + parsed.skipped + "\n";
+    if (parsed.errors != null) output += "Errors: " + parsed.errors + "\n";
+    const downNum = parseInt(parsed.downloadedNew || "0", 10);
+    const skipNum = parseInt(parsed.skipped || "0", 10);
+    const totalInv = data?.syncSummary?.totalInInventory ?? downNum + skipNum;
+    output += "Total in inventory: " + totalInv + "\n";
+
+    if (parsed.syncBucketDetails && parsed.syncBucketDetails.length) {
+      output +=
+        "\nBy brand (staging path → counts):\n  " +
+        parsed.syncBucketDetails.join("\n  ");
     }
-    if (hasExtract) {
-      if (
-        parsed.extractSuccess != null ||
-        parsed.extractFailed != null ||
-        parsed.extractSkipped != null
-      ) {
-        const successVal = parsed.extractSuccess || "0";
-        const skippedVal = parsed.extractSkipped || "0";
-        const failedVal = parsed.extractFailed || "0";
-        const detail =
-          "Success: " +
-          AppUtils.esc(successVal) +
-          ', Skipped<span class="info-icon" title="These files were already extracted in a previous run, so they were skipped this time.">i</span>: ' +
-          AppUtils.esc(skippedVal) +
-          ", Failed: " +
-          AppUtils.esc(failedVal);
-        rows.push(["Extraction overview", detail]);
-      }
-      if (parsed.cumTotal != null) {
-        const cumDetail =
-          "Success: " +
-          AppUtils.esc(parsed.cumSuccess) +
-          ', Failed<span class="info-icon" title="Aggregated status of all unique files found for this filter across all historical runs.">i</span>: ' +
-          AppUtils.esc(parsed.cumFailed) +
-          " (Total: " +
-          AppUtils.esc(parsed.cumTotal) +
-          ")";
-        rows.push(["Overall status", cumDetail]);
-      }
+    rows.push(["Output", output.trim()]);
+  } else if (hasSync) {
+    const overview = [];
+    const downNew = parseInt(parsed.downloadedNew || "0", 10);
+    const skipped = parseInt(parsed.skipped || "0", 10);
+    const totalInventory =
+      (data && data.syncSummary && data.syncSummary.totalInInventory) != null
+        ? data.syncSummary.totalInInventory
+        : downNew + skipped;
+
+    overview.push("Downloaded (this run): " + downNew);
+    overview.push("Skipped (already present): " + skipped);
+    overview.push("Total in inventory: " + totalInventory);
+
+    if (parsed.errors != null && parsed.errors !== "0") {
+      overview.push("Errors: " + AppUtils.esc(parsed.errors));
+    }
+
+    if (parsed.errors != null && parsed.errors !== "0") {
+      overview.push("Errors: " + AppUtils.esc(parsed.errors));
+    }
+
+    if (overview.length) {
+      rows.push(["Download overview", overview.join(", ")]);
+    } else if (caseId === "P1") {
+      rows.push(["Download overview", "Check complete. No files found."]);
+    }
+  }
+
+  if (hasExtract) {
+    if (
+      parsed.extractSuccess != null ||
+      parsed.extractFailed != null ||
+      parsed.extractSkipped != null
+    ) {
+      const successVal = parsed.extractSuccess || "0";
+      const skippedVal = parsed.extractSkipped || "0";
+      const failedVal = parsed.extractFailed || "0";
+      const detail =
+        "Success: " +
+        AppUtils.esc(successVal) +
+        ', Skipped<span class="info-icon" title="These files were already extracted in a previous run, so they were skipped this time.">i</span>: ' +
+        AppUtils.esc(skippedVal) +
+        ", Failed: " +
+        AppUtils.esc(failedVal);
+      rows.push(["Extraction overview", detail]);
+    }
+    if (parsed.cumTotal != null) {
+      const cumDetail =
+        "Success: " +
+        AppUtils.esc(parsed.cumSuccess) +
+        ', Failed<span class="info-icon" title="Aggregated status of all unique files found for this filter across all historical runs.">i</span>: ' +
+        AppUtils.esc(parsed.cumFailed) +
+        " (Total: " +
+        AppUtils.esc(parsed.cumTotal) +
+        ")";
+      rows.push(["Overall status", cumDetail]);
     }
   }
 
@@ -669,16 +757,21 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
       AppUtils.esc(stdoutFiltered.slice(0, 5000)) +
         (stdoutFiltered.length > 5000 ? "…" : ""),
     ]);
-  } else if (!isNoNewProcessed && rows.length === 1) {
+  } else if (!isNoNewProcessed && rows.length === 1 && !hasSyncDetails) {
     const noOutput = !stdoutFiltered && !stderrFiltered;
-    rows.push([
-      "Output",
-      noOutput && data.exitCode === 0
-        ? "Command completed successfully with no console output."
-        : noOutput
-          ? "Command produced no output. Check server logs or run in a terminal for details."
-          : "—",
-    ]);
+    let msg = "—";
+    if (noOutput) {
+      if (pass) {
+        msg = "The operation finished successfully.";
+        // If it's a sync or extract case and we have nothing else, it's likely just done
+        if (hasSync && !hasExtract) msg = "Synchronization complete.";
+        if (!hasSync && hasExtract) msg = "Extraction complete.";
+      } else {
+        msg =
+          "Command produced no output. Check server logs or run in a terminal for details.";
+      }
+    }
+    rows.push(["Output", msg]);
   }
 
   if (stderrFiltered) {
@@ -1186,7 +1279,43 @@ async function updateSystemStatus() {
 
     if (statusText && pill) {
       if (activeRuns.length > 0) {
-        statusText.textContent = "Runner is busy";
+        const run = activeRuns[0];
+        let text = "Runner is busy";
+
+        // Initial label based on caseId if no specific status or progress yet
+        if (run.caseId === "P1" || run.caseId === "PIPE") {
+          text = "Syncing files...";
+        } else if (run.caseId === "P2") {
+          text = "Extracting data...";
+        }
+
+        if (
+          run.status === "syncing" ||
+          (run.syncProgress && run.syncProgress.total > 0)
+        ) {
+          const p = run.syncProgress;
+          text =
+            p && p.total > 0
+              ? `Syncing files (${p.done}/${p.total})`
+              : "Syncing files...";
+        } else if (
+          run.status === "extracting" ||
+          (run.extractProgress && run.extractProgress.total > 0) ||
+          (run.progress && run.progress.total > 0)
+        ) {
+          const p = run.extractProgress || run.progress;
+          if (p && p.total > 0) {
+            text = `Extracting data (${p.done}/${p.total})`;
+          } else if (p && p.percent !== undefined) {
+            text = `Extracting data (${p.percent}%)`;
+          } else {
+            text = "Extracting data...";
+          }
+        }
+
+        if (statusText.textContent !== text) {
+          statusText.textContent = text;
+        }
         pill.classList.add("busy");
         pill.classList.remove("offline");
       } else {

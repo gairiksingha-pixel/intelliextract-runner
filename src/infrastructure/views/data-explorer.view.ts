@@ -1,4 +1,7 @@
-import { DataExplorerBody, DataExplorerBodyProps } from "./data-explorer-body.body.js";
+import {
+  DataExplorerBody,
+  DataExplorerBodyProps,
+} from "./data-explorer-body.body.js";
 
 export class DataExplorerView {
   static getStyles(): string {
@@ -126,6 +129,7 @@ export class DataExplorerView {
     .data-table td {
       padding: 0.75rem 1rem;
       vertical-align: middle;
+      text-align: left;
     }
     .data-table tr.expanded { background: #f0f9ff; }
     .data-table tr.expanded:hover { background: #e0f2fe; }

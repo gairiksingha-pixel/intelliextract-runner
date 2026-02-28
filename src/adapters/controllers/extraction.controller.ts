@@ -14,6 +14,32 @@ import { RunRequestSchema } from "../validation.js";
 
 export type RunRequest = z.infer<typeof RunRequestSchema>;
 
+function parseSyncSummaryFromStdout(stdout: string): {
+  downloaded: number;
+  skipped: number;
+  errors: number;
+  totalInInventory: number;
+} | null {
+  if (!stdout || typeof stdout !== "string") return null;
+  const downloadedM = /Downloaded\s*\(new\):\s*(\d+)/i.exec(stdout);
+  const skippedM =
+    /Skipped\s*\(already\s*present[^:]*:\s*(\d+)/i.exec(stdout) ||
+    /Skipped:\s*(\d+)/i.exec(stdout);
+  const errorsM = /Errors:\s*(\d+)/i.exec(stdout);
+  const downloaded = downloadedM ? parseInt(downloadedM[1], 10) : 0;
+  const skipped = skippedM ? parseInt(skippedM[1], 10) : 0;
+  const errors = errorsM ? parseInt(errorsM[1], 10) : 0;
+  if (downloadedM || skippedM || errorsM) {
+    return {
+      downloaded,
+      skipped,
+      errors,
+      totalInInventory: downloaded + skipped,
+    };
+  }
+  return null;
+}
+
 export class ExtractionController {
   constructor(
     private orchestrator: ProcessOrchestrator,
@@ -117,10 +143,12 @@ export class ExtractionController {
             writeLine({ type: "log", message: "Process started." });
           },
           onSyncProgress: (done, total) => {
+            runInfo.status = "syncing";
             runInfo.syncProgress = { done, total };
             writeLine({ type: "progress", phase: "sync", done, total });
           },
           onExtractionProgress: (done, total) => {
+            runInfo.status = "extracting";
             runInfo.extractProgress = { done, total };
             writeLine({ type: "progress", phase: "extract", done, total });
           },
@@ -131,6 +159,14 @@ export class ExtractionController {
           onRunId: (runId) => {
             runInfo.runId = runId;
             writeLine({ type: "run_id", runId });
+          },
+          onSyncSummary: (downloaded, skipped, errors) => {
+            runInfo.syncSummary = {
+              downloaded,
+              skipped,
+              errors,
+              totalInInventory: downloaded + skipped,
+            };
           },
           onResumeSkip: (skipped, total) => {
             runInfo.resumeSkipExtractProgress = { skipped, total };
@@ -178,6 +214,22 @@ export class ExtractionController {
             avgLatency: avgLat,
             stdout: result.stdout,
             stderr: result.stderr,
+            syncSummary:
+              runInfo.syncSummary ||
+              parseSyncSummaryFromStdout(result.stdout) ||
+              undefined,
+          });
+        } else {
+          // Sync-only (e.g. P1): no run in DB; still send report so UI can show sync counts
+          writeLine({
+            type: "report",
+            message: "Synchronization completed successfully.",
+            runId: runInfo.runId || null,
+            stdout: result.stdout,
+            stderr: result.stderr,
+            syncSummary:
+              runInfo.syncSummary ||
+              parseSyncSummaryFromStdout(result.stdout),
           });
         }
       } else {

@@ -253,6 +253,10 @@ function refreshSchedulePurchaserOptions() {
           return Array.from(set).sort(function (a, b) {
             var nameA = AppUtils.formatPurchaserName(a).toLowerCase();
             var nameB = AppUtils.formatPurchaserName(b).toLowerCase();
+            var isTempA = nameA.includes("temp");
+            var isTempB = nameB.includes("temp");
+            if (isTempA && !isTempB) return 1;
+            if (!isTempA && isTempB) return -1;
             return nameA.localeCompare(nameB);
           });
         })();

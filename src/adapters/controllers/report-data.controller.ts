@@ -29,7 +29,11 @@ export class ReportDataController {
         this.checkpointRepo,
         this.appConfig,
       );
-      const summaries = allSummaries.filter((s) => s.runId === runId);
+      const summaries = allSummaries.filter(
+        (s) =>
+          s.runId === runId ||
+          (s.sessions || []).some((sess) => sess.runId === runId),
+      );
 
       if (summaries.length === 0) {
         res.writeHead(404, { "Content-Type": "application/json" });

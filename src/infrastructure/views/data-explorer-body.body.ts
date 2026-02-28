@@ -107,7 +107,7 @@ export function DataExplorerBody(props: DataExplorerBodyProps) {
                 <th class="sortable" onclick="handleSort('filename')" id="sort-filename">Filename</th>
                 <th class="sortable" onclick="handleSort('runId')" id="sort-runId">Run ID</th>
                 <th class="sortable" onclick="handleSort('patternKey')" id="sort-patternKey">Pattern Key</th>
-                <th class="sortable" onclick="handleSort('purchaserKey')" id="sort-purchaserKey">Purchaser</th>
+                <th class="sortable" onclick="handleSort('purchaserKey')" id="sort-purchaserKey">Purchaser (API)</th>
                 <th class="sortable" onclick="handleSort('status')" id="sort-status">Status</th>
                 <th class="action-cell">Action</th>
               </tr>

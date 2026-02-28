@@ -42,9 +42,20 @@ export class SyncBrandUseCase {
     const brands: string[] = [];
     const purchasers: string[] = [];
 
+    // Per-bucket progress so we can report cumulative progress across all buckets
+    const bucketProgress: Record<number, { done: number; total: number }> = {};
+    const reportCumulativeProgress = (bucketIndex: number, done: number, total: number) => {
+      bucketProgress[bucketIndex] = { done, total };
+      const cumDone = Object.values(bucketProgress).reduce((a, p) => a + (p?.done ?? 0), 0);
+      const cumTotal = Object.values(bucketProgress).reduce((a, p) => a + (p?.total ?? 0), 0);
+      request.onProgress?.(cumDone, Math.max(cumDone, cumTotal));
+    };
+
     const queue = new PQueue({ concurrency: 10 });
 
-    for (const bucket of request.buckets) {
+    for (let i = 0; i < request.buckets.length; i++) {
+      const bucket = request.buckets[i];
+      const bucketIndex = i;
       queue.add(async () => {
         if (limitRemaining.value <= 0) return;
 
@@ -54,7 +65,8 @@ export class SyncBrandUseCase {
           {
             limitRemaining,
             initialLimit,
-            onProgress: request.onProgress,
+            onProgress: (done, total) =>
+              reportCumulativeProgress(bucketIndex, done, total),
             onSyncSkipProgress: request.onSyncSkipProgress,
             onFileSynced: request.onFileSynced,
             onStartDownload: request.onStartDownload,

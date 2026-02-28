@@ -43,18 +43,29 @@ export class SqliteFileRegistryRepository implements IFileRegistry {
   async getUnextractedFiles(filter?: {
     brand?: string;
     purchaser?: string;
+    pairs?: { brand: string; purchaser: string }[];
   }): Promise<UnextractedFile[]> {
     let query =
-      "SELECT fullPath, id as relativePath, brand, purchaser FROM tbl_file_registry WHERE extractStatus != 'done'";
-    const params: string[] = [];
+      "SELECT fullPath, id as relativePath, brand, purchaser FROM tbl_file_registry WHERE (extractStatus IS NULL OR extractStatus != 'done')";
+    const params: (string | number)[] = [];
 
-    if (filter?.brand) {
-      query += " AND brand = ?";
-      params.push(filter.brand);
-    }
-    if (filter?.purchaser) {
-      query += " AND purchaser = ?";
-      params.push(filter.purchaser);
+    if (filter?.pairs?.length) {
+      const placeholders = filter.pairs
+        .map(() => "(brand = ? AND purchaser = ?)")
+        .join(" OR ");
+      query += " AND (" + placeholders + ")";
+      for (const p of filter.pairs) {
+        params.push(p.brand, p.purchaser || "");
+      }
+    } else {
+      if (filter?.brand) {
+        query += " AND brand = ?";
+        params.push(filter.brand);
+      }
+      if (filter?.purchaser) {
+        query += " AND purchaser = ?";
+        params.push(filter.purchaser);
+      }
     }
 
     const rows = this.db.prepare(query).all(...params) as Array<{

@@ -155,12 +155,15 @@ export class CronManager {
                 this.childProcesses.set(activeRunKey, child);
               },
               onProgress: (percent, done, total) => {
+                runInfo.status = "extracting"; // percent progress is used for extraction overall
                 runInfo.progress = { percent, done, total };
               },
               onSyncProgress: (done, total) => {
+                runInfo.status = "syncing";
                 runInfo.syncProgress = { done, total };
               },
               onExtractionProgress: (done, total) => {
+                runInfo.status = "extracting";
                 runInfo.extractProgress = { done, total };
               },
             },

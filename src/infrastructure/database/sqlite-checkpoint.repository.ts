@@ -236,6 +236,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
   async getUnextractedFiles(filter?: {
     brand?: string;
     purchaser?: string;
+    pairs?: { brand: string; purchaser: string }[];
   }): Promise<UnextractedFile[]> {
     this.getDb();
     return this.fileRegistryRepo.getUnextractedFiles(filter);
@@ -468,6 +469,53 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
       )
       .all(runId) as Array<{ relativePath: string }>;
     return new Set(rows.map((r) => r.relativePath));
+  }
+
+  async getFailedFiles(filter?: {
+    brand?: string;
+    purchaser?: string;
+    pairs?: { brand: string; purchaser: string }[];
+  }): Promise<UnextractedFile[]> {
+    const db = this.getDb();
+    let query = `
+      SELECT filePath, relativePath, brand, purchaser
+      FROM tbl_run_checkpoints
+      WHERE status = 'error'
+    `;
+    const params: (string | number)[] = [];
+    if (filter?.pairs?.length) {
+      const placeholders = filter.pairs
+        .map(() => "(brand = ? AND purchaser = ?)")
+        .join(" OR ");
+      query += " AND (" + placeholders + ")";
+      for (const p of filter.pairs) {
+        params.push(p.brand, p.purchaser || "");
+      }
+    } else {
+      if (filter?.brand) {
+        query += " AND brand = ?";
+        params.push(filter.brand);
+      }
+      if (filter?.purchaser) {
+        query += " AND purchaser = ?";
+        params.push(filter.purchaser);
+      }
+    }
+    query += " GROUP BY relativePath";
+    const rows = db.prepare(query).all(...params) as Array<{
+      filePath: string;
+      relativePath: string;
+      brand: string;
+      purchaser?: string;
+    }>;
+    return rows
+      .filter((r) => r.filePath && r.relativePath)
+      .map((r) => ({
+        filePath: r.filePath,
+        relativePath: r.relativePath,
+        brand: r.brand,
+        purchaser: r.purchaser,
+      }));
   }
 
   private mapToEntity(row: CheckpointRow): Checkpoint {

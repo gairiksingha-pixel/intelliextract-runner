@@ -152,15 +152,14 @@ program
         },
       });
 
-      const totalSynced = results.reduce((s, r) => s + r.synced, 0);
-      const totalSkipped = results.reduce((s, r) => s + r.skipped, 0);
-      const totalErrors = results.reduce((s, r) => s + r.errors, 0);
-      console.log(
-        `\nSync Summary — Downloaded: ${totalSynced}, Skipped: ${totalSkipped}, Errors: ${totalErrors}`,
-      );
-      for (const r of results) {
-        console.log(
-          `  ${r.brand}/${r.purchaser}: synced=${r.synced} skipped=${r.skipped} errors=${r.errors}`,
+      printSyncResults(results, syncLimit);
+      if (stdoutPiped) {
+        const totalSynced = results.reduce((s: number, r: any) => s + r.synced, 0);
+        const totalSkipped = results.reduce((s: number, r: any) => s + r.skipped, 0);
+        const totalErrors = results.reduce((s: number, r: any) => s + r.errors, 0);
+        process.stdout.write(
+          `SYNC_SUMMARY\t${totalSynced}\t${totalSkipped}\t${totalErrors}\n`,
+          () => {},
         );
       }
     } catch (e) {
@@ -168,6 +167,34 @@ program
       process.exit(1);
     }
   });
+
+function printSyncResults(results: any[], syncLimit?: number) {
+  const totalSynced = results.reduce((s, r) => s + r.synced, 0);
+  const totalSkipped = results.reduce((s, r) => s + r.skipped, 0);
+  const totalErrors = results.reduce((s, r) => s + r.errors, 0);
+  const limitLabel =
+    syncLimit !== undefined && syncLimit > 0
+      ? `${syncLimit} new file(s)`
+      : "no limit";
+
+  console.log("\nSync Summary");
+  console.log("------------");
+  console.log(`Download limit: ${limitLabel}`);
+  console.log(`Downloaded (new): ${totalSynced}`);
+  console.log(`Skipped (already present, unchanged): ${totalSkipped}`);
+  console.log(`Errors: ${totalErrors}\n`);
+
+  if (results.length > 0) {
+    console.log("By brand (staging path → counts):");
+    for (const r of results) {
+      const label = r.purchaser ? `${r.brand} / ${r.purchaser}` : r.brand;
+      console.log(`  ${label}`);
+      console.log(
+        `    Downloaded: ${r.synced}, Skipped: ${r.skipped}, Errors: ${r.errors}`,
+      );
+    }
+  }
+}
 
 // ─── run ──────────────────────────────────────────────────────────────────────
 
@@ -222,7 +249,10 @@ program
       const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
       const emailService = new NodemailerEmailService(checkpointRepo);
       const logger = new SqliteLogger(checkpointRepo);
-      const extractionService = new IntelliExtractService(config);
+      const extractionService = new IntelliExtractService(
+        config,
+        EXTRACTIONS_DIR,
+      );
       const discoverFiles = new DiscoverFilesUseCase();
       const runExtraction = new RunExtractionUseCase(
         extractionService,
@@ -238,22 +268,36 @@ program
       let filesToExtract: any[] = [];
 
       // Operation 2: Extract Only (no sync)
-      // Check database first for files synced but not yet extracted
+      // Check database first for files synced but not yet extracted (Start Operation)
+      // or files that previously failed (Run Failed)
       if (opts.sync === false) {
-        console.log("Checking for unextracted files in database registry...");
-        filesToExtract = await checkpointRepo.getUnextractedFiles({
-          brand: tenant,
-          purchaser,
-        });
+        const filter =
+          pairs && pairs.length > 0
+            ? { pairs: pairs.map((p) => ({ brand: p.tenant, purchaser: p.purchaser })) }
+            : { brand: tenant, purchaser };
 
-        if (filesToExtract.length > 0) {
-          console.log(
-            `Found ${filesToExtract.length} unextracted files in database.`,
-          );
+        if (opts.retryFailed) {
+          console.log("Fetching previously failed files from database...");
+          filesToExtract = await checkpointRepo.getFailedFiles(filter);
+          if (filesToExtract.length > 0) {
+            console.log(
+              `Found ${filesToExtract.length} failed file(s) to retry.`,
+            );
+          } else {
+            console.log("No failed records found in database.");
+          }
         } else {
-          console.log(
-            "No unextracted records in DB. Performing disk discovery...",
-          );
+          console.log("Checking for unextracted files in database registry...");
+          filesToExtract = await checkpointRepo.getUnextractedFiles(filter);
+          if (filesToExtract.length > 0) {
+            console.log(
+              `Found ${filesToExtract.length} unextracted files in database.`,
+            );
+          } else {
+            console.log(
+              "No unextracted records in DB. Performing disk discovery...",
+            );
+          }
         }
       }
 
@@ -305,10 +349,17 @@ program
         console.log(
           `Sync complete — Downloaded: ${totalSynced}, Skipped: ${totalSkipped}`,
         );
+        if (stdoutPiped) {
+          const totalErrors = syncResults.reduce((s, r) => s + r.errors, 0);
+          process.stdout.write(
+            `SYNC_SUMMARY\t${totalSynced}\t${totalSkipped}\t${totalErrors}\n`,
+            () => {},
+          );
+        }
       }
 
-      // If no files from sync/DB, check disk
-      if (filesToExtract.length === 0) {
+      // If no files from sync/DB, check disk (only for Start Operation; Run Failed uses only DB failed list)
+      if (filesToExtract.length === 0 && !opts.retryFailed) {
         console.log("Discovering files in staging directory...");
         let resolvedPairs = pairs?.map((p) => ({
           brand: p.tenant,
@@ -436,7 +487,10 @@ program
       const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
       const emailService = new NodemailerEmailService(checkpointRepo);
       const logger = new SqliteLogger(checkpointRepo);
-      const extractionService = new IntelliExtractService(config);
+      const extractionService = new IntelliExtractService(
+        config,
+        EXTRACTIONS_DIR,
+      );
 
       // Resolve run ID (resume or fresh)
       const runId =

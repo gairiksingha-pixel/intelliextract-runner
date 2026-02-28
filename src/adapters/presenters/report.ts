@@ -55,8 +55,8 @@ function extractionResultFilenameFromRecord(record: {
   purchaser?: string;
 }): string {
   const safe = record.relativePath
-    .replaceAll("/", "_")
-    .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+    .replace(/[\\\/]/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
   const base = record.brand + "_" + (safe || "file");
   return base.endsWith(".json") ? base : base + ".json";
 }

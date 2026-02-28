@@ -52,6 +52,33 @@ export class ExportController {
       }
 
       if (!existsSync(fullPath)) {
+        // If it's a JSON extraction path, try to find it in the DB
+        if (fileId.includes("output/extractions/")) {
+          const filename = basename(fileId);
+          // Extraction filenames are brand_relativePath.json
+          // We can try to find a match in tbl_run_checkpoints or tbl_file_registry
+          // A robust way is to search for a checkpoint where record.brand + "_" + relativePath_transformed matches filename
+          // But since we have all summaries, we can use the same logic as the ZIP export
+          const records = await this.checkpointRepo.getAllCheckpoints();
+          const match = records.find((r) => {
+            const safe = (r.relativePath || "")
+              .replace(/[\\\/]/g, "_")
+              .replace(/[^a-zA-Z0-9._-]/g, "_");
+            const base = r.brand + "_" + (safe || "file");
+            const jsonName = base.endsWith(".json") ? base : base + ".json";
+            return jsonName === filename && r.fullResponse;
+          });
+
+          if (match && match.fullResponse) {
+            res.writeHead(200, {
+              "Content-Type": "application/octet-stream",
+              "Content-Disposition": `attachment; filename="${filename}"`,
+            });
+            res.end(JSON.stringify(match.fullResponse, null, 2));
+            return;
+          }
+        }
+
         res.writeHead(404);
         res.end("File not found");
         return;
@@ -162,8 +189,8 @@ export class ExportController {
           if (!r.fullResponse) continue;
 
           const safe = (r.relativePath || "")
-            .replaceAll("/", "_")
-            .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+            .replace(/[\\\/]/g, "_")
+            .replace(/[^a-zA-Z0-9._-]/g, "_");
           const base = r.brand + "_" + (safe || "file");
           const jsonName = base.endsWith(".json") ? base : base + ".json";
 
@@ -187,7 +214,7 @@ export class ExportController {
   async exportAllExtractions(res: ServerResponse) {
     try {
       res.writeHead(200, {
-        "Content-Type": "application/zip",
+        "Content-Type": "application/octet-stream",
         "Content-Disposition": 'attachment; filename="extractions.zip"',
       });
       const archive = archiver("zip", { zlib: { level: 9 } });
@@ -198,8 +225,8 @@ export class ExportController {
         if (!r.fullResponse) continue;
 
         const safe = (r.relativePath || "")
-          .replaceAll("/", "_")
-          .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+          .replace(/[\\\/]/g, "_")
+          .replace(/[^a-zA-Z0-9._-]/g, "_");
         const base = r.brand + "_" + (safe || "file");
         const jsonName = base.endsWith(".json") ? base : base + ".json";
 

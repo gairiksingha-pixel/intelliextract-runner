@@ -140,7 +140,15 @@ export class DashboardController {
     const brands = Object.keys(context.brandPurchasers).sort();
     const allPurchasers = Array.from(
       new Set(Object.values(context.brandPurchasers).flat()),
-    ).sort();
+    ).sort((a: string, b: string) => {
+      const nameA = ViewHelper.formatPurchaserDisplayName(a).toLowerCase();
+      const nameB = ViewHelper.formatPurchaserDisplayName(b).toLowerCase();
+      const isTempA = nameA.includes("temp");
+      const isTempB = nameB.includes("temp");
+      if (isTempA && !isTempB) return 1;
+      if (!isTempA && isTempB) return -1;
+      return nameA.localeCompare(nameB);
+    });
 
     return PageLayout({
       title: "IntelliExtract Runner",

@@ -33,6 +33,7 @@ export interface IFileRegistry {
   getUnextractedFiles(filter?: {
     brand?: string;
     purchaser?: string;
+    pairs?: { brand: string; purchaser: string }[];
   }): Promise<UnextractedFile[]>;
   updateFileStatus(
     id: string,

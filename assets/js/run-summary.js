@@ -38,15 +38,43 @@ async function downloadFile(path, btn) {
   const originalHtml = btn.innerHTML;
   btn.innerHTML = "...";
   btn.style.pointerEvents = "none";
+
   try {
+    const isExtractionJson = path.includes("output/extractions/");
     const checkUrl = "/api/download-file?file=" + encodeURIComponent(path);
+
+    // If it's an extraction JSON, we first try to find it in our local data
+    // to avoid a Roundtrip if possible or if the file is missing from disk.
+    if (isExtractionJson) {
+      const filename = path.split("/").pop();
+      // Try to find in SUMMARY_DATA
+      if (window.SUMMARY_DATA) {
+        for (const run of window.SUMMARY_DATA) {
+          const er = (run.extractionResults || []).find(
+            (e) => e.filename === filename,
+          );
+          if (er && er.response) {
+            downloadDataLocally(er.response, filename);
+            return;
+          }
+        }
+      }
+    }
+
     const response = await fetch(checkUrl, { method: "HEAD" });
     if (response.status === 404) {
       alert("The requested file was not found on the server.");
     } else if (!response.ok) {
       throw new Error("Download check failed");
     } else {
-      window.location.href = checkUrl;
+      // Create a temporary anchor to force download instead of just changing location.href
+      const a = document.createElement("a");
+      a.href = checkUrl;
+      const fn = path.split(/[\\\/]/).pop() || "download";
+      a.download = fn;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => document.body.removeChild(a), 200);
     }
   } catch (e) {
     alert("Failed to retrieve file: " + e.message);
@@ -58,6 +86,25 @@ async function downloadFile(path, btn) {
   }
 }
 window.downloadFile = downloadFile;
+
+function downloadDataLocally(data, filename) {
+  if (!data) return;
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  // Delay cleanup to ensure browser initiates the "Save As" handler
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 200);
+}
+window.downloadDataLocally = downloadDataLocally;
 
 function formatDuration(ms) {
   const sec = Math.floor(ms / 1000);
@@ -410,8 +457,8 @@ function buildRunSection(s) {
           <a href="javascript:void(0)" onclick="downloadFile('${sourcePath}', this)" class="action-btn" title="Download Source File">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           </a>
-          <a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Response">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Extraction JSON">
+            ${AppIcons.DOWNLOAD}
           </a>
         </div>
       </td>
@@ -547,9 +594,9 @@ function buildRunSection(s) {
               ${AppIcons.FILE}
             </a>
             ${
-              rec.status !== "skipped" || er
+              resp || er
                 ? `
-            <a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Response">
+            <a href="javascript:void(0)" onclick="downloadFile('${jsonPath}', this)" class="action-btn" title="Download Response (JSON)">
               ${AppIcons.DOWNLOAD}
             </a>`
                 : ""

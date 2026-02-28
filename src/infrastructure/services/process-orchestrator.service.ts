@@ -7,6 +7,12 @@ export interface ProcessOrchestratorCallbacks {
   onResumeSkip?: (skipped: number, total: number) => void;
   onResumeSkipSync?: (skipped: number, total: number) => void;
   onRunId?: (runId: string) => void;
+  /** Sync-only summary: downloaded, skipped, errors (from SYNC_SUMMARY line). */
+  onSyncSummary?: (
+    downloaded: number,
+    skipped: number,
+    errors: number,
+  ) => void;
   onChild?: (child: ChildProcess) => void;
 }
 
@@ -25,6 +31,7 @@ const RESUME_SKIP_PREFIX = "RESUME_SKIP\t";
 const RESUME_SKIP_SYNC_PREFIX = "RESUME_SKIP_SYNC\t";
 const RUN_ID_PREFIX = "RUN_ID\t";
 const LOG_PREFIX = "LOG\t";
+const SYNC_SUMMARY_PREFIX = "SYNC_SUMMARY\t";
 
 export class ProcessOrchestrator {
   private activeProcesses = new Map<string, ChildProcess>();
@@ -152,6 +159,24 @@ export class ProcessOrchestrator {
             if (parts.length >= 1) {
               const runId = parts[0].trim();
               if (callbacks.onRunId) callbacks.onRunId(runId);
+            }
+          }
+          if (
+            callbacks.onSyncSummary &&
+            line.startsWith(SYNC_SUMMARY_PREFIX)
+          ) {
+            const parts = line.slice(SYNC_SUMMARY_PREFIX.length).split("\t");
+            if (parts.length >= 3) {
+              const downloaded = Number(parts[0]);
+              const skipped = Number(parts[1]);
+              const errors = Number(parts[2]);
+              if (!Number.isNaN(downloaded) && !Number.isNaN(skipped)) {
+                callbacks.onSyncSummary(
+                  downloaded,
+                  skipped,
+                  Number.isNaN(errors) ? 0 : errors,
+                );
+              }
             }
           }
           if (line.startsWith(LOG_PREFIX)) {
