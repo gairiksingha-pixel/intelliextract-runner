@@ -19,13 +19,8 @@ import type {
   ExecutiveSummary,
   CheckpointRecord,
 } from "../../core/domain/types.js";
-import {
-  openCheckpointDb,
-  getRecordsForRun,
-  getAllRunIdsOrdered,
-  closeCheckpointDb,
-} from "../../checkpoint.js";
-import { computeMetrics } from "../../metrics.js";
+import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
+import { computeMetrics } from "../../infrastructure/utils/MetricsUtils.js";
 
 export interface ExtractionResultEntry {
   filename: string;
@@ -236,16 +231,16 @@ function minMaxDatesFromRecords(
   return { start, end };
 }
 
-export function loadHistoricalRunSummaries(
+export async function loadHistoricalRunSummaries(
+  repo: ICheckpointRepository,
   config: Config,
-): HistoricalRunSummary[] {
-  const db = openCheckpointDb(config.run.checkpointPath);
-  const runIds = getAllRunIdsOrdered(db);
+): Promise<HistoricalRunSummary[]> {
+  const runIds = await repo.getAllRunIdsOrdered();
 
   // 1. Build a global latency map to enrich skipped records later
   const globalLatencyMap = new Map<string, number>();
   for (const rid of runIds) {
-    const recs = getRecordsForRun(db, rid);
+    const recs = await repo.getRecordsForRun(rid);
     for (const r of recs) {
       if (r.status === "done" && r.latencyMs) {
         globalLatencyMap.set(r.filePath, r.latencyMs);
@@ -265,7 +260,7 @@ export function loadHistoricalRunSummaries(
   }> = [];
 
   for (const runId of runIds) {
-    const records = getRecordsForRun(db, runId);
+    const records = await repo.getRecordsForRun(runId);
     if (records.length === 0) continue;
 
     const allResultsForRun = loadExtractionResults(config, runId);
@@ -321,7 +316,6 @@ export function loadHistoricalRunSummaries(
       });
     }
   }
-  closeCheckpointDb(db);
 
   // 2. Group by Brand + Purchaser
   const groups = new Map<string, typeof rawSummaries>();
@@ -1248,14 +1242,12 @@ export function htmlReportFromHistory(
       color: var(--text);
       font-size: 13px;
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       min-height: 100vh;
-      visibility: hidden;
     }
-    body.ready {
-      visibility: visible;
-      animation: appFadeIn 0.4s ease-out;
-    }
+    .app-container { display: flex; min-height: 100vh; width: 100%; }
+    .content-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; overflow-y: auto; background: #f5f7f9; }
+    
     .page-body { padding: 1.25rem; }
     
     .header {
@@ -2160,26 +2152,9 @@ export function htmlReportFromHistory(
       goToHome();
     });
   </script>
-  <style>
-    .report-header-left .logo { cursor: pointer; }
-    /* Sidebar Layout */
-    body { display: flex; flex-direction: row; min-height: 100vh; }
-    .app-container { display: flex; min-height: 100vh; width: 100%; }
-    .content-wrapper { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; overflow-y: auto; background: #f5f7f9; }
-    .sidebar.collapsed { width: 80px; }
-    .sidebar-toggle-btn { position: absolute; right: -12px; top: 30px; width: 24px; height: 24px; background: white; border: 1px solid rgba(176,191,201,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2100; box-shadow: 0 2px 6px rgba(0,0,0,0.1); transition: all 0.3s; color: #5a5a5a; }
-    .sidebar-toggle-btn:hover { background: #e8f5ee; color: #2d9d5f; border-color: #2d9d5f; }
-    .sidebar-toggle-btn svg { width: 14px; height: 14px; transition: transform 0.3s; stroke-width: 2.5; }
-    .sidebar.collapsed .sidebar-toggle-btn svg { transform: none; }
-    .sidebar.collapsed .sidebar-header { padding: 0 0.75rem 2.5rem 0.75rem; display: flex; justify-content: center; }
-    .logo-small { display: none; height: 32px; width: auto; }
-    .sidebar.collapsed .sidebar-logo { display: none; }
-    .sidebar.collapsed .logo-small { display: block; }
-    .sidebar.collapsed .nav-item { padding: 0.85rem; justify-content: center; gap: 0; }
-    .nav-item span { transition: opacity 0.2s, transform 0.2s; opacity: 1; }
-    .sidebar.collapsed .nav-item span { opacity: 0; width: 0; pointer-events: none; transform: translateX(10px); }
-  </style>
-  <script src="/assets/js/sidebar-component.js"></script>
+  <script type="module" src="/assets/js/icons.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/assets/js/sidebar-component.js"></script>
 </head>
 <body style="background-color: #f5f7f9;">
   <script>document.body.className += ' ready';</script>
@@ -3074,15 +3049,17 @@ function pruneOldReports(outDir: string, retainCount: number): void {
  * Write reports for a single run ID (e.g. after each file completes so the summary is up to date).
  * Reads current checkpoint state, computes metrics, and calls writeReports.
  */
-export function writeReportsForRunId(config: Config, runId: string): void {
-  const db = openCheckpointDb(config.run.checkpointPath);
-  const records = getRecordsForRun(db, runId);
-  closeCheckpointDb(db);
+export async function writeReportsForRunId(
+  repo: ICheckpointRepository,
+  config: Config,
+  runId: string,
+): Promise<void> {
+  const records = await repo.getRecordsForRun(runId);
   if (records.length === 0) return;
   const { start, end } = minMaxDatesFromRecords(records);
   const metrics = computeMetrics(runId, records, start, end);
   const summary = buildSummary(metrics);
-  writeReports(config, summary);
+  await writeReports(repo, config, summary);
 }
 
 /**
@@ -3090,12 +3067,16 @@ export function writeReportsForRunId(config: Config, runId: string): void {
  * Includes all historical sync & extract runs (from checkpoint) so downloaded reports have full history.
  * If report.retainCount is set, older report sets are deleted after writing so only the last N are kept.
  */
-export function writeReports(config: Config, summary: ExecutiveSummary): void {
+export async function writeReports(
+  repo: ICheckpointRepository,
+  config: Config,
+  summary: ExecutiveSummary,
+): Promise<void> {
   const outDir = config.report.outputDir;
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 
   const runId = summary.metrics.runId;
-  const historicalSummaries = loadHistoricalRunSummaries(config);
+  const historicalSummaries = await loadHistoricalRunSummaries(repo, config);
   const generatedAt = new Date().toISOString();
 
   if (runId) {

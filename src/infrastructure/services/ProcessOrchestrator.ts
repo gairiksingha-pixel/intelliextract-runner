@@ -31,7 +31,10 @@ export class ProcessOrchestrator {
   constructor(
     private caseCommands: Record<
       string,
-      (p?: any, runOpts?: any) => [string, string[], any]
+      (
+        p?: any,
+        runOpts?: any,
+      ) => Promise<[string, string[], any]> | [string, string[], any]
     >,
   ) {}
 
@@ -47,7 +50,9 @@ export class ProcessOrchestrator {
     }
 
     const resolved =
-      typeof def === "function" ? (def as Function)(params, runOpts) : def;
+      typeof def === "function"
+        ? await (def as Function)(params, runOpts)
+        : def;
     const [cmd, args, opts] = resolved;
     const displayCmd = args ? [cmd, ...args].join(" ") : cmd;
 

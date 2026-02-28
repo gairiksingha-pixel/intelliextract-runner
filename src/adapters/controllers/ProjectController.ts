@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve, join, normalize, extname } from "node:path";
+import { ServerResponse } from "node:http";
 import { DashboardController } from "./DashboardController.js";
 import { IRunStatusStore } from "../../core/domain/services/IRunStatusStore.js";
 import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
@@ -34,7 +35,7 @@ export class ProjectController {
     private staticAssets: { logo: string; smallLogo: string; favIcon: string },
   ) {}
 
-  async getHomePage(res: any) {
+  async getHomePage(res: ServerResponse) {
     try {
       const html = await this.dashboardController.getHomePage({
         ...this.staticAssets,
@@ -44,16 +45,16 @@ export class ProjectController {
       res.end(html);
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end("Error generating home page: " + e.message);
+      res.end("Error generating home page: " + (e.message || "Unknown error"));
     }
   }
 
-  ping(res: any) {
+  ping(res: ServerResponse) {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "pong" }));
   }
 
-  async getAssets(url: string, res: any) {
+  async getAssets(url: string, res: ServerResponse) {
     let decodedPath;
     try {
       decodedPath = decodeURIComponent(url.slice(1));
@@ -92,7 +93,7 @@ export class ProjectController {
     }
   }
 
-  async getConfig(res: any) {
+  async getConfig(res: ServerResponse) {
     try {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ brandPurchasers: this.brandPurchasers }));
@@ -102,7 +103,7 @@ export class ProjectController {
     }
   }
 
-  async getEmailConfig(res: any) {
+  async getEmailConfig(res: ServerResponse) {
     try {
       const config = await this.checkpointRepo.getEmailConfig();
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -113,7 +114,7 @@ export class ProjectController {
     }
   }
 
-  async saveEmailConfig(body: string, res: any) {
+  async saveEmailConfig(body: string, res: ServerResponse) {
     try {
       const data = JSON.parse(body || "{}");
       if (data.recipientEmail) {
@@ -143,7 +144,7 @@ export class ProjectController {
     }
   }
 
-  async getActiveRuns(res: any) {
+  async getActiveRuns(res: ServerResponse) {
     try {
       const runs = this.runStatusStore.getActiveRuns();
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -154,7 +155,7 @@ export class ProjectController {
     }
   }
 
-  async getRunStatus(url: string, res: any) {
+  async getRunStatus(url: string, res: ServerResponse) {
     try {
       const urlObj = new URL(url, "http://localhost");
       const queryCaseId = urlObj.searchParams.get("caseId");
@@ -173,7 +174,7 @@ export class ProjectController {
             caseId: queryCaseId,
             isRunning: isActive,
             canResume,
-            state: (await this.runStateService.getRunState(queryCaseId)) || {},
+            state: state || {},
           }),
         );
       } else {
@@ -187,7 +188,7 @@ export class ProjectController {
     }
   }
 
-  async stopRun(body: string, res: any) {
+  async stopRun(body: string, res: ServerResponse) {
     try {
       const { caseId, origin } = JSON.parse(body || "{}");
       if (!caseId) {
@@ -212,7 +213,7 @@ export class ProjectController {
     }
   }
 
-  async clearRunState(body: string, res: any) {
+  async clearRunState(body: string, res: ServerResponse) {
     try {
       const { caseId } = JSON.parse(body || "{}");
       if (caseId && typeof caseId === "string") {
@@ -226,7 +227,7 @@ export class ProjectController {
     }
   }
 
-  async getStagingStats(res: any) {
+  async getStagingStats(res: ServerResponse) {
     try {
       const files = listStagingFiles(this.stagingDir, this.stagingDir, []);
       res.writeHead(200, { "Content-Type": "application/json" });

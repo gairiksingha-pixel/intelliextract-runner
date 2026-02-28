@@ -1,5 +1,11 @@
 import { commonStyles } from "./style.js";
-import { NotificationModal, AlertModal } from "./Modals.js";
+import {
+  NotificationModal,
+  AlertModal,
+  ScheduleModal,
+  ExtractionDataModal,
+  ReportViewOverlay,
+} from "./Modals.js";
 
 interface PageLayoutProps {
   title: string;
@@ -38,7 +44,9 @@ export function PageLayout({
     ${commonStyles}
     ${styles}
   </style>
-  <script src="/assets/js/sidebar-component.js"></script>
+  <script type="module" src="/assets/js/icons.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/assets/js/sidebar-component.js"></script>
   ${meta}
 </head>
 <body>
@@ -52,29 +60,12 @@ export function PageLayout({
       ${content}
       ${NotificationModal()}
       ${AlertModal()}
+      ${ScheduleModal()}
+      ${ExtractionDataModal()}
+      ${ReportViewOverlay()}
     </div>
   </div>
   ${scripts}
-  <script>
-    (function() {
-      function showLoader() { var l = document.getElementById('page-loader'); if (l) l.style.display = 'flex'; }
-      function hideLoader() { var l = document.getElementById('page-loader'); if (l) l.style.display = 'none'; }
-      if (document.readyState === 'complete') { hideLoader(); }
-      window.addEventListener('pageshow', function(e) { if (e.persisted) { hideLoader(); } else { hideLoader(); } });
-      window.addEventListener('load', hideLoader);
-      setTimeout(hideLoader, 5000);
-      document.addEventListener('click', function(e) {
-        var t = e.target.closest('a');
-        if (t && t.href && !t.href.startsWith('javascript:') && !t.href.startsWith('#') && t.target !== '_blank' && !e.ctrlKey && !e.metaKey) {
-          var currentUrl = window.location.href.split('#')[0].split('?')[0];
-          var targetUrl = t.href.split('#')[0].split('?')[0];
-          if (targetUrl !== currentUrl && targetUrl !== currentUrl + '/' && currentUrl !== targetUrl + '/') {
-            showLoader();
-          }
-        }
-      });
-    })();
-  </script>
 </body>
 </html>`;
 }

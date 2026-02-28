@@ -1,4 +1,6 @@
 import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { Schedule } from "../../core/domain/entities/Schedule.js";
 import { IScheduleRepository } from "../../core/domain/repositories/IScheduleRepository.js";
 
@@ -6,6 +8,7 @@ export class SqliteScheduleRepository implements IScheduleRepository {
   constructor(private dbPath: string) {}
 
   private getDb() {
+    mkdirSync(dirname(this.dbPath), { recursive: true });
     return new Database(this.dbPath);
   }
 

@@ -1,8 +1,9 @@
-(function () {
-  if (!document.getElementById("sidebar-component-styles")) {
-    const style = document.createElement("style");
-    style.id = "sidebar-component-styles";
-    style.textContent = `
+import { AppIcons } from "./icons.js";
+
+if (!document.getElementById("sidebar-component-styles")) {
+  const style = document.createElement("style");
+  style.id = "sidebar-component-styles";
+  style.textContent = `
       .sidebar {
         width: 275px;
         min-width: 0;
@@ -151,28 +152,24 @@
         transform: scale(1.1);
       }
 `;
-    document.head.appendChild(style);
-  }
+  document.head.appendChild(style);
+}
 
-  class AppSidebar extends HTMLElement {
-    connectedCallback() {
-      const activeTab = this.getAttribute("active-tab") || "";
-      const logoUri = this.getAttribute("logo-uri") || "/assets/logo.png";
-      const smallLogoUri =
-        this.getAttribute("small-logo-uri") || "/assets/logo-small.png";
+class AppSidebar extends HTMLElement {
+  connectedCallback() {
+    const activeTab = this.getAttribute("active-tab") || "";
+    const logoUri = this.getAttribute("logo-uri") || "/assets/logo.png";
+    const smallLogoUri =
+      this.getAttribute("small-logo-uri") || "/assets/logo-small.png";
 
-      const isCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
-      const sidebarWidth = isCollapsed ? "80px" : "275px";
-      const collapsedClass = isCollapsed ? "collapsed" : "";
+    const isCollapsed = localStorage.getItem("sidebarCollapsed") === "true";
+    const sidebarWidth = isCollapsed ? "80px" : "275px";
+    const collapsedClass = isCollapsed ? "collapsed" : "";
 
-      this.innerHTML = `
+    this.innerHTML = `
                 <aside class="sidebar ${collapsedClass}" id="sidebar" style="width: ${sidebarWidth}">
-                    <div class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="3" y1="12" x2="21" y2="12"></line>
-                            <line x1="3" y1="6" x2="21" y2="6"></line>
-                            <line x1="3" y1="18" x2="21" y2="18"></line>
-                        </svg>
+                    <div class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Toggle Sidebar">
+                        ${AppIcons.MENU}
                     </div>
                     <div class="sidebar-header">
                         <a href="/">
@@ -182,44 +179,49 @@
                     </div>
                     <nav class="sidebar-nav">
                         <a href="/" class="nav-item ${activeTab === "dashboard" ? "active" : ""}" data-tab="dashboard">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            ${AppIcons.DASHBOARD}
                             <span>Dashboard</span>
                         </a>
                         <a href="/reports/inventory" class="nav-item ${activeTab === "inventory" ? "active" : ""}" data-tab="inventory">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>
+                            ${AppIcons.INVENTORY}
                             <span>Inventory</span>
                         </a>
                         <a href="/reports/summary" class="nav-item ${activeTab === "summary" ? "active" : ""}" data-tab="summary">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+                            ${AppIcons.SUMMARY}
                             <span>Run Summary</span>
                         </a>
                         <a href="/reports/explorer" class="nav-item ${activeTab === "explorer" ? "active" : ""}" data-tab="explorer">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                            ${AppIcons.EXPLORER}
                             <span>Data Explorer</span>
                         </a>
                     </nav>
                 </aside>
             `;
+
+    // Static event listener instead of inline onclick for better CSP and modularity
+    const toggleBtn = this.querySelector("#sidebar-toggle-btn");
+    if (toggleBtn) {
+      toggleBtn.onclick = () => window.toggleSidebar();
     }
   }
+}
 
-  if (!window.toggleSidebar) {
-    window.toggleSidebar = function () {
-      const sidebar = document.getElementById("sidebar");
-      if (!sidebar) return;
-      const isCollapsed = sidebar.classList.contains("collapsed");
-      if (isCollapsed) {
-        sidebar.classList.remove("collapsed");
-        sidebar.style.width = "275px";
-      } else {
-        sidebar.classList.add("collapsed");
-        sidebar.style.width = "80px";
-      }
-      localStorage.setItem("sidebarCollapsed", !isCollapsed);
-    };
-  }
+if (!window.toggleSidebar) {
+  window.toggleSidebar = function () {
+    const sidebar = document.getElementById("sidebar");
+    if (!sidebar) return;
+    const isCollapsed = sidebar.classList.contains("collapsed");
+    if (isCollapsed) {
+      sidebar.classList.remove("collapsed");
+      sidebar.style.width = "275px";
+    } else {
+      sidebar.classList.add("collapsed");
+      sidebar.style.width = "80px";
+    }
+    localStorage.setItem("sidebarCollapsed", !isCollapsed);
+  };
+}
 
-  if (!customElements.get("app-sidebar")) {
-    customElements.define("app-sidebar", AppSidebar);
-  }
-})();
+if (!customElements.get("app-sidebar")) {
+  customElements.define("app-sidebar", AppSidebar);
+}

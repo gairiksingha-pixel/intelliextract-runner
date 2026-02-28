@@ -17,7 +17,9 @@ import { ReportingUseCase } from "./core/use-cases/ReportingUseCase.js";
 import { DiscoverFilesUseCase } from "./core/use-cases/DiscoverFilesUseCase.js";
 import { DashboardController } from "./adapters/controllers/DashboardController.js";
 import { ExtractionController } from "./adapters/controllers/ExtractionController.js";
+import { ExecuteWorkflowUseCase } from "./core/use-cases/ExecuteWorkflowUseCase.js";
 import { ScheduleController } from "./adapters/controllers/ScheduleController.js";
+import { NodemailerEmailService } from "./infrastructure/services/NodemailerEmailService.js";
 import { ReportController } from "./adapters/controllers/ReportController.js";
 import { ProjectController } from "./adapters/controllers/ProjectController.js";
 import { Router } from "./adapters/Router.js";
@@ -37,18 +39,13 @@ import { CronManager } from "./infrastructure/services/CronManager.js";
 import { loadBrandPurchasers } from "./infrastructure/utils/TenantUtils.js";
 import { getCaseCommands } from "./infrastructure/utils/CommandUtils.js";
 import { loadStaticAssets } from "./infrastructure/views/Constants.js";
-import {
-  openCheckpointDb,
-  getCurrentRunId,
-  closeCheckpointDb,
-} from "./checkpoint.js";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PORT = 8765;
+const PORT = 8767;
 const ROOT = resolve(__dirname, "..");
 const BRAND_PURCHASERS = loadBrandPurchasers();
 
@@ -63,9 +60,11 @@ const jsonLogger = new JsonLogger(
 const REPORTS_DIR = join(ROOT, "output", "reports");
 const EXTRACTIONS_DIR = join(ROOT, "output", "extractions");
 const STAGING_DIR = join(ROOT, "output", "staging");
-const CHECKPOINT_PATH =
+const _rawCheckpointPath =
   appConfig.run.checkpointPath ||
-  join(ROOT, "output", "checkpoints", "checkpoint.sqlite");
+  join(ROOT, "output", "checkpoints", "checkpoint.db");
+// Always resolve relative to ROOT so the path is absolute regardless of cwd
+const CHECKPOINT_PATH = resolve(ROOT, _rawCheckpointPath);
 const SCHEDULE_LOG_PATH = join(ROOT, "output", "logs", "schedule.log");
 
 // Ensure directories exist
@@ -95,7 +94,6 @@ const getInventoryDataUseCase = new GetInventoryDataUseCase(
 );
 const discoverFilesUseCase = new DiscoverFilesUseCase();
 const reportingUseCase = new ReportingUseCase(checkpointRepo);
-
 // 4. Initialize Services
 const s3Service = new AwsS3Service(appConfig.s3.region, syncRepo);
 const extractionService = new IntelliExtractService(appConfig, EXTRACTIONS_DIR);
@@ -103,21 +101,29 @@ const runStatusStore = new RunStatusStore(new Map());
 const notificationService = new NodemailerService(
   await checkpointRepo.getEmailConfig(),
 );
-const runStateService = new RunStateService(CHECKPOINT_PATH);
+const runStateService = new RunStateService(checkpointRepo);
 
 const syncBrandUseCase = new SyncBrandUseCase(s3Service, syncRepo);
+const emailService = new NodemailerEmailService(checkpointRepo);
 const runExtractionUseCase = new RunExtractionUseCase(
   extractionService,
   checkpointRepo,
   jsonLogger,
+  emailService,
 );
 
-const caseCommands = getCaseCommands(ROOT, () => {
+const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
+  syncBrandUseCase,
+  runExtractionUseCase,
+  reportingUseCase,
+  discoverFilesUseCase,
+  runStatusStore,
+  STAGING_DIR,
+);
+
+const caseCommands = getCaseCommands(ROOT, async () => {
   try {
-    const db = openCheckpointDb(CHECKPOINT_PATH);
-    const runId = getCurrentRunId(db);
-    closeCheckpointDb(db);
-    return runId;
+    return await checkpointRepo.getCurrentRunId();
   } catch (_) {
     return null;
   }
@@ -142,12 +148,11 @@ const dashboardController = new DashboardController(
   getInventoryDataUseCase,
 );
 const extractionController = new ExtractionController(
-  syncBrandUseCase,
-  runExtractionUseCase,
-  reportingUseCase,
-  discoverFilesUseCase,
-  notificationService,
+  orchestrator,
   runStatusStore,
+  runStateService,
+  checkpointRepo,
+  RESUME_CAPABLE_CASES,
 );
 
 const staticAssets = loadStaticAssets(ROOT);
@@ -163,7 +168,7 @@ const reportController = new ReportController(
   EXTRACTIONS_DIR,
   STAGING_DIR,
   ROOT,
-  CHECKPOINT_PATH,
+  checkpointRepo,
   appConfig,
   staticAssets,
   BRAND_PURCHASERS,

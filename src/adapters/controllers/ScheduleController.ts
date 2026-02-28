@@ -1,3 +1,4 @@
+import { ServerResponse } from "node:http";
 import { IScheduleRepository } from "../../core/domain/repositories/IScheduleRepository.js";
 import { CronManager } from "../../infrastructure/services/CronManager.js";
 import { readScheduleLogEntries } from "../../infrastructure/utils/LogUtils.js";
@@ -12,7 +13,7 @@ export class ScheduleController {
     private scheduleLogPath: string,
   ) {}
 
-  async getSchedules(res: any) {
+  async getSchedules(res: ServerResponse) {
     try {
       const list = await this.scheduleRepo.getSchedules();
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -25,7 +26,7 @@ export class ScheduleController {
     }
   }
 
-  async addSchedule(body: string, res: any) {
+  async addSchedule(body: string, res: ServerResponse) {
     try {
       const {
         brands,
@@ -34,11 +35,13 @@ export class ScheduleController {
         timezone,
       } = JSON.parse(body || "{}");
       const brandList = Array.isArray(brands)
-        ? brands.filter((b: any) => typeof b === "string" && b.trim() !== "")
+        ? brands.filter(
+            (b): b is string => typeof b === "string" && b.trim() !== "",
+          )
         : [];
       const purchaserList = Array.isArray(purchasers)
         ? purchasers.filter(
-            (p: any) => typeof p === "string" && p.trim() !== "",
+            (p): p is string => typeof p === "string" && p.trim() !== "",
           )
         : [];
 
@@ -86,7 +89,7 @@ export class ScheduleController {
     }
   }
 
-  async updateSchedule(id: string, body: string, res: any) {
+  async updateSchedule(id: string, body: string, res: ServerResponse) {
     try {
       const {
         brands,
@@ -95,11 +98,13 @@ export class ScheduleController {
         timezone,
       } = JSON.parse(body || "{}");
       const brandList = Array.isArray(brands)
-        ? brands.filter((b: any) => typeof b === "string" && b.trim() !== "")
+        ? brands.filter(
+            (b): b is string => typeof b === "string" && b.trim() !== "",
+          )
         : [];
       const purchaserList = Array.isArray(purchasers)
         ? purchasers.filter(
-            (p: any) => typeof p === "string" && p.trim() !== "",
+            (p): p is string => typeof p === "string" && p.trim() !== "",
           )
         : [];
 
@@ -177,7 +182,7 @@ export class ScheduleController {
     }
   }
 
-  async deleteSchedule(id: string, res: any) {
+  async deleteSchedule(id: string, res: ServerResponse) {
     try {
       this.cronManager.stopJob(id);
       await this.scheduleRepo.deleteSchedule(id);
@@ -189,7 +194,7 @@ export class ScheduleController {
     }
   }
 
-  getLogEntries(url: string, res: any) {
+  getLogEntries(url: string, res: ServerResponse) {
     try {
       const urlObj = new URL(url, "http://localhost");
       const page = parseInt(urlObj.searchParams.get("page") || "1", 10);

@@ -1,4 +1,6 @@
 import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { Checkpoint } from "../../core/domain/entities/Checkpoint.js";
 import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
 
@@ -10,6 +12,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
   }
 
   private getDb() {
+    mkdirSync(dirname(this.dbPath), { recursive: true });
     return new Database(this.dbPath);
   }
 
@@ -72,10 +75,63 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     return await this.getMeta("current_run_id");
   }
 
-  async startNewRun(): Promise<string> {
-    const runId = new Date().toISOString().replace(/[:.]/g, "-");
+  async startNewRun(prefix?: string): Promise<string> {
+    const runId =
+      (prefix || "RUN") + new Date().toISOString().replace(/[:.]/g, "-");
     await this.setMeta("current_run_id", runId);
     return runId;
+  }
+
+  async upsertCheckpoints(checkpoints: Checkpoint[]): Promise<void> {
+    const db = this.getDb();
+    try {
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO checkpoints 
+        (filePath, relativePath, brand, status, startedAt, finishedAt, latencyMs, statusCode, errorMessage, patternKey, runId, purchaser)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      db.transaction(() => {
+        for (const cp of checkpoints) {
+          stmt.run(
+            cp.filePath,
+            cp.relativePath,
+            cp.brand,
+            cp.status,
+            cp.startedAt,
+            cp.finishedAt,
+            cp.latencyMs,
+            cp.statusCode,
+            cp.errorMessage,
+            cp.patternKey,
+            cp.runId,
+            cp.purchaser,
+          );
+        }
+      })();
+    } finally {
+      db.close();
+    }
+  }
+
+  async getCumulativeStats(filter?: {
+    tenant?: string;
+    purchaser?: string;
+  }): Promise<{ success: number; failed: number; total: number }> {
+    const db = this.getDb();
+    try {
+      let query = "SELECT status FROM checkpoints";
+      const params: string[] = [];
+      if (filter?.tenant && filter?.purchaser) {
+        query += " WHERE brand = ? AND purchaser = ?";
+        params.push(filter.tenant, filter.purchaser);
+      }
+      const rows = db.prepare(query).all(...params);
+      const success = rows.filter((r: any) => r.status === "done").length;
+      const failed = rows.filter((r: any) => r.status === "error").length;
+      return { success, failed, total: rows.length };
+    } finally {
+      db.close();
+    }
   }
 
   async markRunCompleted(runId: string): Promise<void> {
@@ -126,15 +182,32 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     }
   }
 
-  async getCompletedPaths(runId: string): Promise<Set<string>> {
+  async getCompletedPaths(runId?: string): Promise<Set<string>> {
     const db = this.getDb();
     try {
-      const rows = db
+      let query =
+        "SELECT filePath FROM checkpoints WHERE (status = 'done' OR status = 'skipped')";
+      const params: any[] = [];
+      if (runId) {
+        query += " AND runId = ?";
+        params.push(runId);
+      }
+      const rows = db.prepare(query).all(...params);
+      return new Set(rows.map((r: any) => r.filePath));
+    } finally {
+      db.close();
+    }
+  }
+
+  async getGlobalSkipCount(): Promise<number> {
+    const db = this.getDb();
+    try {
+      const row = db
         .prepare(
-          "SELECT relativePath FROM checkpoints WHERE runId = ? AND status = 'done'",
+          "SELECT COUNT(DISTINCT filePath) as count FROM checkpoints WHERE status = 'done' OR status = 'skipped'",
         )
-        .all(runId);
-      return new Set(rows.map((r: any) => r.relativePath));
+        .get();
+      return (row as any).count;
     } finally {
       db.close();
     }
@@ -175,6 +248,20 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     const canResume = records.length > 0 && runId !== lastCompleted;
 
     return { canResume, runId, done, failed, total: records.length };
+  }
+
+  async getAllRunIdsOrdered(): Promise<string[]> {
+    const db = this.getDb();
+    try {
+      const rows = db
+        .prepare(
+          "SELECT DISTINCT runId FROM checkpoints ORDER BY startedAt DESC",
+        )
+        .all();
+      return rows.map((r: any) => r.runId);
+    } finally {
+      db.close();
+    }
   }
 
   async getMeta(key: string): Promise<string | null> {

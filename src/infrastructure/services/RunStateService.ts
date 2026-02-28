@@ -1,18 +1,11 @@
-import {
-  openCheckpointDb,
-  getMeta,
-  setMeta,
-  closeCheckpointDb,
-} from "../../checkpoint.js";
+import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
 
 export class RunStateService {
-  constructor(private checkpointPath: string) {}
+  constructor(private checkpointRepo: ICheckpointRepository) {}
 
-  loadRunStates(): any {
+  async loadRunStates(): Promise<any> {
     try {
-      const db = openCheckpointDb(this.checkpointPath);
-      const val = getMeta(db, "last_run_state");
-      closeCheckpointDb(db);
+      const val = await this.checkpointRepo.getMeta("last_run_state");
       if (!val) return {};
       return JSON.parse(val);
     } catch (_) {
@@ -20,28 +13,29 @@ export class RunStateService {
     }
   }
 
-  saveRunStates(states: any): void {
+  async saveRunStates(states: any): Promise<void> {
     try {
-      const db = openCheckpointDb(this.checkpointPath);
-      setMeta(db, "last_run_state", JSON.stringify(states));
-      closeCheckpointDb(db);
+      await this.checkpointRepo.setMeta(
+        "last_run_state",
+        JSON.stringify(states),
+      );
     } catch (_) {}
   }
 
-  updateRunState(caseId: string, stateUpdate: any): void {
-    const states = this.loadRunStates();
+  async updateRunState(caseId: string, stateUpdate: any): Promise<void> {
+    const states = await this.loadRunStates();
     states[caseId] = { ...states[caseId], ...stateUpdate };
-    this.saveRunStates(states);
+    await this.saveRunStates(states);
   }
 
-  clearRunState(caseId: string): void {
-    const states = this.loadRunStates();
+  async clearRunState(caseId: string): Promise<void> {
+    const states = await this.loadRunStates();
     delete states[caseId];
-    this.saveRunStates(states);
+    await this.saveRunStates(states);
   }
 
-  getRunState(caseId: string): any {
-    const states = this.loadRunStates();
+  async getRunState(caseId: string): Promise<any> {
+    const states = await this.loadRunStates();
     return states[caseId] || null;
   }
 }

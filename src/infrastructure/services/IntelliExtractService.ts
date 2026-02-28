@@ -1,9 +1,14 @@
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { extract, type ExtractResult } from "./api-client.js";
+import {
+  extract,
+  type ExtractResult,
+  getExtractUploadUrl,
+} from "./api-client.js";
 import {
   IExtractionService,
   ExtractionResult,
+  NetworkAbortError,
 } from "../../core/domain/services/IExtractionService.js";
 import { Config } from "../../core/domain/entities/Config.js";
 
@@ -17,6 +22,8 @@ export class IntelliExtractService implements IExtractionService {
     filePath: string,
     brand: string,
     purchaser?: string,
+    runId?: string,
+    relativePath?: string,
   ): Promise<ExtractionResult> {
     let bodyBase64: string;
     try {
@@ -63,13 +70,15 @@ export class IntelliExtractService implements IExtractionService {
         result.body,
         isAppSuccess,
         result.latencyMs,
+        runId,
+        relativePath,
       );
     }
 
     const finalSuccess = isAppSuccess;
     const baseErrorSnippet = finalSuccess
       ? undefined
-      : result.body.slice(0, 500);
+      : result.body?.slice(0, 500) || "";
     const errorMessage =
       finalSuccess || (!baseErrorSnippet && !appErrorMessage)
         ? undefined
@@ -101,6 +110,8 @@ export class IntelliExtractService implements IExtractionService {
     const NETWORK_MAX_RETRIES = 5;
     const NETWORK_RETRY_DELAY_MS = 12000;
 
+    const stdoutPiped = !process.stdout.isTTY;
+
     while (true) {
       attempt += 1;
       last = await extract(this.appConfig, {
@@ -112,14 +123,19 @@ export class IntelliExtractService implements IExtractionService {
       // Check for Network Error (statusCode === 0)
       if (last.statusCode === 0) {
         if (attempt <= NETWORK_MAX_RETRIES) {
+          if (stdoutPiped) {
+            process.stdout.write(
+              `LOG\tNetwork interruption detected. Retry ${attempt}/${NETWORK_MAX_RETRIES} in ${NETWORK_RETRY_DELAY_MS / 1000}s...\n`,
+            );
+          }
           await new Promise((resolve) =>
             setTimeout(resolve, NETWORK_RETRY_DELAY_MS),
           );
           continue;
         } else {
-          // throw new Error("Network interruption detected (max retries exceeded). Aborting run.");
-          // In this service implementation, we return the error result and let the use case handle it.
-          break;
+          throw new NetworkAbortError(
+            "Network interruption detected (max retries exceeded). Aborting run.",
+          );
         }
       }
 
@@ -148,13 +164,22 @@ export class IntelliExtractService implements IExtractionService {
     responseBody: string,
     success: boolean,
     latencyMs: number,
+    runId?: string,
+    relativePath?: string,
   ) {
     const subdir = success ? "succeeded" : "failed";
     const outDir = join(this.extractionsDir, subdir);
-    mkdirSync(outDir, { recursive: true });
+    if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 
-    const safe = filePath.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const filename = `${brand}_${safe}.json`;
+    // Use relative path for safe filename to match old project logic
+    const relativePathForName = relativePath || filePath;
+    const safe = relativePathForName
+      .replaceAll(/[\\/]/g, "_")
+      .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+
+    let filename = `${brand}_${safe}`;
+    if (!filename.toLowerCase().endsWith(".json")) filename += ".json";
+
     const path = join(outDir, filename);
 
     try {
@@ -162,9 +187,11 @@ export class IntelliExtractService implements IExtractionService {
       if (typeof data === "object" && data !== null) {
         const d = data as any;
         d._filePath = filePath;
+        d._relativePath = relativePathForName;
         d._brand = brand;
         d._purchaser = purchaser;
         d._latencyMs = latencyMs;
+        if (runId) d._runId = runId;
       }
       writeFileSync(path, JSON.stringify(data, null, 2), "utf-8");
     } catch {

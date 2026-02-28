@@ -6,6 +6,7 @@ import {
   readFileSync,
 } from "node:fs";
 import { join, extname, resolve, basename } from "node:path";
+import { ServerResponse } from "node:http";
 // @ts-ignore
 import archiver from "archiver";
 import { DashboardController } from "./DashboardController.js";
@@ -13,11 +14,7 @@ import {
   loadHistoricalRunSummaries,
   htmlReportFromHistory,
 } from "../presenters/report.js";
-import {
-  openCheckpointDb,
-  getRecordsForRun,
-  closeCheckpointDb,
-} from "../../checkpoint.js";
+import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
 
 export class ReportController {
   constructor(
@@ -26,47 +23,55 @@ export class ReportController {
     private extractionsDir: string,
     private stagingDir: string,
     private rootDir: string,
-    private checkpointPath: string,
+    private checkpointRepo: ICheckpointRepository,
     private appConfig: any,
     private staticAssets: { logo: string; smallLogo: string; favIcon: string },
     private brandPurchasers: Record<string, string[]>,
   ) {}
 
-  async listReports(res: any) {
+  async listReports(res: ServerResponse) {
     try {
       const allowedExt = new Set([".html", ".json"]);
-      const list: any = { html: [], json: [] };
+      const list: {
+        html: { name: string; mtime: number }[];
+        json: { name: string; mtime: number }[];
+      } = { html: [], json: [] };
+
       if (!existsSync(this.reportsDir)) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(list));
         return;
       }
+
       const files = readdirSync(this.reportsDir, {
         withFileTypes: true,
       }).filter(
         (e) => e.isFile() && allowedExt.has(extname(e.name).toLowerCase()),
       );
+
       for (const f of files) {
         const ext = extname(f.name).toLowerCase();
-        const key = ext === ".html" ? "html" : "json";
+        const key = (ext === ".html" ? "html" : "json") as keyof typeof list;
         let mtime = 0;
         try {
           mtime = statSync(join(this.reportsDir, f.name)).mtimeMs;
         } catch (_) {}
         list[key].push({ name: f.name, mtime });
       }
-      for (const key of Object.keys(list)) {
-        list[key].sort((a: any, b: any) => b.mtime - a.mtime);
+
+      for (const key of Object.keys(list) as (keyof typeof list)[]) {
+        list[key].sort((a, b) => b.mtime - a.mtime);
       }
+
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(list));
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: String(e.message) }));
+      res.end(JSON.stringify({ error: String(e.message || "Unknown error") }));
     }
   }
 
-  async getReportFile(url: string, res: any) {
+  async getReportFile(url: string, res: ServerResponse) {
     const rest = url.slice("/api/reports/".length);
     const slash = rest.indexOf("/");
     const format = slash === -1 ? rest : rest.slice(0, slash);
@@ -119,23 +124,28 @@ export class ReportController {
       }
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: String(e.message) }));
+      res.end(JSON.stringify({ error: String(e.message || "Unknown error") }));
     }
   }
 
-  async getSummaryReport(res: any) {
+  async getSummaryReport(res: ServerResponse) {
     try {
-      const summaries = loadHistoricalRunSummaries(this.appConfig);
+      const summaries = await loadHistoricalRunSummaries(
+        this.checkpointRepo,
+        this.appConfig,
+      );
       const html = htmlReportFromHistory(summaries, new Date().toISOString());
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(html);
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end("Error generating summary report: " + e.message);
+      res.end(
+        "Error generating summary report: " + (e.message || "Unknown error"),
+      );
     }
   }
 
-  async getExplorerPage(res: any) {
+  async getExplorerPage(res: ServerResponse) {
     try {
       const html = await this.dashboardController.getExplorerPage({
         ...this.staticAssets,
@@ -145,11 +155,13 @@ export class ReportController {
       res.end(html);
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end("Error generating explorer page: " + e.message);
+      res.end(
+        "Error generating explorer page: " + (e.message || "Unknown error"),
+      );
     }
   }
 
-  async getInventoryPage(res: any) {
+  async getInventoryPage(res: ServerResponse) {
     try {
       const html = await this.dashboardController.getInventoryPage({
         ...this.staticAssets,
@@ -159,11 +171,13 @@ export class ReportController {
       res.end(html);
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end("Error generating inventory report: " + e.message);
+      res.end(
+        "Error generating inventory report: " + (e.message || "Unknown error"),
+      );
     }
   }
 
-  async downloadFile(url: string, res: any) {
+  async downloadFile(url: string, res: ServerResponse) {
     try {
       const q = new URL(url, "http://localhost").searchParams;
       const fileId = q.get("file");
@@ -194,11 +208,11 @@ export class ReportController {
       createReadStream(fullPath).pipe(res);
     } catch (e: any) {
       res.writeHead(500);
-      res.end(e.message);
+      res.end(e.message || "Unknown error");
     }
   }
 
-  async exportZip(body: string, res: any) {
+  async exportZip(body: string, res: ServerResponse) {
     try {
       const { files, zipName } = JSON.parse(body);
       if (!Array.isArray(files) || files.length === 0) {
@@ -236,12 +250,14 @@ export class ReportController {
     } catch (e: any) {
       if (!res.writableEnded) {
         res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: String(e.message) }));
+        res.end(
+          JSON.stringify({ error: String(e.message || "Unknown error") }),
+        );
       }
     }
   }
 
-  async exportResultsByRuns(body: string, res: any) {
+  async exportResultsByRuns(body: string, res: ServerResponse) {
     try {
       const { runIds } = JSON.parse(body);
       if (!Array.isArray(runIds) || runIds.length === 0) {
@@ -261,11 +277,10 @@ export class ReportController {
       });
       archive.pipe(res);
 
-      const db = openCheckpointDb(this.checkpointPath);
       const allFiles = new Set<string>();
 
       for (const runId of runIds) {
-        const records = getRecordsForRun(db, runId);
+        const records = await this.checkpointRepo.getRecordsForRun(runId);
         for (const r of records) {
           const safe = (r.relativePath || "")
             .replaceAll("/", "_")
@@ -280,7 +295,6 @@ export class ReportController {
           else if (existsSync(failPath)) allFiles.add(failPath);
         }
       }
-      closeCheckpointDb(db);
 
       for (const absPath of allFiles) {
         archive.file(absPath, { name: basename(absPath) });
@@ -290,12 +304,14 @@ export class ReportController {
     } catch (e: any) {
       if (!res.writableEnded) {
         res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: String(e.message) }));
+        res.end(
+          JSON.stringify({ error: String(e.message || "Unknown error") }),
+        );
       }
     }
   }
 
-  async exportAllExtractions(res: any) {
+  async exportAllExtractions(res: ServerResponse) {
     try {
       if (!existsSync(this.extractionsDir)) {
         res.writeHead(404, { "Content-Type": "application/json" });
@@ -316,7 +332,7 @@ export class ReportController {
       archive.finalize();
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: String(e.message) }));
+      res.end(JSON.stringify({ error: String(e.message || "Unknown error") }));
     }
   }
 }

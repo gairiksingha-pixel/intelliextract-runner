@@ -7,16 +7,23 @@ export interface ICheckpointRepository {
 
   // Run management
   getCurrentRunId(): Promise<string | null>;
-  startNewRun(): Promise<string>;
+  startNewRun(prefix?: string): Promise<string>;
   markRunCompleted(runId: string): Promise<void>;
   getLastCompletedRunId(): Promise<string | null>;
   getRunStatus(): Promise<any>;
+  getAllRunIdsOrdered(): Promise<string[]>;
 
   // Checkpoint management
   upsertCheckpoint(checkpoint: Checkpoint): Promise<void>;
+  upsertCheckpoints(checkpoints: Checkpoint[]): Promise<void>;
   getRecordsForRun(runId: string): Promise<Checkpoint[]>;
-  getCompletedPaths(runId: string): Promise<Set<string>>;
+  getCompletedPaths(runId?: string): Promise<Set<string>>;
+  getGlobalSkipCount(): Promise<number>;
   getErrorPaths(runId: string): Promise<Set<string>>;
+  getCumulativeStats(filter?: {
+    tenant?: string;
+    purchaser?: string;
+  }): Promise<{ success: number; failed: number; total: number }>;
 
   // Meta management (generic key-value for state)
   getMeta(key: string): Promise<string | null>;

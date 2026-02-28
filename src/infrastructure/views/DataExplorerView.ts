@@ -97,7 +97,7 @@ export class DataExplorerView {
       background: var(--surface);
       border: 1px solid var(--border-light);
       border-radius: var(--radius);
-      overflow: hidden;
+      overflow: visible;
       box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
     .data-table {
@@ -139,9 +139,10 @@ export class DataExplorerView {
     .json-viewer {
       padding: 1.25rem 1.5rem;
       overflow-x: auto;
-      max-height: 600px;
-      overflow-y: auto;
+      max-height: 2000px;
+      overflow-y: visible;
       transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+      text-align: left;
     }
     .expand-row-content { overflow: hidden; height: 0; opacity: 0; transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
     .expand-row-content.open { height: auto; opacity: 1; }
@@ -162,6 +163,7 @@ export class DataExplorerView {
       color: #e2e8f0;
       white-space: pre-wrap;
       word-break: break-all;
+      text-align: left;
     }
     .json-key { color: #93c5fd; }
     .json-string { color: #86efac; }

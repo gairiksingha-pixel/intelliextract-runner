@@ -80,10 +80,14 @@ export class CronManager {
           return;
         }
 
-        const pausedCase = Array.from(this.resumeCapableCases).find((cid) => {
-          const state = this.runStateService.getRunState(cid);
-          return state && state.status === "stopped";
-        });
+        let pausedCase: string | undefined;
+        for (const cid of this.resumeCapableCases) {
+          const state = await this.runStateService.getRunState(cid);
+          if (state && state.status === "stopped") {
+            pausedCase = cid;
+            break;
+          }
+        }
 
         if (pausedCase) {
           appendScheduleLog(this.logPath, {

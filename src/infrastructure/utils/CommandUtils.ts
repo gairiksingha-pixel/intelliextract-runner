@@ -4,8 +4,9 @@ import { existsSync, copyFileSync, unlinkSync } from "node:fs";
 export function addPairArgs(base: string[], p: any) {
   if (p?.pairs && Array.isArray(p.pairs) && p.pairs.length > 0) {
     base.push("--pairs", JSON.stringify(p.pairs));
-  } else if (p?.tenant && p?.purchaser) {
-    base.push("--tenant", p.tenant, "--purchaser", p.purchaser);
+  } else {
+    if (p?.tenant) base.push("--tenant", p.tenant);
+    if (p?.purchaser) base.push("--purchaser", p.purchaser);
   }
 }
 
@@ -59,7 +60,7 @@ export function pipelineArgs(
     p?.syncLimit !== undefined && Number(p.syncLimit) >= 0
       ? Number(p.syncLimit)
       : 0;
-  base.push("--limit", String(limit));
+  if (limit > 0) base.push("--limit", String(limit));
   if (p?.retryFailed) base.push("--retry-failed");
   addPairArgs(base, p);
   return ["node", base, { cwd: root }];
@@ -67,8 +68,14 @@ export function pipelineArgs(
 
 export function getCaseCommands(
   root: string,
-  lastRunIdProvider: () => string | null,
-): Record<string, (p?: any, runOpts?: any) => [string, string[], any]> {
+  lastRunIdProvider: () => Promise<string | null>,
+): Record<
+  string,
+  (
+    p?: any,
+    runOpts?: any,
+  ) => Promise<[string, string[], any]> | [string, string[], any]
+> {
   return {
     P1: (p, runOpts) => syncArgs(p, runOpts, root),
     P2: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts, root),
@@ -112,18 +119,18 @@ export function getCaseCommands(
     N3: (p, runOpts) => syncArgs(p, runOpts, root),
     E1: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts, root),
     E2: (p) => {
-      const cpSqlite = join(root, "output", "checkpoints", "checkpoint.sqlite");
-      if (existsSync(cpSqlite)) {
+      const dbPath = join(root, "output", "checkpoints", "checkpoint.db");
+      if (existsSync(dbPath)) {
         try {
-          copyFileSync(cpSqlite, cpSqlite + ".bak");
-          unlinkSync(cpSqlite);
+          copyFileSync(dbPath, dbPath + ".bak");
+          unlinkSync(dbPath);
         } catch (_) {}
       }
       return runArgs(p, ["--no-sync"], null, root);
     },
     E3: (p, runOpts) => syncArgs(p, runOpts, root),
-    E4: () => {
-      const runId = lastRunIdProvider() || "run_0000000000_fake";
+    E4: async () => {
+      const runId = (await lastRunIdProvider()) || "run_0000000000_fake";
       return [
         "node",
         ["dist/index.js", "report", "--run-id", runId],

@@ -67,17 +67,4 @@ export const DashboardBody = () => `
       </table>
     </div>
   </main>
-
-  <div id="schedule-modal-overlay" class="modal-overlay" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
-      <div class="modal-header">
-        <div class="modal-title" id="schedule-modal-title">
-          <span class="title-badge">SCHEDULE</span>
-          <span id="modal-title-text">Dashboard</span>
-        </div>
-        <button type="button" id="schedule-modal-close-icon" class="modal-close-icon" aria-label="Close schedule dialog">&#10005;</button>
-      </div>
-      <div class="modal-body" id="schedule-modal-body"></div>
-    </div>
-  </div>
 `;

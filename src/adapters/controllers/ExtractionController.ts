@@ -1,24 +1,30 @@
-import { SyncBrandUseCase } from "../../core/use-cases/SyncBrandUseCase.js";
-import { RunExtractionUseCase } from "../../core/use-cases/RunExtractionUseCase.js";
-import { ReportingUseCase } from "../../core/use-cases/ReportingUseCase.js";
-import { INotificationService } from "../../core/domain/services/INotificationService.js";
-import { DiscoverFilesUseCase } from "../../core/use-cases/DiscoverFilesUseCase.js";
-import { spawn } from "node:child_process";
+import { ServerResponse } from "node:http";
+import { ProcessOrchestrator } from "../../infrastructure/services/ProcessOrchestrator.js";
 import { IRunStatusStore } from "../../core/domain/services/IRunStatusStore.js";
+import { RunStateService } from "../../infrastructure/services/RunStateService.js";
+import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
+import { Checkpoint } from "../../core/domain/entities/Checkpoint.js";
+
+export interface RunRequest {
+  caseId: string;
+  syncLimit?: number;
+  extractLimit?: number;
+  tenant?: string;
+  purchaser?: string;
+  pairs?: { tenant: string; purchaser: string }[];
+  retryFailed?: boolean;
+}
 
 export class ExtractionController {
-  private stagingDir = "./output/staging";
-
   constructor(
-    private syncBrand: SyncBrandUseCase,
-    private runExtraction: RunExtractionUseCase,
-    private reporting: ReportingUseCase,
-    private discoverFiles: DiscoverFilesUseCase,
-    private notificationService: INotificationService,
+    private orchestrator: ProcessOrchestrator,
     private runStatusStore: IRunStatusStore,
+    private runStateService: RunStateService,
+    private checkpointRepo: ICheckpointRepository,
+    private resumeCapableCases: Set<string>,
   ) {}
 
-  async handleRunRequest(body: any, res: any) {
+  async handleRunRequest(body: RunRequest, res: ServerResponse) {
     const {
       caseId,
       syncLimit,
@@ -26,153 +32,147 @@ export class ExtractionController {
       tenant,
       purchaser,
       pairs,
-      resume,
+      retryFailed,
     } = body;
 
-    // Orchestrate based on caseId (PIPE, P1, etc.)
-    // For now, let's assume a full run or sync
+    if (!caseId) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Missing caseId" }));
+      return;
+    }
+
+    if (this.runStatusStore.isActive(caseId)) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: `Case ${caseId} is already running` }));
+      return;
+    }
 
     res.writeHead(200, {
       "Content-Type": "application/x-ndjson",
       "Transfer-Encoding": "chunked",
     });
-    const writeLine = (obj: any) => res.write(JSON.stringify(obj) + "\n");
+
+    const writeLine = (obj: any) => {
+      if (!res.writableEnded) {
+        res.write(JSON.stringify(obj) + "\n");
+      }
+    };
+
+    const params = {
+      caseId,
+      syncLimit,
+      extractLimit,
+      tenant,
+      purchaser,
+      pairs,
+      retryFailed,
+    };
+
+    // Check resume state
+    let runOpts: any = null;
+    if (this.resumeCapableCases.has(caseId)) {
+      const state = await this.runStateService.getRunState(caseId);
+      if (state && state.status === "stopped" && state.runId) {
+        runOpts = { resume: true, runId: state.runId, ...state };
+        writeLine({
+          type: "log",
+          message: `Resuming previous run ${state.runId}...`,
+        });
+      }
+    }
+
+    const runInfo: any = {
+      caseId,
+      params,
+      startTime: new Date().toISOString(),
+      status: "running",
+      origin: "manual",
+    };
+    this.runStatusStore.registerRun(runInfo);
 
     try {
-      const runId = "RUN-" + Date.now();
-      writeLine({ type: "run_id", runId });
-
-      this.runStatusStore.registerRun({
+      const result = await this.orchestrator.runCase(
         caseId,
-        runId,
-        startedAt: new Date().toISOString(),
-        origin: "manual",
-      });
+        params,
+        {
+          onChild: (child) => {
+            writeLine({ type: "log", message: "Process started." });
+          },
+          onSyncProgress: (done, total) => {
+            writeLine({ type: "progress", phase: "sync", done, total });
+          },
+          onExtractionProgress: (done, total) => {
+            writeLine({ type: "progress", phase: "extract", done, total });
+          },
+          onResumeSkipSync: (skipped, total) => {
+            writeLine({ type: "resume_skip", phase: "sync", skipped, total });
+          },
+          onResumeSkip: (skipped, total) => {
+            writeLine({
+              type: "resume_skip",
+              phase: "extract",
+              skipped,
+              total,
+            });
+          },
+        },
+        { ...runOpts, runKey: caseId },
+      );
 
-      let filesToExtract: any[] = [];
-
-      // 1. Sync Phase
-      if (caseId === "PIPE" || caseId === "SYNC" || caseId === "P1") {
-        writeLine({ type: "log", message: "Starting synchronization..." });
-
-        // In a real implementation, we would get the buckets from config
-        // For this demo/refactor, we'll assume a single bucket config or use the pairs
-        const syncPairs =
-          pairs || (tenant && purchaser ? [{ tenant, purchaser }] : []);
-
-        for (const pair of syncPairs) {
-          const results = await this.syncBrand.execute({
-            buckets: [
-              {
-                bucket: "intelliextract-staging",
-                prefix: `${pair.tenant}/`,
-                name: pair.tenant,
-                purchaser: pair.purchaser,
-              },
-            ],
-            stagingDir: "./output/staging",
-            limit: syncLimit || 0,
-            onProgress: (done, total) =>
-              writeLine({
-                type: "progress",
-                phase: "sync",
-                done,
-                total,
-                percent: Math.round((done / total) * 100),
-              }),
-          });
-
-          // Collect files for extraction if in PIPE mode
-          for (const result of results) {
-            filesToExtract.push(
-              ...result.files.map((f: string) => ({
-                filePath: f,
-                relativePath: f.split("staging")[1] || f,
-                brand: pair.tenant,
-                purchaser: pair.purchaser,
-              })),
-            );
-          }
-        }
-      }
-
-      // 2. Extraction Phase
-      if (caseId === "PIPE" || caseId === "EXTRACT" || caseId === "P2") {
-        writeLine({ type: "log", message: "Starting extraction..." });
-
-        // If not from sync (P2), discover files from staging
-        if (filesToExtract.length === 0) {
-          writeLine({
-            type: "log",
-            message: "Discovering files in staging...",
-          });
-          filesToExtract = this.discoverFiles.execute({
-            stagingDir: this.stagingDir,
-            pairs:
-              pairs ||
-              (tenant && purchaser
-                ? [{ brand: tenant, purchaser }]
-                : undefined),
-          });
-          writeLine({
-            type: "log",
-            message: `Found ${filesToExtract.length} files to process.`,
-          });
+      if (result.exitCode === 0) {
+        // Clear resume state on success
+        if (this.resumeCapableCases.has(caseId)) {
+          await this.runStateService.clearRunState(caseId);
         }
 
-        if (filesToExtract.length === 0) {
-          writeLine({
-            type: "log",
-            message: "No files found to extract.",
-            level: "warn",
-          });
-        } else {
-          await this.runExtraction.execute({
-            files: filesToExtract,
-            runId,
-            concurrency: body.concurrency,
-            requestsPerSecond: body.requestsPerSecond,
-            onProgress: (done, total) =>
-              writeLine({
-                type: "progress",
-                phase: "extract",
-                done,
-                total,
-                percent: Math.round((done / total) * 100),
-              }),
-          });
-        }
-      }
-
-      // 3. Reporting Phase
-      writeLine({ type: "log", message: "Generating report..." });
-
-      // Execute legacy report generation for physical files
-      await new Promise((resolve) => {
-        const child = spawn(
-          "node",
-          ["dist/index.js", "report", "--run-id", runId],
-          { shell: false },
+        // Fetch real stats from DB
+        const status = await this.checkpointRepo.getRunStatus();
+        const records = await this.checkpointRepo.getRecordsForRun(
+          status.runId,
         );
-        child.on("close", resolve);
-        child.on("error", () => resolve(1));
-      });
+        const doneRecords = records.filter(
+          (r: Checkpoint) => r.status === "done",
+        );
+        const avgLat =
+          doneRecords.length > 0
+            ? Math.round(
+                doneRecords.reduce(
+                  (a: number, b: Checkpoint) => a + (b.latencyMs || 0),
+                  0,
+                ) / doneRecords.length,
+              )
+            : 0;
 
-      const report = await this.reporting.execute(runId);
-      writeLine({ type: "report", ...report });
-
-      writeLine({ type: "log", message: "Operation completed successfully." });
-      res.end();
+        writeLine({
+          type: "report",
+          message: "Operation completed successfully.",
+          successCount: status.done,
+          avgLatency: avgLat,
+          stdout: result.stdout,
+          stderr: result.stderr,
+        });
+      } else {
+        // Save state for resume if interrupted
+        if (this.resumeCapableCases.has(caseId) && result.exitCode !== 0) {
+          const s = await this.checkpointRepo.getRunStatus();
+          await this.runStateService.updateRunState(caseId, {
+            status: "stopped",
+            runId: s.runId,
+          });
+        }
+        writeLine({
+          type: "error",
+          message:
+            result.stderr ||
+            result.stdout ||
+            `Process exited with code ${result.exitCode}`,
+        });
+      }
     } catch (e: any) {
-      writeLine({
-        type: "log",
-        message: `Error: ${e.message}`,
-        level: "error",
-      });
-      writeLine({ type: "error", message: e.message });
-      res.end();
+      writeLine({ type: "error", message: e.message || "Unknown error" });
     } finally {
       this.runStatusStore.unregisterRun(caseId);
+      if (!res.writableEnded) res.end();
     }
   }
 }

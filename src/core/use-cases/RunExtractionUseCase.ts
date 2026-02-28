@@ -1,8 +1,16 @@
 import PQueue from "p-queue";
-import { IExtractionService } from "../domain/services/IExtractionService.js";
+import {
+  IExtractionService,
+  NetworkAbortError,
+} from "../domain/services/IExtractionService.js";
 import { ICheckpointRepository } from "../domain/repositories/ICheckpointRepository.js";
 import { Checkpoint } from "../domain/entities/Checkpoint.js";
 import { ILogger } from "../domain/services/ILogger.js";
+import {
+  IEmailService,
+  FailureDetail,
+} from "../domain/services/IEmailService.js";
+import { computeMetrics } from "../../infrastructure/utils/MetricsUtils.js";
 
 export interface RunExtractionRequest {
   files: Array<{
@@ -14,7 +22,11 @@ export interface RunExtractionRequest {
   runId: string;
   concurrency?: number;
   requestsPerSecond?: number;
+  /** When true, only retry files that previously failed in the specified runId (or globally if runId is new) */
+  retryFailed?: boolean;
   onProgress?: (done: number, total: number) => void;
+  /** Filter for cumulative metrics reporting at end of run */
+  filter?: { tenant?: string; purchaser?: string };
 }
 
 export class RunExtractionUseCase {
@@ -22,16 +34,69 @@ export class RunExtractionUseCase {
     private extractionService: IExtractionService,
     private checkpointRepo: ICheckpointRepository,
     private logger: ILogger,
+    private emailService: IEmailService,
   ) {}
 
   async execute(request: RunExtractionRequest): Promise<void> {
-    this.logger.init(request.runId);
-    const completedPaths = await this.checkpointRepo.getCompletedPaths(
-      request.runId,
-    );
-    const total = request.files.length;
+    const stdoutPiped = !process.stdout.isTTY;
+    const runId = request.runId;
+    const startTime = new Date();
+    this.logger.init(runId);
+    const failures: FailureDetail[] = [];
+
+    // 1. Determine files to actually process
+    const completedPaths = await this.checkpointRepo.getCompletedPaths(runId);
+
+    // If retryFailed is on, we only want to process files that have status "error" in the DB
+    let errorPaths: Set<string> | null = null;
+    if (request.retryFailed) {
+      errorPaths = await this.checkpointRepo.getErrorPaths(runId);
+    }
+
+    const toProcess = request.files.filter((f) => {
+      if (request.retryFailed && errorPaths) {
+        return errorPaths.has(f.relativePath);
+      }
+      return !completedPaths.has(f.relativePath);
+    });
+
+    const total = toProcess.length;
     let done = 0;
 
+    // 2. Report resume skip if piped
+    if (stdoutPiped && completedPaths.size > 0 && total > 0) {
+      process.stdout.write(
+        `RESUME_SKIP\t${completedPaths.size}\t${request.files.length}\n`,
+      );
+    }
+
+    // 3. Mark skipped records for this run so metrics are accurate
+    const skippedRecords = request.files
+      .filter(
+        (f) =>
+          completedPaths.has(f.relativePath) ||
+          (errorPaths && !errorPaths.has(f.relativePath)),
+      )
+      .map((f) => ({
+        ...f,
+        status: "skipped" as const,
+        runId,
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+      }));
+
+    if (skippedRecords.length > 0) {
+      await this.checkpointRepo.upsertCheckpoints(
+        skippedRecords as Checkpoint[],
+      );
+    }
+
+    if (total === 0) {
+      this.logger.close();
+      return;
+    }
+
+    // 4. Setup Queue
     const queueOptions: any = {
       concurrency: request.concurrency || 5,
     };
@@ -41,23 +106,21 @@ export class RunExtractionUseCase {
     }
 
     const queue = new PQueue(queueOptions);
+    let aborted = false;
 
-    for (const file of request.files) {
-      if (completedPaths.has(file.relativePath)) {
-        done++;
-        if (request.onProgress) request.onProgress(done, total);
-        continue;
-      }
+    // 5. Execute
+    for (const file of toProcess) {
+      if (aborted) break;
 
       queue.add(async () => {
+        if (aborted) return;
         const startedAt = new Date().toISOString();
 
-        // Update checkpoint to running
         await this.checkpointRepo.upsertCheckpoint({
           ...file,
           status: "running",
           startedAt,
-          runId: request.runId,
+          runId,
         } as Checkpoint);
 
         try {
@@ -65,6 +128,8 @@ export class RunExtractionUseCase {
             file.filePath,
             file.brand,
             file.purchaser,
+            runId,
+            file.relativePath,
           );
 
           await this.checkpointRepo.upsertCheckpoint({
@@ -76,11 +141,22 @@ export class RunExtractionUseCase {
             statusCode: result.statusCode,
             errorMessage: result.errorMessage,
             patternKey: result.patternKey,
-            runId: request.runId,
+            runId,
           } as Checkpoint);
 
+          if (!result.success) {
+            failures.push({
+              filePath: file.filePath,
+              brand: file.brand,
+              purchaser: file.purchaser,
+              statusCode: result.statusCode,
+              errorMessage: result.errorMessage,
+              patternKey: result.patternKey,
+            });
+          }
+
           this.logger.log({
-            runId: request.runId,
+            runId,
             filePath: file.filePath,
             brand: file.brand,
             purchaser: file.purchaser,
@@ -93,13 +169,29 @@ export class RunExtractionUseCase {
             success: result.success,
           });
         } catch (e) {
+          if (e instanceof NetworkAbortError) {
+            aborted = true;
+            queue.clear();
+            if (stdoutPiped) {
+              process.stdout.write(
+                "LOG\tNetwork interruption detected. Execution stopping. Resume later.\n",
+              );
+            }
+          }
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          failures.push({
+            filePath: file.filePath,
+            brand: file.brand,
+            purchaser: file.purchaser,
+            errorMessage: errorMsg,
+          });
           await this.checkpointRepo.upsertCheckpoint({
             ...file,
             status: "error",
             startedAt,
             finishedAt: new Date().toISOString(),
-            errorMessage: e instanceof Error ? e.message : String(e),
-            runId: request.runId,
+            errorMessage: errorMsg,
+            runId,
           } as Checkpoint);
         } finally {
           done++;
@@ -109,6 +201,29 @@ export class RunExtractionUseCase {
     }
 
     await queue.onIdle();
+
+    // 6. Report generation and consolidated email
+    const records = await this.checkpointRepo.getRecordsForRun(runId);
+    const metrics = computeMetrics(runId, records, startTime, new Date());
+
+    if (failures.length > 0) {
+      await this.emailService.sendConsolidatedFailureEmail(
+        runId,
+        failures,
+        metrics,
+      );
+    }
+
+    // 7. Cumulative metrics signal
+    if (stdoutPiped) {
+      const cumStats = await this.checkpointRepo.getCumulativeStats(
+        request.filter,
+      );
+      process.stdout.write(
+        `CUMULATIVE_METRICS\tsuccess=${cumStats.success},failed=${cumStats.failed},total=${cumStats.total}\n`,
+      );
+    }
+
     this.logger.close();
   }
 }

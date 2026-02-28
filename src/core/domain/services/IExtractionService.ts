@@ -1,3 +1,10 @@
+export class NetworkAbortError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NetworkAbortError";
+  }
+}
+
 export interface ExtractionResult {
   success: boolean;
   statusCode: number;
@@ -11,5 +18,7 @@ export interface IExtractionService {
     filePath: string,
     brand: string,
     purchaser?: string,
+    runId?: string,
+    relativePath?: string,
   ): Promise<ExtractionResult>;
 }

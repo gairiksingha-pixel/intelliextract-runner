@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import {
   IS3Service,
   SyncResult,
+  SyncFileSyncedJob,
 } from "../../core/domain/services/IS3Service.js";
 import {
   ISyncRepository,
@@ -37,8 +38,13 @@ export class AwsS3Service implements IS3Service {
     bucketConfig: any,
     stagingDir: string,
     options?: {
-      limit?: number;
+      limitRemaining?: { value: number };
+      initialLimit?: number;
       onProgress?: (done: number, total: number) => void;
+      onSyncSkipProgress?: (skipped: number, totalProcessed: number) => void;
+      onFileSynced?: (job: SyncFileSyncedJob) => void;
+      onStartDownload?: (destPath: string, manifestKey: string) => void;
+      alreadyExtractedPaths?: Set<string>;
     },
   ): Promise<SyncResult> {
     const prefix = bucketConfig.prefix ?? "";
@@ -57,11 +63,22 @@ export class AwsS3Service implements IS3Service {
       (brand.includes("__") ? brand.split("__")[1] : "");
     if (!existsSync(brandDir)) mkdirSync(brandDir, { recursive: true });
 
-    const totalToProcess =
-      options?.limit && options.limit > 0 ? options.limit : keys.length;
+    const initialLimit = options?.initialLimit ?? 0;
+    const totalForProgress = initialLimit > 0 ? initialLimit : keys.length;
+
+    const reportProgress = () => {
+      if (!options?.onProgress) return;
+      const done =
+        initialLimit > 0 && options.limitRemaining
+          ? initialLimit - options.limitRemaining.value
+          : synced + skipped + errors;
+      options.onProgress(done, totalForProgress);
+    };
+    reportProgress();
 
     for (const { key, etag, size } of keys) {
-      if (options?.limit && synced >= options.limit) break;
+      // Respect shared limit across all buckets
+      if (options?.limitRemaining && options.limitRemaining.value <= 0) break;
 
       const keyAfterPrefix =
         prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
@@ -70,36 +87,84 @@ export class AwsS3Service implements IS3Service {
         : join(brandDir, key);
       const mk = `${brand}/${key}`;
 
+      // Fast-skip: already extracted
+      if (options?.alreadyExtractedPaths?.has(destPath)) {
+        skipped++;
+        options.onSyncSkipProgress?.(skipped, skipped + synced);
+        if (options.onFileSynced) {
+          const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
+          options.onFileSynced({
+            filePath: destPath,
+            relativePath,
+            brand,
+            purchaser: purchaser || undefined,
+          });
+        }
+        reportProgress();
+        continue;
+      }
+
       const shouldSkip = await this.skipIfUnchanged(destPath, mk, manifest, {
         etag,
         size,
       });
       if (shouldSkip) {
         skipped++;
-        if (options?.onProgress)
-          options.onProgress(synced + skipped, totalToProcess);
+        options?.onSyncSkipProgress?.(skipped, skipped + synced);
+        // Persist recovery updates to manifest
+        if (typeof manifest[mk] === "string" || !manifest[mk]) {
+          await this.syncRepo.saveManifest(manifest);
+        }
+        if (options?.onFileSynced) {
+          const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
+          options.onFileSynced({
+            filePath: destPath,
+            relativePath,
+            brand,
+            purchaser: purchaser || undefined,
+          });
+        }
+        reportProgress();
         continue;
       }
 
       try {
+        options?.onStartDownload?.(destPath, mk);
         await this.downloadToFile(bucketConfig.bucket, key, destPath);
         const sha = await this.computeFileSha256(destPath);
         const entry: ManifestEntry = { sha256: sha, etag, size };
 
+        manifest[mk] = entry;
         await this.syncRepo.upsertManifestEntry(mk, entry);
         synced++;
         downloadedFiles.push(destPath);
 
-        if (options?.onProgress)
-          options.onProgress(synced + skipped, totalToProcess);
+        if (options?.limitRemaining) options.limitRemaining.value--;
+
+        options?.onSyncSkipProgress?.(skipped, skipped + synced);
+
+        if (options?.onFileSynced) {
+          const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
+          options.onFileSynced({
+            filePath: destPath,
+            relativePath,
+            brand,
+            purchaser: purchaser || undefined,
+          });
+        }
+
+        reportProgress();
       } catch (e) {
         errors++;
         console.error(
           `Failed to download s3://${bucketConfig.bucket}/${key}:`,
           e,
         );
+        reportProgress();
       }
     }
+
+    reportProgress();
 
     return {
       brand,
@@ -139,6 +204,10 @@ export class AwsS3Service implements IS3Service {
     return keys;
   }
 
+  /**
+   * Returns true if the file should be skipped (already downloaded and unchanged).
+   * Handles legacy string SHA entries, modern object entries, and recovery (file on disk, not in manifest).
+   */
   private async skipIfUnchanged(
     destPath: string,
     keyInManifest: string,
@@ -146,13 +215,14 @@ export class AwsS3Service implements IS3Service {
     s3Metadata: { etag: string; size: number },
   ): Promise<boolean> {
     if (!existsSync(destPath)) return false;
+
     const entry = manifest[keyInManifest];
     if (entry) {
+      // Modern entry: instant compare via ETag + size
       if (typeof entry === "object") {
-        if (entry.etag === s3Metadata.etag && entry.size === s3Metadata.size)
-          return true;
-        return false;
+        return entry.etag === s3Metadata.etag && entry.size === s3Metadata.size;
       }
+      // Legacy entry: string SHA-256 — fall back to disk hash
       try {
         const actualSha = await this.computeFileSha256(destPath);
         return actualSha === entry;
@@ -160,6 +230,24 @@ export class AwsS3Service implements IS3Service {
         return false;
       }
     }
+
+    // Recovery path: file exists on disk but not in manifest.
+    // If size matches, compute SHA once and treat as unchanged.
+    try {
+      const stats = statSync(destPath);
+      if (stats.size === s3Metadata.size) {
+        const sha = await this.computeFileSha256(destPath);
+        manifest[keyInManifest] = {
+          sha256: sha,
+          etag: s3Metadata.etag,
+          size: s3Metadata.size,
+        };
+        return true;
+      }
+    } catch {
+      // ignore, re-download
+    }
+
     return false;
   }
 

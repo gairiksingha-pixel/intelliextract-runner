@@ -1,8 +1,8 @@
 import Database from "better-sqlite3";
-import {
-  ISyncRepository,
-  ManifestEntry,
-} from "../../core/domain/repositories/ISyncRepository.js";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { ISyncRepository } from "../../core/domain/repositories/ISyncRepository.js";
+import { ManifestEntry, SyncHistoryEntry } from "../../core/domain/types.js";
 
 export class SqliteSyncRepository implements ISyncRepository {
   private dbPath: string;
@@ -12,17 +12,18 @@ export class SqliteSyncRepository implements ISyncRepository {
   }
 
   private getDb() {
+    mkdirSync(dirname(this.dbPath), { recursive: true });
     return new Database(this.dbPath);
   }
 
-  async getManifest(): Promise<Record<string, ManifestEntry | string>> {
+  async getManifest(): Promise<Record<string, ManifestEntry>> {
     const db = this.getDb();
     try {
       const row = db
         .prepare("SELECT value FROM meta WHERE key = ?")
-        .get("manifest");
+        .get("manifest") as { value: string } | undefined;
       if (!row) return {};
-      return JSON.parse((row as any).value || "{}");
+      return JSON.parse(row.value || "{}");
     } catch (_) {
       return {};
     } finally {
@@ -30,9 +31,7 @@ export class SqliteSyncRepository implements ISyncRepository {
     }
   }
 
-  async saveManifest(
-    manifest: Record<string, ManifestEntry | string>,
-  ): Promise<void> {
+  async saveManifest(manifest: Record<string, ManifestEntry>): Promise<void> {
     const db = this.getDb();
     try {
       db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run(
@@ -56,14 +55,17 @@ export class SqliteSyncRepository implements ISyncRepository {
     await this.saveManifest(manifest);
   }
 
-  async getSyncHistory(): Promise<any[]> {
+  async getSyncHistory(): Promise<SyncHistoryEntry[]> {
     const db = this.getDb();
     try {
       const rows = db
         .prepare("SELECT * FROM sync_history ORDER BY timestamp ASC")
-        .all();
-      return rows.map((r: any) => ({
-        ...r,
+        .all() as any[];
+      return rows.map((r) => ({
+        timestamp: r.timestamp,
+        synced: r.synced,
+        skipped: r.skipped,
+        errors: r.errors,
         brands: JSON.parse(r.brands || "[]"),
         purchasers: JSON.parse(r.purchasers || "[]"),
       }));
@@ -74,14 +76,7 @@ export class SqliteSyncRepository implements ISyncRepository {
     }
   }
 
-  async appendSyncHistory(entry: {
-    timestamp: string;
-    synced: number;
-    skipped: number;
-    errors: number;
-    brands: string[];
-    purchasers?: string[];
-  }): Promise<void> {
+  async appendSyncHistory(entry: SyncHistoryEntry): Promise<void> {
     const db = this.getDb();
     try {
       db.prepare(

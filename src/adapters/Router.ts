@@ -1,3 +1,4 @@
+import { IncomingMessage, ServerResponse } from "node:http";
 import { ExtractionController } from "./controllers/ExtractionController.js";
 import { ScheduleController } from "./controllers/ScheduleController.js";
 import { ReportController } from "./controllers/ReportController.js";
@@ -11,7 +12,7 @@ export class Router {
     private projectController: ProjectController,
   ) {}
 
-  async handleRequest(req: any, res: any) {
+  async handleRequest(req: IncomingMessage, res: ServerResponse) {
     const url = req.url?.split("?")[0] || "/";
     const method = req.method;
 
@@ -54,7 +55,7 @@ export class Router {
       return this.projectController.getActiveRuns(res);
     }
     if (method === "GET" && url.startsWith("/api/run-status")) {
-      return this.projectController.getRunStatus(req.url!, res);
+      return this.projectController.getRunStatus(req.url || url, res);
     }
     if (method === "POST" && url === "/api/run-state/clear") {
       let body = "";
@@ -85,7 +86,7 @@ export class Router {
       return this.scheduleController.deleteSchedule(id, res);
     }
     if (method === "GET" && url === "/api/schedule-log") {
-      return this.scheduleController.getLogEntries(req.url!, res);
+      return this.scheduleController.getLogEntries(req.url || url, res);
     }
 
     // 6. Reports & Files
@@ -114,7 +115,7 @@ export class Router {
       (method === "GET" || method === "HEAD") &&
       url === "/api/download-file"
     ) {
-      return this.reportController.downloadFile(req.url!, res);
+      return this.reportController.downloadFile(req.url || url, res);
     }
 
     // 7. Exports

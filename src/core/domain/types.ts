@@ -205,3 +205,62 @@ export interface ResumeState {
   syncInProgressPath?: string;
   syncInProgressManifestKey?: string;
 }
+
+export interface ExtractionFileDetails {
+  filename: string;
+  brand: string;
+  purchaser: string;
+  status: "success" | "failed";
+  mtime: number;
+  patternKey: string | null;
+  purchaserKey: string | null;
+  success: boolean | null;
+  json: any;
+  runId: string | null;
+  sourceRelativePath: string | null;
+  sourceBrand: string | null;
+  sourcePurchaser: string | null;
+}
+
+export interface ExplorerDataDTO {
+  rows: ExtractionFileDetails[];
+  config: {
+    brands: string[];
+    purchasers: string[];
+    brandPurchaserMap: Record<string, string[]>;
+    brandNames: Record<string, string>;
+    purchaserNames: Record<string, string>;
+  };
+  stats: {
+    totalAll: number;
+    totalSuccess: number;
+    totalFailed: number;
+    successRate: number;
+  };
+}
+
+export interface InventoryFileDetails {
+  path: string;
+  brand: string;
+  purchaser: string;
+  size: number;
+  mtime: number;
+  runId: string | null;
+}
+
+export interface InventoryDataDTO {
+  files: InventoryFileDetails[];
+  history: SyncHistoryEntry[];
+  manifestEntries: Record<string, ManifestEntry>;
+  config: {
+    brands: string[];
+    purchasers: string[];
+    brandPurchaserMap: Record<string, string[]>;
+    brandNames: Record<string, string>;
+    purchaserNames: Record<string, string>;
+  };
+  stats: {
+    totalFiles: number;
+    totalSizeStr: string;
+  };
+}
