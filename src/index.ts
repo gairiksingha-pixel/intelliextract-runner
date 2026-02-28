@@ -8,18 +8,18 @@ import { program } from "commander";
 import {
   loadConfig,
   getConfigPath,
-} from "./infrastructure/utils/ConfigUtils.js";
-import { Config } from "./core/domain/entities/Config.js";
-import { SqliteCheckpointRepository } from "./infrastructure/database/SqliteCheckpointRepository.js";
-import { SqliteSyncRepository } from "./infrastructure/database/SqliteSyncRepository.js";
-import { SyncBrandUseCase } from "./core/use-cases/SyncBrandUseCase.js";
-import { RunExtractionUseCase } from "./core/use-cases/RunExtractionUseCase.js";
-import { AwsS3Service } from "./infrastructure/services/AwsS3Service.js";
-import { IntelliExtractService } from "./infrastructure/services/IntelliExtractService.js";
-import { SqliteLogger } from "./infrastructure/services/SqliteLogger.js";
-import { DiscoverFilesUseCase } from "./core/use-cases/DiscoverFilesUseCase.js";
-import { NodemailerEmailService } from "./infrastructure/services/NodemailerEmailService.js";
-import { computeMetrics } from "./infrastructure/utils/MetricsUtils.js";
+} from "./infrastructure/utils/config.utils.js";
+import { Config } from "./core/domain/entities/config.entity.js";
+import { SqliteCheckpointRepository } from "./infrastructure/database/sqlite-checkpoint.repository.js";
+import { SqliteSyncRepository } from "./infrastructure/database/sqlite-sync.repository.js";
+import { SyncBrandUseCase } from "./core/use-cases/sync-brand.use-case.js";
+import { RunExtractionUseCase } from "./core/use-cases/run-extraction.use-case.js";
+import { AwsS3Service } from "./infrastructure/services/aws-s3.service.js";
+import { IntelliExtractService } from "./infrastructure/services/intelli-extract.service.js";
+import { SqliteLogger } from "./infrastructure/services/sqlite-logger.service.js";
+import { DiscoverFilesUseCase } from "./core/use-cases/discover-files.use-case.js";
+import { NodemailerEmailService } from "./infrastructure/services/nodemailer-email.service.js";
+import { computeMetrics } from "./infrastructure/utils/metrics.utils.js";
 import { join, dirname } from "node:path";
 import {
   writeFileSync,
@@ -32,7 +32,7 @@ import PQueue from "p-queue";
 import {
   clearPartialFileAndResumeState,
   saveResumeState,
-} from "./infrastructure/utils/ResumeUtils.js";
+} from "./infrastructure/utils/resume.utils.js";
 
 const EXTRACTIONS_DIR = join(process.cwd(), "output", "extractions");
 const STAGING_DIR = join(process.cwd(), "output", "staging");

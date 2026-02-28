@@ -166,6 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initCharts(runData);
   renderHistory();
   setupSmoothAccordion();
+  handleDeepLinking();
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -739,7 +740,7 @@ window.goHistoryPage = (p) => {
 // ─────────────────────────────────────────────────────────────
 // Tabs
 // ─────────────────────────────────────────────────────────────
-window.switchTab = (tabId) => {
+window.switchTab = (tabId, btn) => {
   document
     .querySelectorAll(".tab-content")
     .forEach((c) => c.classList.remove("active"));
@@ -747,7 +748,11 @@ window.switchTab = (tabId) => {
     .querySelectorAll(".tab-btn")
     .forEach((b) => b.classList.remove("active"));
   document.getElementById(tabId).classList.add("active");
-  if (event && event.target) event.target.classList.add("active");
+  if (btn) btn.classList.add("active");
+  else {
+    const defaultBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
+    if (defaultBtn) defaultBtn.classList.add("active");
+  }
   if (tabId === "history") renderHistory();
   else applyFilteringToUI();
 };
@@ -762,7 +767,7 @@ function setupSmoothAccordion() {
       const summary = el.querySelector(".run-section-summary");
       if (!summary) return;
       summary.onclick = (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         if (
           el.classList.contains("collapsing") ||
           el.classList.contains("expanding")
@@ -794,6 +799,40 @@ function setupSmoothAccordion() {
         }
       };
     });
+}
+
+function handleDeepLinking() {
+  const hash = window.location.hash;
+  const search = window.location.search;
+  const params = new URLSearchParams(search || hash.split("?")[1] || "");
+  const runId = params.get("runId");
+
+  if (hash.startsWith("#history") || runId) {
+    window.switchTab("history");
+    if (runId) {
+      // Find which page this runId is on
+      const items = Array.from(document.querySelectorAll(".history-item"));
+      const idx = items.findIndex(
+        (el) => el.getAttribute("data-runid") === runId,
+      );
+
+      if (idx !== -1) {
+        historyPage = Math.floor(idx / historyPageSize) + 1;
+        renderHistory();
+
+        setTimeout(() => {
+          const el = document.querySelector(
+            `.history-item[data-runid="${runId}"]`,
+          );
+          if (el) {
+            const summary = el.querySelector(".run-section-summary");
+            if (summary) summary.click(); // Trigger smooth expansion
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 500);
+      }
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

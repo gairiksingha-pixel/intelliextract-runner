@@ -19,8 +19,8 @@ import type {
   ExecutiveSummary,
   CheckpointRecord,
 } from "../../core/domain/types.js";
-import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
-import { computeMetrics } from "../../infrastructure/utils/MetricsUtils.js";
+import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { computeMetrics } from "../../infrastructure/utils/metrics.utils.js";
 
 export interface ExtractionResultEntry {
   filename: string;

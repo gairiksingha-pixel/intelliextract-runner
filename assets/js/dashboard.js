@@ -461,6 +461,9 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
         total: parseInt(skipM[2]),
       };
 
+    const runIdM = /RUN_ID\s+(\S+)/.exec(line);
+    if (runIdM) parsed.runId = runIdM[1];
+
     // 2. Capture Identity and Limits
     let m;
     if ((m = /^Download limit:\s*(.+)$/.exec(line)))
@@ -687,12 +690,13 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
   }
 
   if (parsed.reportsPath) {
-    const reportUrl = parsed.reportsPath.startsWith("http")
-      ? parsed.reportsPath
-      : parsed.reportsPath; // already /api/reports/... from index.ts
+    const runId = parsed.runId || "";
     rows.push([
-      "Detailed Report",
-      `<a href="${reportUrl}" target="_blank" class="report-link" onclick="if(window.showReportOverlay){window.showReportOverlay(event, '${reportUrl}'); return false;}">${reportUrl}</a>`,
+      "History View",
+      `<button class="btn-secondary" style="height:28px; padding:0 10px; font-size: 0.75rem; gap: 2px;" onclick="window.location.href='/reports/summary#history?runId=${runId}'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        View in History
+      </button>`,
     ]);
   }
 
@@ -705,7 +709,7 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     "Sync Progress",
     "Extraction",
     "Resumed State",
-    "Detailed Report",
+    "History View",
   ]);
   const METRIC_ROWS = new Set([
     "Status",

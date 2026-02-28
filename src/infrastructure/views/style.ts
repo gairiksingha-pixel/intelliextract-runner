@@ -81,7 +81,7 @@ export const commonStyles = `
     .header-actions-wrap { display: flex; align-items: center; gap: 0.75rem; margin-right: 1.25rem; }
     .header-action-btn {
       height: 32px; padding: 0 0.85rem; border-radius: var(--radius-sm);
-      font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; gap: 8px;
       cursor: pointer; transition: all 0.2s; border: 1px solid rgba(176, 191, 201, 0.4);
       background: #f8fafc; color: var(--text-secondary); white-space: nowrap;
     }
@@ -239,12 +239,13 @@ export const commonStyles = `
     .modal-screen-animate { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: visible; }
     .modal-screen-animate.slide-right { animation: slideInRight 0.18s cubic-bezier(0.2, 0, 0, 1) forwards; }
     .modal-screen-animate.slide-left { animation: slideInLeft 0.18s cubic-bezier(0.2, 0, 0, 1) forwards; }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.75rem; background: white; border-bottom: 1px solid rgba(203, 213, 225, 0.4); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between;        padding: 1.25rem 1.75rem; background: white; border-bottom: 1px solid rgba(203, 213, 225, 0.4);
+        border-radius: 16px 16px 0 0;
+      }
     .modal-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.15rem; font-weight: 700; color: var(--header-bg); }
     .title-badge {
       background: var(--primary); color: white; font-size: 0.625rem; font-weight: 800;
-      padding: 0.35rem 1.25rem 0.35rem 0.75rem;
-      clip-path: polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%);
+      padding: 0.25rem 0.75rem; border-radius: 4px;
       text-transform: uppercase; letter-spacing: 0.1em;
     }
     .modal-body {
@@ -259,7 +260,7 @@ export const commonStyles = `
 
     /* Buttons */
     .btn-secondary {
-      height: 34px; display: inline-flex; align-items: center; justify-content: center;
+      height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       background: var(--accent-light); color: var(--primary); border: 1px solid rgba(45, 157, 95, 0.2);
       border-radius: var(--radius-sm); padding: 0 1.25rem; font-size: 0.8rem; font-weight: 700;
       cursor: pointer; font-family: inherit; box-shadow: var(--shadow-sm); transition: all 0.2s ease;
@@ -274,7 +275,7 @@ export const commonStyles = `
       margin-bottom: 1.1rem; gap: 0.85rem;
       padding: 0.6rem 0.34rem 0.6rem 0.68rem;
       background: linear-gradient(90deg, rgba(33, 108, 109, 0.07) 0%, rgba(33, 108, 109, 0.02) 100%);
-      border-left: 3.5px solid var(--header-bg); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      border-left: 3.5px solid var(--header-bg); border-radius: var(--radius-sm);
     }
     .subtitle-chip { display: inline-flex; align-items: center; gap: 0.4rem; background: transparent; color: var(--header-bg); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 0; }
     .schedule-list {
@@ -369,13 +370,13 @@ export const commonStyles = `
     button.run {
       background: var(--primary); color: #fff; border: 1px solid rgba(45, 157, 95, 0.25);
       border-radius: var(--radius-sm); height: 38px; padding: 0 1.062rem; font-size: 0.9rem; font-weight: 700;
-      cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
     }
     button.run:hover:not(:disabled) { background: var(--primary-hover) !important; box-shadow: 0 1.7px 5.1px rgba(0, 0, 0, 0.18); }
     button.reset-case {
       background: var(--surface); color: var(--text-secondary); border: 0.85px solid rgba(176, 191, 201, 0.45);
       border-radius: var(--radius-sm); height: 38px; padding: 0 0.85rem; font-size: 0.85rem; font-weight: 700;
-      cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
     }
     button.reset-case.stop-btn { background: var(--fail); color: #fff; border-color: var(--fail); box-shadow: var(--shadow-btn); }
     button.reset-case.stop-btn:hover { background: #a00; border-color: #a00; color: #fff; }
@@ -480,7 +481,7 @@ export const commonStyles = `
       height: 34px; border: none; border-radius: var(--radius-sm); padding: 0 0.5rem;
       font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit;
       box-sizing: border-box; box-shadow: var(--shadow-btn); color: #fff;
-      width: 180px; transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center;
+      width: 180px; transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     }
     button.download-report-schedule-btn { background: var(--primary) !important; color: #fff !important; box-shadow: var(--shadow-btn) !important; }
     button.download-report-schedule-btn:hover:not(:disabled) { background: var(--primary-hover) !important; }

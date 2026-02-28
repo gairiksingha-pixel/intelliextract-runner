@@ -6,42 +6,42 @@ import { mkdirSync } from "node:fs";
 import dotenv from "dotenv";
 
 // Clean Architecture Components
-import { SqliteCheckpointRepository } from "./infrastructure/database/SqliteCheckpointRepository.js";
-import { SqliteSyncRepository } from "./infrastructure/database/SqliteSyncRepository.js";
-import { SqliteScheduleRepository } from "./infrastructure/database/SqliteScheduleRepository.js";
-import { GetExtractionDataUseCase } from "./core/use-cases/GetExtractionDataUseCase.js";
-import { GetInventoryDataUseCase } from "./core/use-cases/GetInventoryDataUseCase.js";
-import { SyncBrandUseCase } from "./core/use-cases/SyncBrandUseCase.js";
-import { RunExtractionUseCase } from "./core/use-cases/RunExtractionUseCase.js";
-import { ReportingUseCase } from "./core/use-cases/ReportingUseCase.js";
-import { DiscoverFilesUseCase } from "./core/use-cases/DiscoverFilesUseCase.js";
-import { DashboardController } from "./adapters/controllers/DashboardController.js";
-import { ExtractionController } from "./adapters/controllers/ExtractionController.js";
-import { ExecuteWorkflowUseCase } from "./core/use-cases/ExecuteWorkflowUseCase.js";
-import { ScheduleController } from "./adapters/controllers/ScheduleController.js";
-import { NodemailerEmailService } from "./infrastructure/services/NodemailerEmailService.js";
-import { ReportPageController } from "./adapters/controllers/ReportPageController.js";
-import { ReportDataController } from "./adapters/controllers/ReportDataController.js";
-import { ProjectController } from "./adapters/controllers/ProjectController.js";
-import { ExportController } from "./adapters/controllers/ExportController.js";
-import { Router } from "./adapters/Router.js";
+import { SqliteCheckpointRepository } from "./infrastructure/database/sqlite-checkpoint.repository.js";
+import { SqliteSyncRepository } from "./infrastructure/database/sqlite-sync.repository.js";
+import { SqliteScheduleRepository } from "./infrastructure/database/sqlite-schedule.repository.js";
+import { GetExtractionDataUseCase } from "./core/use-cases/get-extraction-data.use-case.js";
+import { GetInventoryDataUseCase } from "./core/use-cases/get-inventory-data.use-case.js";
+import { SyncBrandUseCase } from "./core/use-cases/sync-brand.use-case.js";
+import { RunExtractionUseCase } from "./core/use-cases/run-extraction.use-case.js";
+import { ReportingUseCase } from "./core/use-cases/reporting.use-case.js";
+import { DiscoverFilesUseCase } from "./core/use-cases/discover-files.use-case.js";
+import { DashboardController } from "./adapters/controllers/dashboard.controller.js";
+import { ExtractionController } from "./adapters/controllers/extraction.controller.js";
+import { ExecuteWorkflowUseCase } from "./core/use-cases/execute-workflow.use-case.js";
+import { ScheduleController } from "./adapters/controllers/schedule.controller.js";
+import { NodemailerEmailService } from "./infrastructure/services/nodemailer-email.service.js";
+import { ReportPageController } from "./adapters/controllers/report-page.controller.js";
+import { ReportDataController } from "./adapters/controllers/report-data.controller.js";
+import { ProjectController } from "./adapters/controllers/project.controller.js";
+import { ExportController } from "./adapters/controllers/export.controller.js";
+import { Router } from "./adapters/router.js";
 
 // Infrastructure Services
-import { AwsS3Service } from "./infrastructure/services/AwsS3Service.js";
-import { IntelliExtractService } from "./infrastructure/services/IntelliExtractService.js";
-import { NodemailerService } from "./infrastructure/services/NodemailerService.js";
-import { RunStatusStore } from "./infrastructure/services/RunStatusStore.js";
-import { ConfigService } from "./infrastructure/services/ConfigService.js";
-import { SqliteLogger } from "./infrastructure/services/SqliteLogger.js";
-import { RunStateService } from "./infrastructure/services/RunStateService.js";
-import { ProcessOrchestrator } from "./infrastructure/services/ProcessOrchestrator.js";
-import { CronManager } from "./infrastructure/services/CronManager.js";
-import { NodeReportGenerationService } from "./infrastructure/services/NodeReportGenerationService.js";
+import { AwsS3Service } from "./infrastructure/services/aws-s3.service.js";
+import { IntelliExtractService } from "./infrastructure/services/intelli-extract.service.js";
+import { NodemailerService } from "./infrastructure/services/nodemailer.service.js";
+import { RunStatusStore } from "./infrastructure/services/run-status-store.service.js";
+import { ConfigService } from "./infrastructure/services/config.service.js";
+import { SqliteLogger } from "./infrastructure/services/sqlite-logger.service.js";
+import { RunStateService } from "./infrastructure/services/run-state.service.js";
+import { ProcessOrchestrator } from "./infrastructure/services/process-orchestrator.service.js";
+import { CronManager } from "./infrastructure/services/cron-manager.service.js";
+import { NodeReportGenerationService } from "./infrastructure/services/node-report-generation.service.js";
 
 // Utilities
-import { loadBrandPurchasers } from "./infrastructure/utils/TenantUtils.js";
-import { getCaseCommands } from "./infrastructure/utils/CommandUtils.js";
-import { loadStaticAssets } from "./infrastructure/views/Constants.js";
+import { loadBrandPurchasers } from "./infrastructure/utils/tenant.utils.js";
+import { getCaseCommands } from "./infrastructure/utils/command.utils.js";
+import { loadStaticAssets } from "./infrastructure/views/constants.js";
 
 dotenv.config();
 

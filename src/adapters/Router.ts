@@ -1,10 +1,10 @@
 import { IncomingMessage, ServerResponse } from "node:http";
-import { ExtractionController } from "./controllers/ExtractionController.js";
-import { ScheduleController } from "./controllers/ScheduleController.js";
-import { ReportPageController } from "./controllers/ReportPageController.js";
-import { ReportDataController } from "./controllers/ReportDataController.js";
-import { ExportController } from "./controllers/ExportController.js";
-import { ProjectController } from "./controllers/ProjectController.js";
+import { ExtractionController } from "./controllers/extraction.controller.js";
+import { ScheduleController } from "./controllers/schedule.controller.js";
+import { ReportPageController } from "./controllers/report-page.controller.js";
+import { ReportDataController } from "./controllers/report-data.controller.js";
+import { ExportController } from "./controllers/export.controller.js";
+import { ProjectController } from "./controllers/project.controller.js";
 
 const MAX_BODY_BYTES = 512 * 1024; // 512 KB — guard against request flooding
 
