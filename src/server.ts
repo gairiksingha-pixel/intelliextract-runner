@@ -30,7 +30,7 @@ import { IntelliExtractService } from "./infrastructure/services/IntelliExtractS
 import { NodemailerService } from "./infrastructure/services/NodemailerService.js";
 import { RunStatusStore } from "./infrastructure/services/RunStatusStore.js";
 import { ConfigService } from "./infrastructure/services/ConfigService.js";
-import { JsonLogger } from "./infrastructure/services/JsonLogger.js";
+import { SqliteLogger } from "./infrastructure/services/SqliteLogger.js";
 import { RunStateService } from "./infrastructure/services/RunStateService.js";
 import { ProcessOrchestrator } from "./infrastructure/services/ProcessOrchestrator.js";
 import { CronManager } from "./infrastructure/services/CronManager.js";
@@ -52,41 +52,30 @@ const BRAND_PURCHASERS = loadBrandPurchasers();
 // 1. Initialize Configuration and Logging
 const configService = new ConfigService();
 const appConfig = configService.getConfig();
-const jsonLogger = new JsonLogger(
-  appConfig.logging.dir,
-  appConfig.logging.requestResponseLog,
-);
 
 const REPORTS_DIR = join(ROOT, "output", "reports");
 const EXTRACTIONS_DIR = join(ROOT, "output", "extractions");
 const STAGING_DIR = join(ROOT, "output", "staging");
 const _rawCheckpointPath =
   appConfig.run.checkpointPath ||
-  join(ROOT, "output", "checkpoints", "checkpoint.db");
+  join(ROOT, "output", "checkpoints", "intelliextract.db");
 // Always resolve relative to ROOT so the path is absolute regardless of cwd
 const CHECKPOINT_PATH = resolve(ROOT, _rawCheckpointPath);
-const SCHEDULE_LOG_PATH = join(ROOT, "output", "logs", "schedule.log");
 
-// Ensure directories exist
-[
-  REPORTS_DIR,
-  EXTRACTIONS_DIR,
-  STAGING_DIR,
-  dirname(CHECKPOINT_PATH),
-  dirname(SCHEDULE_LOG_PATH),
-].forEach((dir) => mkdirSync(dir, { recursive: true }));
+// Ensure required directories exist
+[STAGING_DIR, join(CHECKPOINT_PATH, "..")].forEach((dir) =>
+  mkdirSync(dir, { recursive: true }),
+);
 
 // 2. Initialize Repositories
 const checkpointRepo = new SqliteCheckpointRepository(CHECKPOINT_PATH);
 await checkpointRepo.initialize();
 const syncRepo = new SqliteSyncRepository(CHECKPOINT_PATH);
 const scheduleRepo = new SqliteScheduleRepository(CHECKPOINT_PATH);
+const logger = new SqliteLogger(checkpointRepo);
 
 // 3. Initialize Use Cases
-const getExtractionDataUseCase = new GetExtractionDataUseCase(
-  checkpointRepo,
-  EXTRACTIONS_DIR,
-);
+const getExtractionDataUseCase = new GetExtractionDataUseCase(checkpointRepo);
 const getInventoryDataUseCase = new GetInventoryDataUseCase(
   checkpointRepo,
   syncRepo,
@@ -96,7 +85,7 @@ const discoverFilesUseCase = new DiscoverFilesUseCase();
 const reportingUseCase = new ReportingUseCase(checkpointRepo);
 // 4. Initialize Services
 const s3Service = new AwsS3Service(appConfig.s3.region, syncRepo);
-const extractionService = new IntelliExtractService(appConfig, EXTRACTIONS_DIR);
+const extractionService = new IntelliExtractService(appConfig);
 const runStatusStore = new RunStatusStore(new Map());
 const notificationService = new NodemailerService(
   await checkpointRepo.getEmailConfig(),
@@ -108,7 +97,7 @@ const emailService = new NodemailerEmailService(checkpointRepo);
 const runExtractionUseCase = new RunExtractionUseCase(
   extractionService,
   checkpointRepo,
-  jsonLogger,
+  logger,
   emailService,
 );
 
@@ -137,7 +126,7 @@ const cronManager = new CronManager(
   runStatusStore,
   scheduleRepo,
   runStateService,
-  SCHEDULE_LOG_PATH,
+  checkpointRepo,
   BRAND_PURCHASERS,
   RESUME_CAPABLE_CASES,
 );
@@ -160,7 +149,7 @@ const staticAssets = loadStaticAssets(ROOT);
 const scheduleController = new ScheduleController(
   scheduleRepo,
   cronManager,
-  SCHEDULE_LOG_PATH,
+  checkpointRepo,
 );
 const reportController = new ReportController(
   dashboardController,

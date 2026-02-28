@@ -1,5 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readFileSync } from "node:fs";
 import {
   extract,
   type ExtractResult,
@@ -13,10 +12,7 @@ import {
 import { Config } from "../../core/domain/entities/Config.js";
 
 export class IntelliExtractService implements IExtractionService {
-  constructor(
-    private appConfig: Config,
-    private extractionsDir: string,
-  ) {}
+  constructor(private appConfig: Config) {}
 
   async extractFile(
     filePath: string,
@@ -62,18 +58,7 @@ export class IntelliExtractService implements IExtractionService {
     }
 
     // Write result to disk
-    if (result.body) {
-      this.writeResult(
-        filePath,
-        brand,
-        purchaser,
-        result.body,
-        isAppSuccess,
-        result.latencyMs,
-        runId,
-        relativePath,
-      );
-    }
+    // DISABLED: Now stored in DB via fullResponse
 
     const finalSuccess = isAppSuccess;
     const baseErrorSnippet = finalSuccess
@@ -87,12 +72,22 @@ export class IntelliExtractService implements IExtractionService {
             ? `${baseErrorSnippet} (after ${attempts} attempt${attempts === 1 ? "" : "s"})`
             : baseErrorSnippet);
 
+    let fullResponse: any = undefined;
+    if (result.body) {
+      try {
+        fullResponse = JSON.parse(result.body);
+      } catch (_) {
+        fullResponse = { raw: result.body };
+      }
+    }
+
     return {
       success: finalSuccess,
       statusCode: result.statusCode,
       latencyMs: result.latencyMs,
       patternKey,
       errorMessage,
+      fullResponse,
     };
   }
 
@@ -155,47 +150,5 @@ export class IntelliExtractService implements IExtractionService {
     }
 
     return { result: last!, attempts: attempt };
-  }
-
-  private writeResult(
-    filePath: string,
-    brand: string,
-    purchaser: string | undefined,
-    responseBody: string,
-    success: boolean,
-    latencyMs: number,
-    runId?: string,
-    relativePath?: string,
-  ) {
-    const subdir = success ? "succeeded" : "failed";
-    const outDir = join(this.extractionsDir, subdir);
-    if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
-
-    // Use relative path for safe filename to match old project logic
-    const relativePathForName = relativePath || filePath;
-    const safe = relativePathForName
-      .replaceAll(/[\\/]/g, "_")
-      .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
-
-    let filename = `${brand}_${safe}`;
-    if (!filename.toLowerCase().endsWith(".json")) filename += ".json";
-
-    const path = join(outDir, filename);
-
-    try {
-      const data = JSON.parse(responseBody);
-      if (typeof data === "object" && data !== null) {
-        const d = data as any;
-        d._filePath = filePath;
-        d._relativePath = relativePathForName;
-        d._brand = brand;
-        d._purchaser = purchaser;
-        d._latencyMs = latencyMs;
-        if (runId) d._runId = runId;
-      }
-      writeFileSync(path, JSON.stringify(data, null, 2), "utf-8");
-    } catch {
-      writeFileSync(path, responseBody, "utf-8");
-    }
   }
 }

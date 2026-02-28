@@ -162,10 +162,16 @@ export class ProjectController {
 
       if (queryCaseId) {
         const state = await this.runStateService.getRunState(queryCaseId);
-        const isActive = this.runStatusStore.isActive(queryCaseId);
+        const isRegistered = this.runStatusStore.isActive(queryCaseId);
+        const hasProcess =
+          !!this.orchestrator.getActiveChildProcess(queryCaseId);
+        const isActive = isRegistered && hasProcess;
+
+        // Resumable if we have a state and it's not currently active (either stopped normally or interrupted)
         const canResume =
           state &&
-          state.status === "stopped" &&
+          (state.status === "stopped" || state.status === "running") &&
+          !isActive &&
           this.resumeCapableCases.has(queryCaseId);
 
         res.writeHead(200, { "Content-Type": "application/json" });

@@ -66,75 +66,6 @@ function extractionResultFilenameFromRecord(record: {
  * extractionSuccess now respects response.success if present.
  * Folder name is only fallback.
  */
-function loadJsonEntries(
-  dir: string,
-  defaultExtractionSuccess: boolean,
-): ExtractionResultEntry[] {
-  const entries: ExtractionResultEntry[] = [];
-
-  const files = readdirSync(dir, { withFileTypes: true }).filter(
-    (e) => e.isFile() && e.name.toLowerCase().endsWith(".json"),
-  );
-
-  for (const e of files) {
-    const path = join(dir, e.name);
-
-    try {
-      const raw = readFileSync(path, "utf-8");
-      const response = JSON.parse(raw) as unknown;
-
-      let extractionSuccess = defaultExtractionSuccess;
-
-      // ✅ Trust API response.success if present
-      if (
-        typeof response === "object" &&
-        response !== null &&
-        "success" in response
-      ) {
-        const successValue = (response as { success?: unknown }).success;
-        if (typeof successValue === "boolean") {
-          extractionSuccess = successValue;
-        }
-      }
-
-      entries.push({
-        filename: e.name,
-        response,
-        extractionSuccess,
-      });
-    } catch {
-      // skip unreadable
-    }
-  }
-
-  return entries;
-}
-
-function loadExtractionResults(
-  config: Config,
-  runId: string,
-): ExtractionResultEntry[] {
-  const baseDir = join(dirname(config.report.outputDir), "extractions");
-  if (!existsSync(baseDir)) return [];
-
-  const succeededDir = join(baseDir, "succeeded");
-  const failedDir = join(baseDir, "failed");
-
-  const fromSucceeded = existsSync(succeededDir)
-    ? loadJsonEntries(succeededDir, true)
-    : [];
-
-  const fromFailed = existsSync(failedDir)
-    ? loadJsonEntries(failedDir, false)
-    : [];
-
-  if (fromSucceeded.length > 0 || fromFailed.length > 0) {
-    return [...fromSucceeded, ...fromFailed];
-  }
-
-  // Backward compatibility: flat structure
-  return loadJsonEntries(baseDir, false);
-}
 
 function filterExtractionResultsForRecords(
   records: CheckpointRecord[],
@@ -263,7 +194,25 @@ export async function loadHistoricalRunSummaries(
     const records = await repo.getRecordsForRun(runId);
     if (records.length === 0) continue;
 
-    const allResultsForRun = loadExtractionResults(config, runId);
+    const allResultsForRun: ExtractionResultEntry[] = records
+      .filter((r) => r.fullResponse)
+      .map((r) => {
+        const response = r.fullResponse;
+        let extractionSuccess = r.status === "done";
+        if (
+          typeof response === "object" &&
+          response !== null &&
+          "success" in response
+        ) {
+          const s = (response as any).success;
+          if (typeof s === "boolean") extractionSuccess = s;
+        }
+        return {
+          filename: extractionResultFilenameFromRecord(r),
+          response,
+          extractionSuccess,
+        };
+      });
 
     // Group records in this run by (brand, purchaser)
     const recordsByGroup = new Map<string, CheckpointRecord[]>();
@@ -3049,89 +2998,63 @@ function pruneOldReports(outDir: string, retainCount: number): void {
  * Write reports for a single run ID (e.g. after each file completes so the summary is up to date).
  * Reads current checkpoint state, computes metrics, and calls writeReports.
  */
-export async function writeReportsForRunId(
-  repo: ICheckpointRepository,
-  config: Config,
-  runId: string,
-): Promise<void> {
-  const records = await repo.getRecordsForRun(runId);
-  if (records.length === 0) return;
-  const { start, end } = minMaxDatesFromRecords(records);
-  const metrics = computeMetrics(runId, records, start, end);
-  const summary = buildSummary(metrics);
-  await writeReports(repo, config, summary);
+/**
+ * Builds the JSON payload for reports, derived from historical summaries.
+ */
+export function buildReportJsonPayload(
+  historicalSummaries: HistoricalRunSummary[],
+  generatedAt: string = new Date().toISOString(),
+) {
+  const operationsPayload = historicalSummaries.map((r) => {
+    const processed = r.metrics.success + r.metrics.failed;
+    const throughputPerMinute =
+      r.runDurationSeconds > 0 ? (processed / r.runDurationSeconds) * 60 : 0;
+    const throughputPerSecond = throughputPerMinute / 60;
+    return {
+      runId: r.runId,
+      metrics: r.metrics,
+      runDurationSeconds: r.runDurationSeconds,
+      loadTesting: {
+        throughputPerMinute: Math.round(throughputPerMinute * 10) / 10,
+        throughputPerSecond: Math.round(throughputPerSecond * 100) / 100,
+        errorRatePercent: Math.round(r.metrics.errorRate * 10000) / 100,
+        idealExtractCount5Min: Math.round(throughputPerMinute * 5),
+        idealExtractCount10Min: Math.round(throughputPerMinute * 10),
+        idealExtractCount15Min: Math.round(throughputPerMinute * 15),
+        p50LatencyMs: r.metrics.p50LatencyMs,
+        p95LatencyMs: r.metrics.p95LatencyMs,
+        p99LatencyMs: r.metrics.p99LatencyMs,
+      },
+      extractionResults: r.extractionResults.map((e) => ({
+        filename: e.filename,
+        response: e.response,
+        extractionSuccess: e.extractionSuccess,
+      })),
+      itemCount: processed,
+    };
+  });
+
+  return {
+    title: REPORT_TITLE,
+    generatedAt,
+    operations: operationsPayload,
+  };
 }
 
-/**
- * Write reports to config.report.outputDir in requested formats.
- * Includes all historical sync & extract runs (from checkpoint) so downloaded reports have full history.
- * If report.retainCount is set, older report sets are deleted after writing so only the last N are kept.
- */
 export async function writeReports(
   repo: ICheckpointRepository,
   config: Config,
   summary: ExecutiveSummary,
 ): Promise<void> {
-  const outDir = config.report.outputDir;
-  if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
+  // NO LONGER WRITING FILES
+  // The system now serves reports dynamically via ReportController.
+  // We just ensure the metrics are loggable if needed.
+}
 
-  const runId = summary.metrics.runId;
-  const historicalSummaries = await loadHistoricalRunSummaries(repo, config);
-  const generatedAt = new Date().toISOString();
-
-  if (runId) {
-    const base = `report_${runId}_${Date.now()}`;
-    if (config.report.formats.includes("html")) {
-      const path = join(outDir, `${base}.html`);
-      writeFileSync(
-        path,
-        htmlReportFromHistory(historicalSummaries, generatedAt),
-        "utf-8",
-      );
-    }
-    if (config.report.formats.includes("json")) {
-      const path = join(outDir, `${base}.json`);
-      const operationsPayload = historicalSummaries.map((r) => {
-        const processed = r.metrics.success + r.metrics.failed;
-        const throughputPerMinute =
-          r.runDurationSeconds > 0
-            ? (processed / r.runDurationSeconds) * 60
-            : 0;
-        const throughputPerSecond = throughputPerMinute / 60;
-        return {
-          runId: r.runId,
-          metrics: r.metrics,
-          runDurationSeconds: r.runDurationSeconds,
-          loadTesting: {
-            throughputPerMinute: Math.round(throughputPerMinute * 10) / 10,
-            throughputPerSecond: Math.round(throughputPerSecond * 100) / 100,
-            errorRatePercent: Math.round(r.metrics.errorRate * 10000) / 100,
-            idealExtractCount5Min: Math.round(throughputPerMinute * 5),
-            idealExtractCount10Min: Math.round(throughputPerMinute * 10),
-            idealExtractCount15Min: Math.round(throughputPerMinute * 15),
-            p50LatencyMs: r.metrics.p50LatencyMs,
-            p95LatencyMs: r.metrics.p95LatencyMs,
-            p99LatencyMs: r.metrics.p99LatencyMs,
-          },
-          extractionResults: r.extractionResults.map((e) => ({
-            filename: e.filename,
-            response: e.response,
-            extractionSuccess: e.extractionSuccess,
-          })),
-          itemCount: processed,
-        };
-      });
-      const jsonPayload = {
-        title: REPORT_TITLE,
-        generatedAt,
-        operations: operationsPayload,
-      };
-      writeFileSync(path, JSON.stringify(jsonPayload, null, 2), "utf-8");
-    }
-  }
-
-  const retain = config.report.retainCount;
-  if (typeof retain === "number" && retain > 0) {
-    pruneOldReports(outDir, retain);
-  }
+export async function writeReportsForRunId(
+  repo: ICheckpointRepository,
+  config: Config,
+  runId: string,
+): Promise<void> {
+  // NO LONGER WRITING FILES
 }

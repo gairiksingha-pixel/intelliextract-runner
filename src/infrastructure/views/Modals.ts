@@ -99,6 +99,9 @@ export const ExtractionDataModal = () => `
 
 export const ReportViewOverlay = () => `
   <div id="report-view-overlay" class="report-view-overlay" aria-hidden="true" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 5000; flex-direction: column;">
+    <button type="button" onclick="window.hideReportOverlay()" style="position: absolute; top: 20px; right: 30px; width: 40px; height: 40px; border-radius: 50%; background: white; border: 1px solid rgba(0,0,0,0.1); cursor: pointer; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 20px; display: flex; align-items: center; justify-content: center; color: var(--text);">
+      &#10005;
+    </button>
     <div class="report-overlay-body" style="flex: 1; width: 100%; height: 100%; position: relative; background: var(--bg);">
       <iframe id="report-view-frame" title="Report Content" style="width: 100%; height: 100%; border: none; display: block;"></iframe>
       <div id="report-view-loader" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(248, 250, 252, 0.85); display: flex; align-items: center; justify-content: center; z-index: 10; font-size: 1.1rem; font-weight: 700; color: var(--primary);">

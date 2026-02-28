@@ -22,7 +22,9 @@ export interface RunExtractionRequest {
   runId: string;
   concurrency?: number;
   requestsPerSecond?: number;
-  /** When true, only retry files that previously failed in the specified runId (or globally if runId is new) */
+  /** When true, only skip files that were successfully processed in ANY run */
+  skipCompleted?: boolean;
+  /** When true, only retry files that previously failed in the specified runId */
   retryFailed?: boolean;
   onProgress?: (done: number, total: number) => void;
   /** Filter for cumulative metrics reporting at end of run */
@@ -45,7 +47,10 @@ export class RunExtractionUseCase {
     const failures: FailureDetail[] = [];
 
     // 1. Determine files to actually process
-    const completedPaths = await this.checkpointRepo.getCompletedPaths(runId);
+    // If skipCompleted is true, we check globally. Otherwise, we only check within this run (for resume).
+    const completedPaths = await this.checkpointRepo.getCompletedPaths(
+      request.skipCompleted ? undefined : runId,
+    );
 
     // If retryFailed is on, we only want to process files that have status "error" in the DB
     let errorPaths: Set<string> | null = null;
@@ -57,7 +62,7 @@ export class RunExtractionUseCase {
       if (request.retryFailed && errorPaths) {
         return errorPaths.has(f.relativePath);
       }
-      return !completedPaths.has(f.relativePath);
+      return !completedPaths.has(f.filePath);
     });
 
     const total = toProcess.length;
@@ -141,6 +146,7 @@ export class RunExtractionUseCase {
             statusCode: result.statusCode,
             errorMessage: result.errorMessage,
             patternKey: result.patternKey,
+            fullResponse: result.fullResponse,
             runId,
           } as Checkpoint);
 

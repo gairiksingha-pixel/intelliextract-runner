@@ -16,14 +16,9 @@ import { SyncBrandUseCase } from "./core/use-cases/SyncBrandUseCase.js";
 import { RunExtractionUseCase } from "./core/use-cases/RunExtractionUseCase.js";
 import { AwsS3Service } from "./infrastructure/services/AwsS3Service.js";
 import { IntelliExtractService } from "./infrastructure/services/IntelliExtractService.js";
-import { JsonLogger } from "./infrastructure/services/JsonLogger.js";
+import { SqliteLogger } from "./infrastructure/services/SqliteLogger.js";
 import { DiscoverFilesUseCase } from "./core/use-cases/DiscoverFilesUseCase.js";
 import { NodemailerEmailService } from "./infrastructure/services/NodemailerEmailService.js";
-import {
-  buildSummary,
-  writeReports,
-  writeReportsForRunId,
-} from "./adapters/presenters/report.js";
 import { computeMetrics } from "./infrastructure/utils/MetricsUtils.js";
 import { join, dirname } from "node:path";
 import {
@@ -44,16 +39,6 @@ const STAGING_DIR = join(process.cwd(), "output", "staging");
 
 // Graceful SIGTERM (needed for ProcessOrchestrator stop signal)
 process.on("SIGTERM", () => process.exit(143));
-
-const LAST_RUN_FILE = "last-run-id.txt";
-function getLastRunIdPath(checkpointPath: string): string {
-  return join(dirname(checkpointPath), LAST_RUN_FILE);
-}
-function saveLastRunId(checkpointPath: string, runId: string): void {
-  try {
-    writeFileSync(getLastRunIdPath(checkpointPath), runId, "utf-8");
-  } catch (_) {}
-}
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -207,9 +192,14 @@ program
   .option("--pairs <json>", "JSON array of {tenant, purchaser} pairs")
   .option("-r, --run-id <id>", "Resume with existing run ID")
   .option("--retry-failed", "Only retry files with status 'error'")
+  .option(
+    "--skip-completed",
+    "Skip files already processed successfully in any run",
+  )
   .action(async (opts) => {
     try {
       const config = loadConfig(program.opts().config);
+      const skipCompleted = opts.skipCompleted ?? config.run.skipCompleted;
       const pairs = parsePairs(opts.pairs);
       const tenant = !pairs?.length ? opts.tenant?.trim() : undefined;
       const purchaser = !pairs?.length ? opts.purchaser?.trim() : undefined;
@@ -231,14 +221,8 @@ program
       await checkpointRepo.initialize();
       const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
       const emailService = new NodemailerEmailService(checkpointRepo);
-      const logger = new JsonLogger(
-        config.logging.dir,
-        config.logging.requestResponseLog,
-      );
-      const extractionService = new IntelliExtractService(
-        config,
-        EXTRACTIONS_DIR,
-      );
+      const logger = new SqliteLogger(checkpointRepo);
+      const extractionService = new IntelliExtractService(config);
       const discoverFiles = new DiscoverFilesUseCase();
       const runExtraction = new RunExtractionUseCase(
         extractionService,
@@ -252,6 +236,26 @@ program
       console.log(`Starting Run: ${runId}`);
 
       let filesToExtract: any[] = [];
+
+      // Operation 2: Extract Only (no sync)
+      // Check database first for files synced but not yet extracted
+      if (opts.sync === false) {
+        console.log("Checking for unextracted files in database registry...");
+        filesToExtract = await checkpointRepo.getUnextractedFiles({
+          brand: tenant,
+          purchaser,
+        });
+
+        if (filesToExtract.length > 0) {
+          console.log(
+            `Found ${filesToExtract.length} unextracted files in database.`,
+          );
+        } else {
+          console.log(
+            "No unextracted records in DB. Performing disk discovery...",
+          );
+        }
+      }
 
       if (opts.sync !== false) {
         const s3Service = new AwsS3Service(config.s3.region, syncRepo);
@@ -283,6 +287,19 @@ program
             })),
           );
         }
+
+        // Register synced files in database
+        if (filesToExtract.length > 0) {
+          await checkpointRepo.registerFiles(
+            filesToExtract.map((f) => ({
+              id: f.relativePath,
+              fullPath: f.filePath,
+              brand: f.brand,
+              purchaser: f.purchaser,
+            })),
+          );
+        }
+
         const totalSynced = syncResults.reduce((s, r) => s + r.synced, 0);
         const totalSkipped = syncResults.reduce((s, r) => s + r.skipped, 0);
         console.log(
@@ -290,14 +307,14 @@ program
         );
       }
 
+      // If no files from sync/DB, check disk
       if (filesToExtract.length === 0) {
-        console.log("Discovering files in staging...");
+        console.log("Discovering files in staging directory...");
         let resolvedPairs = pairs?.map((p) => ({
           brand: p.tenant,
           purchaser: p.purchaser,
         }));
         if (!resolvedPairs && (tenant || purchaser)) {
-          // Resolve pairs from filesystem if only one filter is provided
           resolvedPairs = [];
           const brands = existsSync(STAGING_DIR)
             ? readdirSync(STAGING_DIR)
@@ -320,6 +337,18 @@ program
           stagingDir: STAGING_DIR,
           pairs: resolvedPairs,
         });
+
+        // Register discovered files in database so next time they are found in registry
+        if (filesToExtract.length > 0) {
+          await checkpointRepo.registerFiles(
+            filesToExtract.map((f) => ({
+              id: f.relativePath,
+              fullPath: f.filePath,
+              brand: f.brand,
+              purchaser: f.purchaser,
+            })),
+          );
+        }
       }
 
       if (extractLimit && extractLimit > 0) {
@@ -338,6 +367,7 @@ program
         concurrency: opts.concurrency || config.run.concurrency,
         requestsPerSecond: opts.rps || config.run.requestsPerSecond,
         retryFailed: opts.retryFailed,
+        skipCompleted,
         filter: tenant && purchaser ? { tenant, purchaser } : undefined,
         onProgress: (done, total) => {
           if (stdoutPiped)
@@ -346,13 +376,12 @@ program
         },
       });
 
+      await clearPartialFileAndResumeState(checkpointRepo);
       console.log("\nExtraction completed.");
-      saveLastRunId(config.run.checkpointPath, runId);
 
       if (doReport) {
-        console.log("Generating report...");
-        await writeReportsForRunId(checkpointRepo, config, runId);
-        console.log(`Reports path: ${config.report.outputDir}`);
+        const reportUrl = `/api/reports/html/report_${runId}.html`;
+        console.log(`Reports path: ${reportUrl}`);
       }
     } catch (e) {
       console.error("Run failed:", e instanceof Error ? e.message : String(e));
@@ -406,14 +435,8 @@ program
       await checkpointRepo.initialize();
       const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
       const emailService = new NodemailerEmailService(checkpointRepo);
-      const logger = new JsonLogger(
-        config.logging.dir,
-        config.logging.requestResponseLog,
-      );
-      const extractionService = new IntelliExtractService(
-        config,
-        EXTRACTIONS_DIR,
-      );
+      const logger = new SqliteLogger(checkpointRepo);
+      const extractionService = new IntelliExtractService(config);
 
       // Resolve run ID (resume or fresh)
       const runId =
@@ -428,9 +451,9 @@ program
       }
 
       if (opts.resume) {
-        clearPartialFileAndResumeState(config);
+        await clearPartialFileAndResumeState(checkpointRepo);
       } else {
-        clearPartialFileAndResumeState(config);
+        await clearPartialFileAndResumeState(checkpointRepo);
       }
 
       if (pairs?.length) console.log(`Scoped to ${pairs.length} pair(s).`);
@@ -471,7 +494,7 @@ program
         limit: limit,
         alreadyExtractedPaths: globalCompleted,
         onStartDownload: (destPath, manifestKey) => {
-          saveResumeState(config, {
+          saveResumeState(checkpointRepo, {
             syncInProgressPath: destPath,
             syncInProgressManifestKey: manifestKey,
           });
@@ -527,9 +550,9 @@ program
                 statusCode: result.statusCode,
                 errorMessage: result.errorMessage,
                 patternKey: result.patternKey,
+                fullResponse: result.fullResponse,
                 runId,
               } as any);
-
               if (!result.success) {
                 failures.push({ ...job, ...result });
               }
@@ -546,11 +569,6 @@ program
                 },
                 success: result.success,
               });
-              if (doReport) {
-                try {
-                  await writeReportsForRunId(checkpointRepo, config, runId);
-                } catch (_) {}
-              }
             } catch (err: any) {
               if (err?.message?.includes("Network")) {
                 aborted = true;
@@ -604,12 +622,10 @@ program
       console.log(
         `\nSync-extract complete — success=${metrics.success}, skipped=${metrics.skipped}, failed=${metrics.failed}`,
       );
-      saveLastRunId(config.run.checkpointPath, runId);
 
       if (doReport) {
-        const summary = buildSummary(metrics);
-        await writeReports(checkpointRepo, config, summary);
-        console.log(`Reports path: ${config.report.outputDir}`);
+        const reportUrl = `/api/reports/html/report_${runId}.html`;
+        console.log(`Reports path: ${reportUrl}`);
       }
     } catch (e) {
       console.error(
@@ -638,12 +654,7 @@ program
 
       let runId = opts.runId;
       if (!runId) {
-        const lastPath = getLastRunIdPath(config.run.checkpointPath);
-        if (existsSync(lastPath)) {
-          runId = readFileSync(lastPath, "utf-8").trim();
-        } else {
-          runId = await checkpointRepo.getCurrentRunId();
-        }
+        runId = await checkpointRepo.getCurrentRunId();
       }
       if (!runId) {
         console.error(
@@ -658,10 +669,8 @@ program
         process.exit(1);
       }
 
-      const metrics = computeMetrics(runId, records);
-      const summary = buildSummary(metrics);
-      await writeReports(checkpointRepo, config, summary);
-      console.log(`Reports path: ${config.report.outputDir}`);
+      const reportUrl = `/api/reports/html/report_${runId}.html`;
+      console.log(`Reports path: ${reportUrl}`);
     } catch (e) {
       console.error(
         "Report failed:",

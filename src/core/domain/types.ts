@@ -85,6 +85,7 @@ export interface CheckpointRecord {
   patternKey?: string;
   runId: string;
   purchaser?: string;
+  fullResponse?: any;
 }
 
 export interface RequestResponseLogEntry {

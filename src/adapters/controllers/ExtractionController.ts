@@ -13,6 +13,7 @@ export interface RunRequest {
   purchaser?: string;
   pairs?: { tenant: string; purchaser: string }[];
   retryFailed?: boolean;
+  skipCompleted?: boolean;
 }
 
 export class ExtractionController {
@@ -99,15 +100,19 @@ export class ExtractionController {
             writeLine({ type: "log", message: "Process started." });
           },
           onSyncProgress: (done, total) => {
+            runInfo.syncProgress = { done, total };
             writeLine({ type: "progress", phase: "sync", done, total });
           },
           onExtractionProgress: (done, total) => {
+            runInfo.extractProgress = { done, total };
             writeLine({ type: "progress", phase: "extract", done, total });
           },
           onResumeSkipSync: (skipped, total) => {
+            runInfo.resumeSkipSyncProgress = { skipped, total };
             writeLine({ type: "resume_skip", phase: "sync", skipped, total });
           },
           onResumeSkip: (skipped, total) => {
+            runInfo.resumeSkipExtractProgress = { skipped, total };
             writeLine({
               type: "resume_skip",
               phase: "extract",
@@ -162,10 +167,14 @@ export class ExtractionController {
         }
         writeLine({
           type: "error",
-          message:
-            result.stderr ||
-            result.stdout ||
-            `Process exited with code ${result.exitCode}`,
+          message: result.stderr
+            ? "Process produced errors."
+            : result.exitCode !== 0
+              ? "Process was interrupted."
+              : "Process finished.",
+          stdout: result.stdout,
+          stderr: result.stderr,
+          exitCode: result.exitCode,
         });
       }
     } catch (e: any) {

@@ -2,9 +2,9 @@ import cron from "node-cron";
 import { ProcessOrchestrator } from "./ProcessOrchestrator.js";
 import { IRunStatusStore } from "../../core/domain/services/IRunStatusStore.js";
 import { IScheduleRepository } from "../../core/domain/repositories/IScheduleRepository.js";
+import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
 import { RunStateService } from "./RunStateService.js";
 import { getPairsForSchedule } from "../utils/TenantUtils.js";
-import { appendScheduleLog } from "../utils/LogUtils.js";
 import { SCHEDULE_TIMEZONES } from "../views/Constants.js";
 import { ChildProcess } from "node:child_process";
 
@@ -17,7 +17,7 @@ export class CronManager {
     private runStatusStore: IRunStatusStore,
     private scheduleRepo: IScheduleRepository,
     private runStateService: RunStateService,
-    private logPath: string,
+    private checkpointRepo: ICheckpointRepository,
     private brandPurchaserMap: Record<string, string[]>,
     private resumeCapableCases: Set<string>,
   ) {}
@@ -29,7 +29,7 @@ export class CronManager {
 
   registerJob(schedule: any) {
     if (!schedule.cron || !cron.validate(schedule.cron)) {
-      appendScheduleLog(this.logPath, {
+      this.checkpointRepo.appendScheduleLog({
         outcome: "skipped",
         level: "error",
         message: "Invalid cron expression",
@@ -40,7 +40,7 @@ export class CronManager {
     }
 
     if (!SCHEDULE_TIMEZONES.includes(schedule.timezone)) {
-      appendScheduleLog(this.logPath, {
+      this.checkpointRepo.appendScheduleLog({
         outcome: "skipped",
         level: "warn",
         message: "Invalid timezone for schedule; skipping",
@@ -69,7 +69,7 @@ export class CronManager {
         );
 
         if (manualRunning) {
-          appendScheduleLog(this.logPath, {
+          this.checkpointRepo.appendScheduleLog({
             outcome: "skipped",
             level: "warn",
             message: `Scheduled job skipped — a manual process (${manualRunning.caseId}) is currently running`,
@@ -90,7 +90,7 @@ export class CronManager {
         }
 
         if (pausedCase) {
-          appendScheduleLog(this.logPath, {
+          this.checkpointRepo.appendScheduleLog({
             outcome: "skipped",
             level: "warn",
             message: `Scheduled job skipped — a process (${pausedCase}) is in paused (resume) mode`,
@@ -101,7 +101,7 @@ export class CronManager {
           return;
         }
 
-        appendScheduleLog(this.logPath, {
+        this.checkpointRepo.appendScheduleLog({
           outcome: "executed",
           level: "info",
           message: "Scheduled job started",
@@ -153,10 +153,10 @@ export class CronManager {
             null,
           );
 
-          this.runStatusStore.unregisterRun(caseId); // Note: key in store is caseId check IRunStatusStore
+          this.runStatusStore.unregisterRun(caseId);
           this.childProcesses.delete(activeRunKey);
 
-          appendScheduleLog(this.logPath, {
+          this.checkpointRepo.appendScheduleLog({
             outcome: "executed",
             level: "info",
             message: "Scheduled job finished",
@@ -167,7 +167,7 @@ export class CronManager {
           this.runStatusStore.unregisterRun(caseId);
           this.childProcesses.delete(activeRunKey);
 
-          appendScheduleLog(this.logPath, {
+          this.checkpointRepo.appendScheduleLog({
             outcome: "executed",
             level: "error",
             message: "Scheduled job failed",

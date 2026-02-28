@@ -1,28 +1,17 @@
-import {
-  existsSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-  mkdirSync,
-} from "node:fs";
-import { dirname, join } from "node:path";
-import { Config } from "../../core/domain/entities/Config.js";
+import { existsSync, unlinkSync } from "node:fs";
+import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
 
 export interface ResumeState {
   syncInProgressPath?: string;
   syncInProgressManifestKey?: string;
 }
 
-function getResumeStatePath(config: Config): string {
-  const checkpointDir = dirname(config.run.checkpointPath);
-  return join(checkpointDir, "resume-state.json");
-}
-
-export function loadResumeState(config: Config): ResumeState {
-  const path = getResumeStatePath(config);
-  if (!existsSync(path)) return {};
+export async function loadResumeState(
+  repo: ICheckpointRepository,
+): Promise<ResumeState> {
   try {
-    const raw = readFileSync(path, "utf-8");
+    const raw = await repo.getMeta("resume_state");
+    if (!raw) return {};
     const data = JSON.parse(raw) as ResumeState;
     return typeof data === "object" && data !== null ? data : {};
   } catch {
@@ -30,19 +19,23 @@ export function loadResumeState(config: Config): ResumeState {
   }
 }
 
-export function saveResumeState(config: Config, state: ResumeState): void {
-  const path = getResumeStatePath(config);
-  const dir = dirname(path);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify(state, null, 0), "utf-8");
+export async function saveResumeState(
+  repo: ICheckpointRepository,
+  state: ResumeState,
+): Promise<void> {
+  await repo.setMeta("resume_state", JSON.stringify(state));
 }
 
-export function clearResumeState(config: Config): void {
-  saveResumeState(config, {});
+export async function clearResumeState(
+  repo: ICheckpointRepository,
+): Promise<void> {
+  await saveResumeState(repo, {});
 }
 
-export function clearPartialFileAndResumeState(config: Config): void {
-  const state = loadResumeState(config);
+export async function clearPartialFileAndResumeState(
+  repo: ICheckpointRepository,
+): Promise<void> {
+  const state = await loadResumeState(repo);
   const path = state.syncInProgressPath;
 
   if (path && existsSync(path)) {
@@ -53,7 +46,5 @@ export function clearPartialFileAndResumeState(config: Config): void {
     }
   }
 
-  // Note: sync manifest in this project is in SQLite (SqliteSyncRepository),
-  // which handles its own persistence. Here we just clear the file-level resume state.
-  clearResumeState(config);
+  await clearResumeState(repo);
 }

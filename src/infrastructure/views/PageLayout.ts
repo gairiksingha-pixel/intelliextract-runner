@@ -17,6 +17,7 @@ interface PageLayoutProps {
   logo?: string;
   smallLogo?: string;
   activeTab?: string;
+  showSidebar?: boolean;
 }
 
 export function PageLayout({
@@ -29,6 +30,7 @@ export function PageLayout({
   logo = "",
   smallLogo = "",
   activeTab = "",
+  showSidebar = true,
 }: PageLayoutProps) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -43,10 +45,11 @@ export function PageLayout({
   <style>
     ${commonStyles}
     ${styles}
+    ${!showSidebar ? ".content-wrapper { padding: 0 !important; max-width: 100% !important; border-radius: 0 !important; }" : ""}
   </style>
   <script type="module" src="/assets/js/icons.js"></script>
   <script type="module" src="/assets/js/common.js"></script>
-  <script type="module" src="/assets/js/sidebar-component.js"></script>
+  ${showSidebar ? `<script type="module" src="/assets/js/sidebar-component.js"></script>` : ""}
   ${meta}
 </head>
 <body>
@@ -54,8 +57,8 @@ export function PageLayout({
     <div class="loader-spinner"></div>
     <div class="loader-text">Loading...</div>
   </div>
-  <div class="app-container">
-    <app-sidebar active-tab="${activeTab}" logo-uri="${logo}" small-logo-uri="${smallLogo}"></app-sidebar>
+  <div class="app-container ${!showSidebar ? "no-sidebar" : ""}">
+    ${showSidebar ? `<app-sidebar active-tab="${activeTab}" logo-uri="${logo}" small-logo-uri="${smallLogo}"></app-sidebar>` : ""}
     <div class="content-wrapper">
       ${content}
       ${NotificationModal()}

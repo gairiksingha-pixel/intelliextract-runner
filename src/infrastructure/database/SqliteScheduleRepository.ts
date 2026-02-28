@@ -5,105 +5,92 @@ import { Schedule } from "../../core/domain/entities/Schedule.js";
 import { IScheduleRepository } from "../../core/domain/repositories/IScheduleRepository.js";
 
 export class SqliteScheduleRepository implements IScheduleRepository {
+  private _db: Database.Database | null = null;
+
   constructor(private dbPath: string) {}
 
   private getDb() {
+    if (this._db) return this._db;
     mkdirSync(dirname(this.dbPath), { recursive: true });
-    return new Database(this.dbPath);
+    this._db = new Database(this.dbPath);
+    this._db.pragma("journal_mode = DELETE");
+    this._db.pragma("synchronous = FULL");
+    this._db.pragma("busy_timeout = 5000");
+    return this._db;
   }
 
   async getSchedules(): Promise<Schedule[]> {
     const db = this.getDb();
-    try {
-      const rows = db
-        .prepare("SELECT * FROM schedules ORDER BY created_at DESC")
-        .all();
-      return rows.map((r: any) => ({
-        id: r.id,
-        createdAt: r.created_at,
-        brands: JSON.parse(r.brands),
-        purchasers: JSON.parse(r.purchasers),
-        cron: r.cron,
-        timezone: r.timezone,
-      }));
-    } finally {
-      db.close();
-    }
+    const rows = db
+      .prepare("SELECT * FROM tbl_cron_schedules ORDER BY created_at DESC")
+      .all();
+    return rows.map((r: any) => ({
+      id: r.id,
+      createdAt: r.created_at,
+      brands: JSON.parse(r.brands),
+      purchasers: JSON.parse(r.purchasers),
+      cron: r.cron,
+      timezone: r.timezone,
+    }));
   }
 
   async saveSchedules(schedules: Schedule[]): Promise<void> {
     const db = this.getDb();
-    try {
-      db.transaction(() => {
-        db.prepare("DELETE FROM schedules").run();
-        const insert = db.prepare(`
-          INSERT INTO schedules (id, created_at, brands, purchasers, cron, timezone)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `);
-        for (const s of schedules) {
-          insert.run(
-            s.id,
-            s.createdAt,
-            JSON.stringify(s.brands),
-            JSON.stringify(s.purchasers),
-            s.cron,
-            s.timezone,
-          );
-        }
-      })();
-    } finally {
-      db.close();
-    }
+    db.transaction(() => {
+      db.prepare("DELETE FROM tbl_cron_schedules").run();
+      const insert = db.prepare(`
+        INSERT INTO tbl_cron_schedules (id, created_at, brands, purchasers, cron, timezone)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      for (const s of schedules) {
+        insert.run(
+          s.id,
+          s.createdAt,
+          JSON.stringify(s.brands),
+          JSON.stringify(s.purchasers),
+          s.cron,
+          s.timezone,
+        );
+      }
+    })();
   }
 
   async addSchedule(schedule: Schedule): Promise<void> {
     const db = this.getDb();
-    try {
-      db.prepare(
-        `
-        INSERT INTO schedules (id, created_at, brands, purchasers, cron, timezone)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `,
-      ).run(
-        schedule.id,
-        schedule.createdAt,
-        JSON.stringify(schedule.brands),
-        JSON.stringify(schedule.purchasers),
-        schedule.cron,
-        schedule.timezone,
-      );
-    } finally {
-      db.close();
-    }
+    db.prepare(
+      `
+      INSERT INTO tbl_cron_schedules (id, created_at, brands, purchasers, cron, timezone)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+    ).run(
+      schedule.id,
+      schedule.createdAt,
+      JSON.stringify(schedule.brands),
+      JSON.stringify(schedule.purchasers),
+      schedule.cron,
+      schedule.timezone,
+    );
   }
 
   async updateSchedule(schedule: Schedule): Promise<void> {
     const db = this.getDb();
-    try {
-      db.prepare(
-        `
-        UPDATE schedules 
-        SET brands = ?, purchasers = ?, cron = ?, timezone = ?
-        WHERE id = ?
-      `,
-      ).run(
-        JSON.stringify(schedule.brands),
-        JSON.stringify(schedule.purchasers),
-        schedule.cron,
-        schedule.timezone,
-        schedule.id,
-      );
-    } finally {
-      db.close();
-    }
+    db.prepare(
+      `
+      UPDATE tbl_cron_schedules
+      SET brands = ?, purchasers = ?, cron = ?, timezone = ?
+      WHERE id = ?
+    `,
+    ).run(
+      JSON.stringify(schedule.brands),
+      JSON.stringify(schedule.purchasers),
+      schedule.cron,
+      schedule.timezone,
+      schedule.id,
+    );
   }
 
   async deleteSchedule(id: string): Promise<void> {
     const db = this.getDb();
-    try {
-      db.prepare("DELETE FROM schedules WHERE id = ?").run(id);
-    } finally {
-      db.close();
-    }
+    db.prepare("DELETE FROM tbl_cron_schedules WHERE id = ?").run(id);
   }
 }

@@ -1,11 +1,5 @@
-import {
-  existsSync,
-  readdirSync,
-  statSync,
-  createReadStream,
-  readFileSync,
-} from "node:fs";
-import { join, extname, resolve, basename } from "node:path";
+import { existsSync, createReadStream, statSync } from "node:fs";
+import { resolve, basename } from "node:path";
 import { ServerResponse } from "node:http";
 // @ts-ignore
 import archiver from "archiver";
@@ -15,6 +9,8 @@ import {
   htmlReportFromHistory,
 } from "../presenters/report.js";
 import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
+import { PageLayout } from "../../infrastructure/views/PageLayout.js";
+import { RunSummaryView } from "../../infrastructure/views/RunSummaryView.js";
 
 export class ReportController {
   constructor(
@@ -31,37 +27,12 @@ export class ReportController {
 
   async listReports(res: ServerResponse) {
     try {
-      const allowedExt = new Set([".html", ".json"]);
-      const list: {
-        html: { name: string; mtime: number }[];
-        json: { name: string; mtime: number }[];
-      } = { html: [], json: [] };
+      const runIds = await this.checkpointRepo.getAllRunIdsOrdered();
 
-      if (!existsSync(this.reportsDir)) {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(list));
-        return;
-      }
-
-      const files = readdirSync(this.reportsDir, {
-        withFileTypes: true,
-      }).filter(
-        (e) => e.isFile() && allowedExt.has(extname(e.name).toLowerCase()),
-      );
-
-      for (const f of files) {
-        const ext = extname(f.name).toLowerCase();
-        const key = (ext === ".html" ? "html" : "json") as keyof typeof list;
-        let mtime = 0;
-        try {
-          mtime = statSync(join(this.reportsDir, f.name)).mtimeMs;
-        } catch (_) {}
-        list[key].push({ name: f.name, mtime });
-      }
-
-      for (const key of Object.keys(list) as (keyof typeof list)[]) {
-        list[key].sort((a, b) => b.mtime - a.mtime);
-      }
+      const list = {
+        html: runIds.map((id) => ({ name: `report_${id}.html`, runId: id })),
+        json: runIds.map((id) => ({ name: `report_${id}.json`, runId: id })),
+      };
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(list));
@@ -76,51 +47,66 @@ export class ReportController {
     const slash = rest.indexOf("/");
     const format = slash === -1 ? rest : rest.slice(0, slash);
     let filename = slash === -1 ? null : rest.slice(slash + 1);
-    if (filename) {
-      try {
-        filename = decodeURIComponent(filename);
-      } catch (_) {}
-    }
+
     if (!filename || !["html", "json"].includes(format)) {
       res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Invalid or missing caseId" }));
+      res.end(
+        JSON.stringify({ error: "Invalid report format or missing runId" }),
+      );
       return;
     }
-    const filePath = resolve(this.reportsDir, filename);
-    if (!filePath.startsWith(resolve(this.reportsDir))) {
-      res.writeHead(403);
-      res.end();
-      return;
-    }
+
+    // Extract runId from filename like report_RUN_ID.html
+    let runId = filename.replace(/^report_/, "").replace(/\.(html|json)$/, "");
+
     try {
-      if (!existsSync(filePath)) {
+      const allSummaries = await loadHistoricalRunSummaries(
+        this.checkpointRepo,
+        this.appConfig,
+      );
+      const summaries = allSummaries.filter((s) => s.runId === runId);
+
+      if (summaries.length === 0) {
         res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Not found" }));
+        res.end(JSON.stringify({ error: `Report for run ${runId} not found` }));
         return;
       }
-      const stat = statSync(filePath);
-      const contentType = format === "html" ? "text/html" : "application/json";
+
       if (format === "html") {
-        let content = readFileSync(filePath, "utf-8");
-        if (!content.includes('rel="icon"')) {
-          const faviconHtml = this.staticAssets.favIcon
-            ? `<link rel="icon" href="${this.staticAssets.favIcon}" type="image/x-icon">`
-            : "";
-          content = content.replace("<head>", "<head>\n  " + faviconHtml);
-        }
-        res.writeHead(200, {
-          "Content-Type": "text/html",
-          "Content-Length": Buffer.byteLength(content),
+        const props = {
+          totalAll: summaries.length,
+          totalSuccess: summaries.filter((s) => s.metrics.failed === 0).length,
+          totalFailed: summaries.filter((s) => s.metrics.failed > 0).length,
+        };
+
+        const content = RunSummaryView.render(props);
+        const styles = RunSummaryView.getStyles();
+        const scripts = `
+          <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+          <script>window.SUMMARY_DATA = ${JSON.stringify(summaries).replace(/</g, "\\u003c")};</script>
+          <script type="module" src="/assets/js/run-summary.js"></script>
+        `;
+
+        const html = PageLayout({
+          title: `Report - ${runId}`,
+          content,
+          styles,
+          scripts,
+          ...this.staticAssets,
+          showSidebar: false,
         });
-        res.end(content);
+
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(html);
       } else {
+        const { buildReportJsonPayload } =
+          await import("../presenters/report.js");
+        const jsonPayload = buildReportJsonPayload(summaries);
         res.writeHead(200, {
-          "Content-Type": contentType,
-          "Content-Length": stat.size,
-          "Content-Disposition":
-            'attachment; filename="' + filename.replace(/"/g, '\\"') + '"',
+          "Content-Type": "application/json",
+          "Content-Disposition": `attachment; filename="report_${runId}.json"`,
         });
-        createReadStream(filePath).pipe(res);
+        res.end(JSON.stringify(jsonPayload, null, 2));
       }
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "application/json" });
@@ -134,7 +120,30 @@ export class ReportController {
         this.checkpointRepo,
         this.appConfig,
       );
-      const html = htmlReportFromHistory(summaries, new Date().toISOString());
+
+      const props = {
+        totalAll: summaries.length,
+        totalSuccess: summaries.filter((s) => s.metrics.failed === 0).length,
+        totalFailed: summaries.filter((s) => s.metrics.failed > 0).length,
+      };
+
+      const content = RunSummaryView.render(props);
+      const styles = RunSummaryView.getStyles();
+      const scripts = `
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script>window.SUMMARY_DATA = ${JSON.stringify(summaries).replace(/</g, "\\u003c")};</script>
+        <script type="module" src="/assets/js/run-summary.js"></script>
+      `;
+
+      const html = PageLayout({
+        title: "Run Summary Report",
+        content,
+        styles,
+        scripts,
+        ...this.staticAssets,
+        activeTab: "summary",
+      });
+
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(html);
     } catch (e: any) {
@@ -277,27 +286,22 @@ export class ReportController {
       });
       archive.pipe(res);
 
-      const allFiles = new Set<string>();
-
       for (const runId of runIds) {
         const records = await this.checkpointRepo.getRecordsForRun(runId);
         for (const r of records) {
+          if (!r.fullResponse) continue;
+
           const safe = (r.relativePath || "")
             .replaceAll("/", "_")
             .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
           const base = r.brand + "_" + (safe || "file");
           const jsonName = base.endsWith(".json") ? base : base + ".json";
 
-          const succPath = resolve(this.extractionsDir, "succeeded", jsonName);
-          const failPath = resolve(this.extractionsDir, "failed", jsonName);
-
-          if (existsSync(succPath)) allFiles.add(succPath);
-          else if (existsSync(failPath)) allFiles.add(failPath);
+          // Add as virtual file to zip
+          archive.append(JSON.stringify(r.fullResponse, null, 2), {
+            name: (r.status === "done" ? "succeeded/" : "failed/") + jsonName,
+          });
         }
-      }
-
-      for (const absPath of allFiles) {
-        archive.file(absPath, { name: basename(absPath) });
       }
 
       archive.finalize();
@@ -313,22 +317,28 @@ export class ReportController {
 
   async exportAllExtractions(res: ServerResponse) {
     try {
-      if (!existsSync(this.extractionsDir)) {
-        res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Extractions folder not found." }));
-        return;
-      }
       res.writeHead(200, {
         "Content-Type": "application/zip",
         "Content-Disposition": 'attachment; filename="extractions.zip"',
       });
       const archive = archiver("zip", { zlib: { level: 9 } });
       archive.pipe(res);
-      const succeededDir = join(this.extractionsDir, "succeeded");
-      const failedDir = join(this.extractionsDir, "failed");
-      if (existsSync(succeededDir))
-        archive.directory(succeededDir, "succeeded");
-      if (existsSync(failedDir)) archive.directory(failedDir, "failed");
+
+      const records = await this.checkpointRepo.getAllCheckpoints();
+      for (const r of records) {
+        if (!r.fullResponse) continue;
+
+        const safe = (r.relativePath || "")
+          .replaceAll("/", "_")
+          .replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+        const base = r.brand + "_" + (safe || "file");
+        const jsonName = base.endsWith(".json") ? base : base + ".json";
+
+        archive.append(JSON.stringify(r.fullResponse, null, 2), {
+          name: (r.status === "done" ? "succeeded/" : "failed/") + jsonName,
+        });
+      }
+
       archive.finalize();
     } catch (e: any) {
       res.writeHead(500, { "Content-Type": "application/json" });

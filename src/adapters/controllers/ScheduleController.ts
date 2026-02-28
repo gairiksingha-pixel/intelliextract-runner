@@ -1,7 +1,7 @@
 import { ServerResponse } from "node:http";
 import { IScheduleRepository } from "../../core/domain/repositories/IScheduleRepository.js";
+import { ICheckpointRepository } from "../../core/domain/repositories/ICheckpointRepository.js";
 import { CronManager } from "../../infrastructure/services/CronManager.js";
-import { readScheduleLogEntries } from "../../infrastructure/utils/LogUtils.js";
 import { SCHEDULE_TIMEZONES } from "../../infrastructure/views/Constants.js";
 import { scheduleId } from "../../infrastructure/utils/IdUtils.js";
 import cron from "node-cron";
@@ -10,7 +10,7 @@ export class ScheduleController {
   constructor(
     private scheduleRepo: IScheduleRepository,
     private cronManager: CronManager,
-    private scheduleLogPath: string,
+    private checkpointRepo: ICheckpointRepository,
   ) {}
 
   async getSchedules(res: ServerResponse) {
@@ -199,7 +199,7 @@ export class ScheduleController {
       const urlObj = new URL(url, "http://localhost");
       const page = parseInt(urlObj.searchParams.get("page") || "1", 10);
       const limit = parseInt(urlObj.searchParams.get("limit") || "20", 10);
-      const allEntries = readScheduleLogEntries(this.scheduleLogPath);
+      const allEntries = this.checkpointRepo.getScheduleLogs(500);
       const total = allEntries.length;
       const startIndex = (page - 1) * limit;
       const entries = allEntries.slice(startIndex, startIndex + limit);

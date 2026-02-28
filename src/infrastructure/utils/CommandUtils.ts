@@ -44,6 +44,7 @@ export function runArgs(
   if (p?.syncLimit > 0) base.push("--sync-limit", String(p.syncLimit));
   if (p?.extractLimit > 0) base.push("--extract-limit", String(p.extractLimit));
   if (p?.retryFailed) base.push("--retry-failed");
+  if (p?.skipCompleted) base.push("--skip-completed");
   addPairArgs(base, p);
   return ["node", base, { cwd: root }];
 }
@@ -62,6 +63,7 @@ export function pipelineArgs(
       : 0;
   if (limit > 0) base.push("--limit", String(limit));
   if (p?.retryFailed) base.push("--retry-failed");
+  if (p?.skipCompleted) base.push("--skip-completed");
   addPairArgs(base, p);
   return ["node", base, { cwd: root }];
 }
@@ -119,7 +121,7 @@ export function getCaseCommands(
     N3: (p, runOpts) => syncArgs(p, runOpts, root),
     E1: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts, root),
     E2: (p) => {
-      const dbPath = join(root, "output", "checkpoints", "checkpoint.db");
+      const dbPath = join(root, "output", "checkpoints", "intelliextract.db");
       if (existsSync(dbPath)) {
         try {
           copyFileSync(dbPath, dbPath + ".bak");

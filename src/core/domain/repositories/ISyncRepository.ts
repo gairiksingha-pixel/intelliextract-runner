@@ -3,6 +3,7 @@ export type { ManifestEntry, SyncHistoryEntry } from "../types.js";
 
 export interface ISyncRepository {
   getManifest(): Promise<Record<string, ManifestEntry>>;
+  getManifestEntry(key: string): Promise<ManifestEntry | null>;
   saveManifest(manifest: Record<string, ManifestEntry>): Promise<void>;
   upsertManifestEntry(key: string, entry: ManifestEntry): Promise<void>;
   deleteManifestEntry(key: string): Promise<void>;

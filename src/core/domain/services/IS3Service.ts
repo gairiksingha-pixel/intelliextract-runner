@@ -26,9 +26,12 @@ export interface IS3Service {
       /** Called when a file is skipped (already synced): shows "Skipping synced files" in UI. */
       onSyncSkipProgress?: (skipped: number, totalProcessed: number) => void;
       /** Called after each file is synced or skipped — enables pipeline extraction. */
-      onFileSynced?: (job: SyncFileSyncedJob) => void;
+      onFileSynced?: (job: SyncFileSyncedJob) => void | Promise<void>;
       /** Called before a download begins — allows saving resume state. */
-      onStartDownload?: (destPath: string, manifestKey: string) => void;
+      onStartDownload?: (
+        destPath: string,
+        manifestKey: string,
+      ) => void | Promise<void>;
       /** Paths already extracted — skip without disk I/O. */
       alreadyExtractedPaths?: Set<string>;
     },

@@ -15,6 +15,7 @@ export interface WorkflowRequest {
   resume?: boolean;
   concurrency?: number;
   requestsPerSecond?: number;
+  skipCompleted?: boolean;
 }
 
 export interface WorkflowProgress {
@@ -132,6 +133,7 @@ export class ExecuteWorkflowUseCase {
             runId,
             concurrency: request.concurrency,
             requestsPerSecond: request.requestsPerSecond,
+            skipCompleted: request.skipCompleted,
             onProgress: (done, total) =>
               onUpdate({
                 type: "progress",

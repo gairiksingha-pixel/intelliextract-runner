@@ -48,8 +48,6 @@ export class AwsS3Service implements IS3Service {
     },
   ): Promise<SyncResult> {
     const prefix = bucketConfig.prefix ?? "";
-    const keys = await this.listAllKeys(bucketConfig.bucket, prefix);
-    const manifest = await this.syncRepo.getManifest();
 
     let synced = 0;
     let skipped = 0;
@@ -64,7 +62,9 @@ export class AwsS3Service implements IS3Service {
     if (!existsSync(brandDir)) mkdirSync(brandDir, { recursive: true });
 
     const initialLimit = options?.initialLimit ?? 0;
-    const totalForProgress = initialLimit > 0 ? initialLimit : keys.length;
+
+    // Total might grow as we discover keys
+    let totalDiscovered = 0;
 
     const reportProgress = () => {
       if (!options?.onProgress) return;
@@ -72,97 +72,123 @@ export class AwsS3Service implements IS3Service {
         initialLimit > 0 && options.limitRemaining
           ? initialLimit - options.limitRemaining.value
           : synced + skipped + errors;
-      options.onProgress(done, totalForProgress);
+      const total = initialLimit > 0 ? initialLimit : totalDiscovered;
+      options.onProgress(done, Math.max(done, total));
     };
-    reportProgress();
 
-    for (const { key, etag, size } of keys) {
-      // Respect shared limit across all buckets
+    let continuationToken: string | undefined;
+    do {
+      // Respect shared limit
       if (options?.limitRemaining && options.limitRemaining.value <= 0) break;
 
-      const keyAfterPrefix =
-        prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
-      const destPath = purchaser
-        ? join(brandDir, purchaser, keyAfterPrefix)
-        : join(brandDir, key);
-      const mk = `${brand}/${key}`;
-
-      // Fast-skip: already extracted
-      if (options?.alreadyExtractedPaths?.has(destPath)) {
-        skipped++;
-        options.onSyncSkipProgress?.(skipped, skipped + synced);
-        if (options.onFileSynced) {
-          const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
-          options.onFileSynced({
-            filePath: destPath,
-            relativePath,
-            brand,
-            purchaser: purchaser || undefined,
-          });
-        }
-        reportProgress();
-        continue;
-      }
-
-      const shouldSkip = await this.skipIfUnchanged(destPath, mk, manifest, {
-        etag,
-        size,
+      const cmd = new ListObjectsV2Command({
+        Bucket: bucketConfig.bucket,
+        Prefix: prefix || undefined,
+        ContinuationToken: continuationToken,
       });
-      if (shouldSkip) {
-        skipped++;
-        options?.onSyncSkipProgress?.(skipped, skipped + synced);
-        // Persist recovery updates to manifest
-        if (typeof manifest[mk] === "string" || !manifest[mk]) {
-          await this.syncRepo.saveManifest(manifest);
+
+      const out = await this.s3Client.send(cmd);
+      const contents = out.Contents ?? [];
+      totalDiscovered += contents.length;
+
+      for (const obj of contents) {
+        if (!obj.Key) continue;
+        if (options?.limitRemaining && options.limitRemaining.value <= 0) break;
+
+        const key = obj.Key;
+        const etag = obj.ETag?.replace(/"/g, "") || "";
+        const size = obj.Size ?? 0;
+
+        const keyAfterPrefix =
+          prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
+        const destPath = purchaser
+          ? join(brandDir, purchaser, keyAfterPrefix)
+          : join(brandDir, key);
+        const mk = `${brand}/${key}`;
+
+        // Fast-skip: already extracted
+        if (options?.alreadyExtractedPaths?.has(destPath)) {
+          skipped++;
+          options.onSyncSkipProgress?.(skipped, skipped + synced);
+          if (options.onFileSynced) {
+            const relativePath = relative(brandDir, destPath).replace(
+              /\\/g,
+              "/",
+            );
+            await options.onFileSynced({
+              filePath: destPath,
+              relativePath,
+              brand,
+              purchaser: purchaser || undefined,
+            });
+          }
+          reportProgress();
+          continue;
         }
-        if (options?.onFileSynced) {
-          const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
-          options.onFileSynced({
-            filePath: destPath,
-            relativePath,
-            brand,
-            purchaser: purchaser || undefined,
-          });
+
+        const shouldSkip = await this.skipIfUnchanged(destPath, mk, {
+          etag,
+          size,
+        });
+        if (shouldSkip) {
+          skipped++;
+          options?.onSyncSkipProgress?.(skipped, skipped + synced);
+          if (options?.onFileSynced) {
+            const relativePath = relative(brandDir, destPath).replace(
+              /\\/g,
+              "/",
+            );
+            await options.onFileSynced({
+              filePath: destPath,
+              relativePath,
+              brand,
+              purchaser: purchaser || undefined,
+            });
+          }
+          reportProgress();
+          continue;
         }
-        reportProgress();
-        continue;
+
+        try {
+          await options?.onStartDownload?.(destPath, mk);
+          await this.downloadToFile(bucketConfig.bucket, key, destPath);
+          const sha = await this.computeFileSha256(destPath);
+          const entry: ManifestEntry = { sha256: sha, etag, size };
+
+          await this.syncRepo.upsertManifestEntry(mk, entry);
+          synced++;
+          downloadedFiles.push(destPath);
+
+          if (options?.limitRemaining) options.limitRemaining.value--;
+
+          options?.onSyncSkipProgress?.(skipped, skipped + synced);
+
+          if (options?.onFileSynced) {
+            const relativePath = relative(brandDir, destPath).replace(
+              /\\/g,
+              "/",
+            );
+            await options.onFileSynced({
+              filePath: destPath,
+              relativePath,
+              brand,
+              purchaser: purchaser || undefined,
+            });
+          }
+
+          reportProgress();
+        } catch (e) {
+          errors++;
+          console.error(
+            `Failed to download s3://${bucketConfig.bucket}/${key}:`,
+            e,
+          );
+          reportProgress();
+        }
       }
 
-      try {
-        options?.onStartDownload?.(destPath, mk);
-        await this.downloadToFile(bucketConfig.bucket, key, destPath);
-        const sha = await this.computeFileSha256(destPath);
-        const entry: ManifestEntry = { sha256: sha, etag, size };
-
-        manifest[mk] = entry;
-        await this.syncRepo.upsertManifestEntry(mk, entry);
-        synced++;
-        downloadedFiles.push(destPath);
-
-        if (options?.limitRemaining) options.limitRemaining.value--;
-
-        options?.onSyncSkipProgress?.(skipped, skipped + synced);
-
-        if (options?.onFileSynced) {
-          const relativePath = relative(brandDir, destPath).replace(/\\/g, "/");
-          options.onFileSynced({
-            filePath: destPath,
-            relativePath,
-            brand,
-            purchaser: purchaser || undefined,
-          });
-        }
-
-        reportProgress();
-      } catch (e) {
-        errors++;
-        console.error(
-          `Failed to download s3://${bucketConfig.bucket}/${key}:`,
-          e,
-        );
-        reportProgress();
-      }
-    }
+      continuationToken = out.NextContinuationToken;
+    } while (continuationToken);
 
     reportProgress();
 
@@ -211,12 +237,11 @@ export class AwsS3Service implements IS3Service {
   private async skipIfUnchanged(
     destPath: string,
     keyInManifest: string,
-    manifest: Record<string, ManifestEntry | string>,
     s3Metadata: { etag: string; size: number },
   ): Promise<boolean> {
     if (!existsSync(destPath)) return false;
 
-    const entry = manifest[keyInManifest];
+    const entry = await this.syncRepo.getManifestEntry(keyInManifest);
     if (entry) {
       // Modern entry: instant compare via ETag + size
       if (typeof entry === "object") {
@@ -237,11 +262,12 @@ export class AwsS3Service implements IS3Service {
       const stats = statSync(destPath);
       if (stats.size === s3Metadata.size) {
         const sha = await this.computeFileSha256(destPath);
-        manifest[keyInManifest] = {
+        const entry = {
           sha256: sha,
           etag: s3Metadata.etag,
           size: s3Metadata.size,
         };
+        await this.syncRepo.upsertManifestEntry(keyInManifest, entry);
         return true;
       }
     } catch {

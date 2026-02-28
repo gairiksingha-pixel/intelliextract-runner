@@ -4,6 +4,7 @@ import {
   SyncFileSyncedJob,
 } from "../domain/services/IS3Service.js";
 import { ISyncRepository } from "../domain/repositories/ISyncRepository.js";
+import PQueue from "p-queue";
 
 export interface SyncBrandRequest {
   buckets: any[];
@@ -38,36 +39,40 @@ export class SyncBrandUseCase {
     };
     const initialLimit = limit !== undefined && limit > 0 ? limit : 0;
 
-    let totalSynced = 0;
-    let totalSkipped = 0;
-    let totalErrors = 0;
     const brands: string[] = [];
     const purchasers: string[] = [];
 
+    const queue = new PQueue({ concurrency: 10 });
+
     for (const bucket of request.buckets) {
-      if (limitRemaining.value <= 0) break;
+      queue.add(async () => {
+        if (limitRemaining.value <= 0) return;
 
-      const result = await this.s3Service.syncBucket(
-        bucket,
-        request.stagingDir,
-        {
-          limitRemaining,
-          initialLimit,
-          onProgress: request.onProgress,
-          onSyncSkipProgress: request.onSyncSkipProgress,
-          onFileSynced: request.onFileSynced,
-          onStartDownload: request.onStartDownload,
-          alreadyExtractedPaths: request.alreadyExtractedPaths,
-        },
-      );
+        const result = await this.s3Service.syncBucket(
+          bucket,
+          request.stagingDir,
+          {
+            limitRemaining,
+            initialLimit,
+            onProgress: request.onProgress,
+            onSyncSkipProgress: request.onSyncSkipProgress,
+            onFileSynced: request.onFileSynced,
+            onStartDownload: request.onStartDownload,
+            alreadyExtractedPaths: request.alreadyExtractedPaths,
+          },
+        );
 
-      allResults.push(result);
-      totalSynced += result.synced;
-      totalSkipped += result.skipped;
-      totalErrors += result.errors;
-      if (result.brand) brands.push(result.brand);
-      if (result.purchaser) purchasers.push(result.purchaser);
+        allResults.push(result);
+        if (result.brand) brands.push(result.brand);
+        if (result.purchaser) purchasers.push(result.purchaser);
+      });
     }
+
+    await queue.onIdle();
+
+    const totalSynced = allResults.reduce((s, r) => s + r.synced, 0);
+    const totalSkipped = allResults.reduce((s, r) => s + r.skipped, 0);
+    const totalErrors = allResults.reduce((s, r) => s + r.errors, 0);
 
     // Record sync history
     if (totalSynced > 0 || totalSkipped > 0 || totalErrors > 0) {

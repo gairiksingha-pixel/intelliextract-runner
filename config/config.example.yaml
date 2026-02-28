@@ -25,7 +25,7 @@ s3:
 run:
   concurrency: 5
   requestsPerSecond: 10
-  checkpointPath: ./output/checkpoints/checkpoint.db
+  checkpointPath: ./output/checkpoints/intelliextract.db
   skipCompleted: true
   # Optional: API retry settings (for timeouts/5xx/429). Defaults: maxRetries=0, retryBackoffMs=500.
   maxRetries: 2

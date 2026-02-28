@@ -18,4 +18,5 @@ export interface Checkpoint {
   patternKey?: string;
   runId: string;
   purchaser?: string;
+  fullResponse?: any;
 }

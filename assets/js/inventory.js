@@ -410,6 +410,14 @@ function updateCharts() {
     return g;
   };
 
+  // Apply JetBrains Mono to all chart elements globally for this page
+  if (window.Chart) {
+    Chart.defaults.font.family =
+      "'JetBrains Mono', 'Consolas', 'Courier New', monospace";
+    Chart.defaults.font.size = 11;
+    Chart.defaults.color = "#5a5a5a";
+  }
+
   historyChartInstance = new Chart(ctx, {
     type: "bar",
     data: {
@@ -444,7 +452,11 @@ function updateCharts() {
           labels: {
             usePointStyle: true,
             padding: 20,
-            font: { weight: "600" },
+            font: {
+              family: "'JetBrains Mono', 'Consolas', 'Courier New', monospace",
+              weight: "600",
+              size: 11,
+            },
           },
         },
       },

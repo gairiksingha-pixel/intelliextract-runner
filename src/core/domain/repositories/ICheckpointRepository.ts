@@ -1,4 +1,4 @@
-import { Checkpoint } from "../entities/Checkpoint.js";
+import { Checkpoint, CheckpointStatus } from "../entities/Checkpoint.js";
 
 export interface ICheckpointRepository {
   open(path: string): Promise<void>;
@@ -34,4 +34,42 @@ export interface ICheckpointRepository {
   saveEmailConfig(config: any): Promise<void>;
 
   getAllCheckpoints(): Promise<Checkpoint[]>;
+  getUnextractedFiles(filter?: { brand?: string; purchaser?: string }): Promise<
+    Array<{
+      filePath: string;
+      relativePath: string;
+      brand: string;
+      purchaser?: string;
+    }>
+  >;
+  registerFiles(
+    files: Array<{
+      id: string;
+      fullPath: string;
+      brand: string;
+      purchaser?: string;
+      size?: number;
+      etag?: string;
+      sha256?: string;
+    }>,
+  ): Promise<void>;
+  updateFileStatus(
+    id: string,
+    status: CheckpointStatus,
+    metrics?: {
+      latencyMs?: number;
+      statusCode?: number;
+      errorMessage?: string;
+      patternKey?: string;
+      runId?: string;
+    },
+  ): Promise<void>;
+
+  // Log management
+  saveLog(entry: any): Promise<void>;
+  getLogsForRun(runId: string): Promise<any[]>;
+
+  // Schedule audit log (DB-backed, replaces schedule.log flat file)
+  appendScheduleLog(entry: Record<string, unknown>): void;
+  getScheduleLogs(limit?: number): any[];
 }

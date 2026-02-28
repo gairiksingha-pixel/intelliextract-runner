@@ -9,6 +9,7 @@ let BRAND_PURCHASERS = {};
 let ALL_PURCHASERS = [];
 let SELECTED_BRANDS = [];
 let SELECTED_PURCHASERS = [];
+let CURRENT_ACTIVE_RUNS = [];
 
 const ROWS = [
   {
@@ -62,6 +63,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // System status polling
   updateSystemStatus();
   setInterval(updateSystemStatus, 3000);
+
+  // Auto-pause on reload/leave
+  window.addEventListener("beforeunload", () => {
+    // Only stop manual runs, as scheduled ones should be persistent theoretically,
+    // but the user requirement implies all current dashboard-visible ops should pause.
+    const manualRuns = CURRENT_ACTIVE_RUNS.filter((r) => r.origin === "manual");
+    for (const run of manualRuns) {
+      const payload = JSON.stringify({ caseId: run.caseId, origin: "manual" });
+      const blob = new Blob([payload], { type: "application/json" });
+      navigator.sendBeacon("/api/stop-run", blob);
+    }
+  });
 });
 
 // --- Core Dashboard Logic ---
@@ -190,13 +203,16 @@ async function runCase(caseId, btn, resultDiv, options = {}) {
     clearRowProgress(caseId);
     resultDiv.className = "result running";
     resultDiv.innerHTML =
-      '<span class="exit">Starting process…<span class="loading-dots"></span></span><div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>';
+      '<span class="exit">Starting process…<span class="loading-dots"></span></span><div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:0%"></div></div>';
 
     const isPipe = caseId === "PIPE";
-    resetBtn.innerHTML = `${AppIcons.STOP}<span>Stop</span>`;
-    resetBtn.classList.add("stop-btn");
-    resetBtn.title = "Stop the execution";
-    resetBtn.onclick = () => stopCase(caseId, row, resultDiv, "manual");
+    row._isRetryFailed = !!options.retryFailed;
+    row._isPaused = false; // Clear pause state on new run
+    btn.innerHTML = `${AppIcons.PAUSE}<span>Pause</span>`;
+    btn.disabled = false;
+    btn.onclick = () => stopCase(caseId, row, resultDiv, "manual");
+    resetBtn.disabled = true;
+    resetBtn.style.display = "none"; // Instant hide
 
     try {
       const response = await fetch("/run", {
@@ -238,6 +254,17 @@ async function runCase(caseId, btn, resultDiv, options = {}) {
           }
         }
       }
+      // Safety: If the reader finishes but we're still in 'running' state and haven't shown a result,
+      // it means the stream ended without a 'report' JSON. We should force a result check.
+      const currentState = getRowProgress(caseId);
+      if (currentState && resultDiv.classList.contains("running")) {
+        // Fetch status one last time to get the final state
+        const statusRes = await fetch(`/api/run-status?caseId=${caseId}`);
+        if (statusRes.ok) {
+          const finalData = await statusRes.json();
+          handleStreamData(caseId, { type: "report", ...finalData });
+        }
+      }
     } catch (e) {
       if (e.name === "AbortError" || e.message?.includes("aborted")) {
         // Handled by Stop logic
@@ -269,28 +296,48 @@ async function runCase(caseId, btn, resultDiv, options = {}) {
 }
 
 async function stopCase(caseId, row, resultDiv, origin = "manual") {
-  showAppAlert(
-    "Stop Operation",
-    "Are you sure you want to stop the current process? Progress will be saved for resume.",
-    {
-      isConfirm: true,
-      confirmText: "Yes, Stop",
-      onConfirm: async () => {
-        try {
-          const res = await fetch("/api/stop-run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ caseId, origin }),
-          });
-          if (!res.ok) throw new Error(await res.text());
+  const isManual = origin === "manual";
+  const title = isManual ? "Pause Operation" : "Stop Operation";
+  const message = isManual
+    ? "Are you sure you want to pause the current process? Progress will be saved for resumption."
+    : "Are you sure you want to stop the current process? Progress will be saved for resumption.";
+  const confirmText = isManual ? "Yes, Pause" : "Yes, Stop";
 
-          resultDiv.innerHTML = '<span class="exit">Stopping process...</span>';
-        } catch (e) {
-          showAppAlert("Error", "Failed to stop process: " + e.message, true);
+  showAppAlert(title, message, {
+    isConfirm: true,
+    confirmText,
+    onConfirm: async () => {
+      try {
+        const res = await fetch("/api/stop-run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ caseId, origin }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          // If process not found, it finished or was stopped already. Silent handle.
+          if (res.status === 404 && errText.includes("Process not found")) {
+            return;
+          }
+          throw new Error(errText);
         }
-      },
+
+        row._isPaused = isManual; // Mark as paused if manual and stop-run was successful
+        resultDiv.innerHTML = '<span class="exit">Stopping process...</span>';
+        // Instant reveal for better UX
+        const resetBtn = row.querySelector(
+          ".reset-case:not(.reset-during-resume)",
+        );
+        if (resetBtn) {
+          resetBtn.style.display = "flex";
+          resetBtn.disabled = false;
+        }
+      } catch (e) {
+        showAppAlert("Error", "Failed to stop process: " + e.message, true);
+      }
     },
-  );
+  });
 }
 
 // Per-row progress state accumulation (keyed by caseId)
@@ -350,33 +397,68 @@ function handleStreamData(caseId, data) {
 }
 
 function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
+  const row = document.getElementById(`result-${caseId}`)?.closest("tr");
   const SYNC_CASES = ["P1", "PIPE", "P5"];
   const EXTRACT_CASES = ["P2", "PIPE", "P5", "P3"];
 
   function filterResultLine(line) {
-    if (line.indexOf("SYNC_PROGRESS\t") === 0) return false;
+    line = line.trim();
+    if (!line) return false;
+    // Filter out protocol markers (handle both tabs and spaces)
     if (
-      line.indexOf("RESUME_SKIP\t") === 0 ||
-      line.indexOf("RESUME_SKIP_SYNC\t") === 0
+      /^(SYNC_PROGRESS|EXTRACTION_PROGRESS|RESUME_SKIP|RESUME_SKIP_SYNC|RUN_ID|RUN_PROTOCOL)\b/.test(
+        line,
+      )
     )
       return false;
+    // Filter out JSON markers if they look like system signals
+    if (line.startsWith("{") && line.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.type === "run_id" || parsed.runId) return false;
+      } catch (e) {}
+      return false; // Safely filter out any JSON line in stdout logs
+    }
     if (line.indexOf("Report(s) written:") !== -1) return false;
     if (/Run (?:run_|RUN|SKIP-)\S+ finished\./.test(line)) return false;
     return true;
   }
 
-  const stdoutFiltered = stdoutStr
-    ? stdoutStr.split("\n").filter(filterResultLine).join("\n").trim()
-    : "";
-  const stderrFiltered = stderrStr
-    ? stderrStr.split("\n").filter(filterResultLine).join("\n").trim()
-    : "";
+  let statusLabel = pass ? "Success" : "Failed";
+  if (row?._isPaused) statusLabel = "Paused";
 
-  const statusLabel = pass ? "Success" : "Failed";
-  const parsed = {};
-  const lines = stdoutFiltered ? stdoutFiltered.split("\n") : [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = (lines[i] || "").trim().replace(/\r$/, "");
+  const parsed = {
+    protocol: { sync: null, extract: null, skipSync: null },
+  };
+
+  const allLines = stdoutStr ? stdoutStr.split("\n") : [];
+  for (let i = 0; i < allLines.length; i++) {
+    const line = (allLines[i] || "").trim().replace(/\r$/, "");
+    if (!line) continue;
+
+    // 1. Capture Protocol Markers (Last wins)
+    const syncM = /SYNC_PROGRESS\s+(\d+)\s+(\d+)/.exec(line);
+    if (syncM)
+      parsed.protocol.sync = {
+        done: parseInt(syncM[1]),
+        total: parseInt(syncM[2]),
+      };
+
+    const extM = /EXTRACTION_PROGRESS\s+(\d+)\s+(\d+)/.exec(line);
+    if (extM)
+      parsed.protocol.extract = {
+        done: parseInt(extM[1]),
+        total: parseInt(extM[2]),
+      };
+
+    const skipM = /RESUME_SKIP_SYNC\s+(\d+)\s+(\d+)/.exec(line);
+    if (skipM)
+      parsed.protocol.skipSync = {
+        done: parseInt(skipM[1]),
+        total: parseInt(skipM[2]),
+      };
+
+    // 2. Capture Identity and Limits
     let m;
     if ((m = /^Download limit:\s*(.+)$/.exec(line)))
       parsed.downloadLimit = m[1].trim();
@@ -424,6 +506,13 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     }
   }
 
+  const stdoutFiltered = stdoutStr
+    ? stdoutStr.split("\n").filter(filterResultLine).join("\n").trim()
+    : "";
+  const stderrFiltered = stderrStr
+    ? stderrStr.split("\n").filter(filterResultLine).join("\n").trim()
+    : "";
+
   // Also extract from structured report data if stdout wasn't parsed
   if (data.successCount !== undefined && parsed.extractSuccess === undefined) {
     parsed.extractSuccess = String(data.successCount);
@@ -441,35 +530,87 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     (parsed.extractSuccess != null ||
       parsed.extractionResultsPath != null ||
       parsed.reportsPath != null);
-  const allExtractZero =
-    (parsed.extractSuccess === "0" || parsed.extractSuccess === 0) &&
-    (parsed.extractFailed === "0" || parsed.extractFailed === 0) &&
-    (parsed.extractSkipped === "0" || parsed.extractSkipped === 0);
+
+  const allNewExtractZero =
+    (parsed.extractSuccess === "0" ||
+      parsed.extractSuccess === 0 ||
+      parsed.extractSuccess == null) &&
+    (parsed.extractFailed === "0" ||
+      parsed.extractFailed === 0 ||
+      parsed.extractFailed == null);
   const noSyncDownloaded =
     parsed.downloadedNew == null || parsed.downloadedNew === "0";
-  let noFilesFound = pass && allExtractZero && (noSyncDownloaded || !hasSync);
-  if (parsed.cumTotal != null && Number(parsed.cumTotal) > 0)
-    noFilesFound = false;
+
+  const isNoNewProcessed =
+    pass &&
+    allNewExtractZero &&
+    (noSyncDownloaded || !hasSync) &&
+    (parsed.extractSuccess !== undefined ||
+      parsed.downloadedNew !== undefined ||
+      stdoutFiltered.length > 0);
 
   const rows = [];
   rows.push(["Status", statusLabel]);
 
-  if (noFilesFound) {
-    let msg = "No files found to sync or extract.";
+  // Identity Row
+  let identity = parsed.brandAndPurchaser;
+  if (
+    !identity &&
+    parsed.brandAndPurchaserList &&
+    parsed.brandAndPurchaserList.length
+  ) {
+    identity = parsed.brandAndPurchaserList.join(", ");
+  }
+  if (identity) rows.push(["Identity", identity]);
+
+  // Sync Progress Row
+  if (parsed.protocol.sync) {
+    const { done, total } = parsed.protocol.sync;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    rows.push(["Sync Progress", `${done} / ${total} files synced (${pct}%)`]);
+  }
+
+  // Extraction Progress Row
+  if (parsed.protocol.extract) {
+    const { done, total } = parsed.protocol.extract;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    rows.push(["Extraction", `${done} / ${total} files processed (${pct}%)`]);
+  }
+
+  // Skipped (Resumed) Row
+  if (parsed.protocol.skipSync) {
+    const { done, total } = parsed.protocol.skipSync;
+    rows.push([
+      "Resumed State",
+      `Resuming... Skipped ${done} already-synced files.`,
+    ]);
+  }
+
+  if (parsed.stagingPaths && parsed.stagingPaths.length)
+    rows.push(["Staging path", parsed.stagingPaths.join("\n")]);
+
+  if (isNoNewProcessed) {
+    const hasExistingKnown =
+      (parsed.skipped != null &&
+        parsed.skipped !== "0" &&
+        parsed.skipped !== 0) ||
+      (parsed.extractSkipped != null &&
+        parsed.extractSkipped !== "0" &&
+        parsed.extractSkipped !== 0) ||
+      (parsed.cumTotal != null &&
+        parsed.cumTotal !== "0" &&
+        parsed.cumTotal !== 0);
+
+    let msg = hasExistingKnown
+      ? "No new files found to sync or extract. All files in the selected folder are already being synced or extracted."
+      : "No files found to sync or extract.";
+
     if (row && row._isRetryFailed) {
       msg = "No failed files found to retry.";
     }
     rows.push(["Message", msg]);
   } else {
     if (hasSync) {
-      const bp =
-        parsed.brandAndPurchaser ||
-        (parsed.brandAndPurchaserList && parsed.brandAndPurchaserList.length
-          ? parsed.brandAndPurchaserList.join("\n")
-          : null);
-      if (bp) rows.push(["Brand and purchaser", bp]);
-      if (parsed.stagingPaths && parsed.stagingPaths.length)
-        rows.push(["Staging path", parsed.stagingPaths.join("\n")]);
       const overview = [];
       if (parsed.downloadedNew != null)
         overview.push("Downloaded: " + AppUtils.esc(parsed.downloadedNew));
@@ -485,8 +626,6 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
         rows.push(["Download overview", overview.join(", ")]);
     }
     if (hasExtract) {
-      if (parsed.brandAndPurchaser && !hasSync)
-        rows.push(["Brand and purchaser", parsed.brandAndPurchaser]);
       if (
         parsed.extractSuccess != null ||
         parsed.extractFailed != null ||
@@ -516,23 +655,24 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
         rows.push(["Overall status", cumDetail]);
       }
     }
-    if (!hasSync && !hasExtract && stdoutFiltered) {
-      rows.push([
-        "Output",
-        AppUtils.esc(stdoutFiltered.slice(0, 5000)) +
-          (stdoutFiltered.length > 5000 ? "…" : ""),
-      ]);
-    } else if (rows.length === 1) {
-      const noOutput = !stdoutFiltered && !stderrFiltered;
-      rows.push([
-        "Output",
-        noOutput && data.exitCode === 0
-          ? "Command completed successfully with no console output."
-          : noOutput
-            ? "Command produced no output. Check server logs or run in a terminal for details."
-            : "—",
-      ]);
-    }
+  }
+
+  if (!isNoNewProcessed && !hasSync && !hasExtract && stdoutFiltered) {
+    rows.push([
+      "Output",
+      AppUtils.esc(stdoutFiltered.slice(0, 5000)) +
+        (stdoutFiltered.length > 5000 ? "…" : ""),
+    ]);
+  } else if (!isNoNewProcessed && rows.length === 1) {
+    const noOutput = !stdoutFiltered && !stderrFiltered;
+    rows.push([
+      "Output",
+      noOutput && data.exitCode === 0
+        ? "Command completed successfully with no console output."
+        : noOutput
+          ? "Command produced no output. Check server logs or run in a terminal for details."
+          : "—",
+    ]);
   }
 
   if (stderrFiltered) {
@@ -543,20 +683,39 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     ]);
   }
 
+  if (parsed.reportsPath) {
+    const reportUrl = parsed.reportsPath.startsWith("http")
+      ? parsed.reportsPath
+      : parsed.reportsPath; // already /api/reports/... from index.ts
+    rows.push([
+      "Detailed Report",
+      `<a href="${reportUrl}" target="_blank" class="report-link" onclick="if(window.showReportOverlay){window.showReportOverlay(event, '${reportUrl}'); return false;}">${reportUrl}</a>`,
+    ]);
+  }
+
   const LABEL_HTML_SAFE = new Set([
     "Standard error",
     "Output",
     "Download overview",
     "Extraction overview",
     "Overall status",
+    "Sync Progress",
+    "Extraction",
+    "Resumed State",
+    "Detailed Report",
   ]);
   const METRIC_ROWS = new Set([
     "Status",
+    "Identity",
     "Brand and purchaser",
     "Staging path",
     "Download overview",
     "Extraction overview",
     "Overall status",
+    "Message",
+    "Sync Progress",
+    "Extraction",
+    "Resumed State",
   ]);
 
   const tableRows = rows.map((r) => {
@@ -579,19 +738,23 @@ function showResult(div, data, pass, options) {
 
   if (data) {
     const caseId = (options && options.caseId) || "";
-    if (data.type === "report") {
-      // Build legacy-matching detailed table from report data
-      const stdout = data.stdout ? String(data.stdout).trim() : "";
+    if (data.type === "report" || data.type === "error") {
+      // Use built-in structured table logic for both success and error/interrupt reports
+      const stdout = data.stdout
+        ? String(data.stdout).trim()
+        : data.message && data.type === "error"
+          ? data.message
+          : "";
       const stderr = data.stderr ? String(data.stderr).trim() : "";
       div.innerHTML = buildResultTable(caseId, data, pass, stdout, stderr);
     } else {
-      // Error type — show the message as a table row
-      const errMsg = data.message || (pass ? "Completed" : "Error");
+      // Fallback for simple error objects
+      const errMsg = data.message || "Unknown error";
       const rows = [
-        ["Status", pass ? "Success" : "Failed"],
+        ["Status", "Failed"],
         ["Output", AppUtils.esc(errMsg)],
       ];
-      div.innerHTML = `<table class="result-table-wrap">${rows.map((r) => `<tr class="${r[0] === "Status" ? "status-row metric-row" : ""}"><th>${r[0]}</th><td>${r[1]}</td></tr>`).join("")}</table>`;
+      div.innerHTML = `<table class="result-table-wrap">${rows.map((r) => `<tr class="status-row metric-row"><th>${r[0]}</th><td>${r[1]}</td></tr>`).join("")}</table>`;
     }
     return;
   }
@@ -607,7 +770,6 @@ function showResult(div, data, pass, options) {
 
   let extra = "";
   let label = logMessage || "Starting process…";
-  let showDots = !logMessage;
 
   const hasSync = !!syncProgress;
   const hasExtraction = !!extractionProgress;
@@ -619,8 +781,8 @@ function showResult(div, data, pass, options) {
     const total = Number(resumeSkipSyncProgress.total) || 0;
     const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
     extra += `
-      <div class="sync-progress-wrap skip-progress-wrap">Runner is skipping synced files: ${total > 0 ? done + " / " + total : done + " file(s)"}</div>
-      <div class="sync-progress-bar"><div class="sync-progress-fill skip-fill ${total > 0 && done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 40}%"></div></div>
+      <div class="sync-progress-wrap skip-progress-wrap">Runner is skipping synced files: ${total > 0 ? done + " / " + total : done + " file(s)"} skipped</div>
+      <div class="sync-progress-bar"><div class="sync-progress-fill skip-fill ${done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 0}%"></div></div>
     `;
   }
 
@@ -629,8 +791,8 @@ function showResult(div, data, pass, options) {
     const total = Number(resumeSkipExtractProgress.total) || 0;
     const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
     extra += `
-      <div class="sync-progress-wrap skip-progress-wrap">Runner is skipping extracted files: ${total > 0 ? done + " / " + total : done + " file(s)"}</div>
-      <div class="sync-progress-bar"><div class="sync-progress-fill skip-fill ${total > 0 && done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 40}%"></div></div>
+      <div class="sync-progress-wrap skip-progress-wrap">Runner is skipping extracted files: ${total > 0 ? done + " / " + total : done + " file(s)"} skipped</div>
+      <div class="sync-progress-bar"><div class="sync-progress-fill skip-fill ${done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 0}%"></div></div>
     `;
   }
 
@@ -640,7 +802,7 @@ function showResult(div, data, pass, options) {
     const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
     extra += `
       <div class="sync-progress-wrap">Runner is syncing file: ${total > 0 ? done + " / " + total : done + " file(s)"}</div>
-      <div class="sync-progress-bar"><div class="sync-progress-fill ${total > 0 && done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 40}%"></div></div>
+      <div class="sync-progress-bar"><div class="sync-progress-fill ${done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 0}%"></div></div>
     `;
   }
 
@@ -650,13 +812,12 @@ function showResult(div, data, pass, options) {
     const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
     extra += `
       <div class="sync-progress-wrap extraction-progress-wrap">Runner is extracting: ${total > 0 ? done + " / " + total : done + " file(s)"}</div>
-      <div class="sync-progress-bar"><div class="sync-progress-fill ${total > 0 && done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 40}%"></div></div>
+      <div class="sync-progress-bar"><div class="sync-progress-fill ${done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 0}%"></div></div>
     `;
   }
 
   if (!logMessage) {
     if (hasResumeSkipSync || hasResumeSkipExtract || hasSync || hasExtraction) {
-      showDots = false;
       const showSyncSkipLabel = hasResumeSkipSync && caseId !== "PIPE";
       label = showSyncSkipLabel
         ? "Runner is skipping synced files…"
@@ -688,14 +849,21 @@ function showResult(div, data, pass, options) {
     }
   }
 
+  // Always show dots and indeterminate bar if no real progress bars (extra) are present yet
+  const showActiveState =
+    !hasResumeSkipSync && !hasResumeSkipExtract && !hasSync && !hasExtraction;
+
   div.innerHTML = `
     <span class="exit">
-      ${AppUtils.esc(label)}${showDots ? '<span class="loading-dots"></span>' : ""}
+      ${AppUtils.esc(label)}<span class="loading-dots"></span>
     </span>
-    ${showDots ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:40%"></div></div>' : ""}
+    ${showActiveState ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:0%"></div></div>' : ""}
     ${extra}
   `;
 }
+
+const ICON_MINI_RESET =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>';
 
 function getPairsForRun() {
   const pairs = [];
@@ -753,21 +921,46 @@ function renderLimitsCell(c) {
   }
   var html = '<td class="limits-cell"><div class="limit-row">';
   if (lim.pipeline) {
-    html +=
-      '<div class="limit-chip"><span class="limit-label">Limit:</span><input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to sync; each is extracted in background as it is synced. 0 = no limit"></div>';
+    html += `
+      <div class="limit-chip">
+        <span class="limit-label">Limit:</span>
+        <input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to sync; each is extracted in background as it is synced. 0 = no limit">
+        <button type="button" class="field-reset" title="Reset to 0">${ICON_MINI_RESET}</button>
+      </div>`;
   } else {
     if (lim.sync)
-      html +=
-        '<div class="limit-chip"><span class="limit-label">Sync:</span><input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to download. 0 = no limit"></div>';
+      html += `
+        <div class="limit-chip">
+          <span class="limit-label">Sync:</span>
+          <input type="number" class="limit-sync" min="0" step="1" value="0" title="Max files to download. 0 = no limit">
+          <button type="button" class="field-reset" title="Reset to 0">${ICON_MINI_RESET}</button>
+        </div>`;
     if (lim.extract)
-      html +=
-        '<div class="limit-chip"><span class="limit-label">Extract:</span><input type="number" class="limit-extract" min="0" step="1" value="0" title="Max files to extract. 0 = no limit"></div>';
+      html += `
+        <div class="limit-chip">
+          <span class="limit-label">Extract:</span>
+          <input type="number" class="limit-extract" min="0" step="1" value="0" title="Max files to extract. 0 = no limit">
+          <button type="button" class="field-reset" title="Reset to 0">${ICON_MINI_RESET}</button>
+        </div>`;
   }
   html += '</div><div class="limit-hint">0 = no limit</div></td>';
   return html;
 }
 
 // --- Dropdown Management ---
+
+// --- Event Delegation ---
+document.addEventListener("click", (e) => {
+  const fieldReset = e.target.closest(".field-reset");
+  if (fieldReset) {
+    const chip = fieldReset.closest(".limit-chip");
+    const input = chip?.querySelector('input[type="number"]');
+    if (input) {
+      input.value = 0;
+      input.dispatchEvent(new Event("change"));
+    }
+  }
+});
 
 function initDropdowns() {
   const brandTrigger = document.getElementById("brand-dropdown-trigger");
@@ -979,6 +1172,7 @@ async function updateSystemStatus() {
     const activeRes = await fetch("/api/active-runs");
     const activeData = await activeRes.json();
     const activeRuns = activeData.activeRuns || [];
+    CURRENT_ACTIVE_RUNS = activeRuns;
 
     const statusText = document.getElementById("system-status-text");
     const pill = document.querySelector(".system-status-pill");
@@ -1042,6 +1236,11 @@ function updateRowUI(row, status, activeInfo) {
   const resultDiv = document.getElementById(`result-${caseId}`);
   const syncInput = row.querySelector(".limit-sync");
   const extInput = row.querySelector(".limit-extract");
+  const allFieldResets = row.querySelectorAll(".field-reset");
+
+  const setFieldResetsDisabled = (isDisabled) => {
+    allFieldResets.forEach((b) => (b.disabled = isDisabled));
+  };
 
   if (status.isRunning) {
     // RUNNING state
@@ -1049,26 +1248,64 @@ function updateRowUI(row, status, activeInfo) {
     if (retryBtn) retryBtn.disabled = true;
     if (syncInput) syncInput.disabled = true;
     if (extInput) extInput.disabled = true;
+    setFieldResetsDisabled(true);
 
     const isScheduled = activeInfo && activeInfo.origin === "scheduled";
     if (isScheduled) {
+      runBtn.disabled = true;
       resetBtn.innerHTML = `${AppIcons.STOP}<span>Stop Auto Extraction</span>`;
       resetBtn.classList.add("stop-btn");
       resetBtn.classList.remove("resume-btn");
       resetBtn.onclick = () => stopCase(caseId, row, resultDiv, "scheduled");
+      resetBtn.disabled = false;
+      resetBtn.style.display = "flex";
     } else {
-      // Manual run - user wants it to show reset button
-      resetBtn.innerHTML = `${AppIcons.RESET}<span>Reset</span>`;
-      resetBtn.classList.remove("stop-btn", "resume-btn");
-      resetBtn.onclick = () => resetCase(resultDiv);
+      // Manual run
+      runBtn.disabled = false;
+      runBtn.innerHTML = `${AppIcons.PAUSE}<span>Pause</span>`;
+      runBtn.onclick = () => stopCase(caseId, row, resultDiv, "manual");
+
+      resetBtn.style.display = "none";
+      resetBtn.disabled = true;
     }
 
-    if (activeInfo && activeInfo.progress) {
-      handleStreamData(caseId, {
-        type: "progress",
-        phase: activeInfo.progress.phase || "sync",
-        ...activeInfo.progress,
-      });
+    if (activeInfo) {
+      if (activeInfo.syncProgress) {
+        handleStreamData(caseId, {
+          type: "progress",
+          phase: "sync",
+          ...activeInfo.syncProgress,
+        });
+      }
+      if (activeInfo.extractProgress) {
+        handleStreamData(caseId, {
+          type: "progress",
+          phase: "extract",
+          ...activeInfo.extractProgress,
+        });
+      }
+      if (activeInfo.resumeSkipSyncProgress) {
+        handleStreamData(caseId, {
+          type: "resume_skip",
+          phase: "sync",
+          ...activeInfo.resumeSkipSyncProgress,
+        });
+      }
+      if (activeInfo.resumeSkipExtractProgress) {
+        handleStreamData(caseId, {
+          type: "resume_skip",
+          phase: "extract",
+          ...activeInfo.resumeSkipExtractProgress,
+        });
+      }
+      if (activeInfo.progress) {
+        // Fallback for scheduled/legacy
+        handleStreamData(caseId, {
+          type: "progress",
+          phase: activeInfo.progress.phase || "sync",
+          ...activeInfo.progress,
+        });
+      }
     }
   } else if (status.canResume) {
     // RESUMABLE state
@@ -1076,16 +1313,19 @@ function updateRowUI(row, status, activeInfo) {
     if (retryBtn) retryBtn.disabled = false;
     if (syncInput) syncInput.disabled = false;
     if (extInput) extInput.disabled = false;
+    setFieldResetsDisabled(false);
 
     runBtn.innerHTML = `${AppIcons.PLAY}<span>Resume</span>`;
     runBtn.onclick = () => runCase(caseId, runBtn, resultDiv, { resume: true });
 
-    resetBtn.innerHTML = `${AppIcons.RESET}<span>Hard Reset</span>`;
+    resetBtn.innerHTML = `${AppIcons.RESET}<span>Reset</span>`;
     resetBtn.classList.remove("stop-btn", "resume-btn");
+    resetBtn.disabled = false;
+    resetBtn.style.display = "flex";
     resetBtn.onclick = () => {
       showAppAlert(
         "Hard Reset",
-        "This will clear the current progress and start fresh next time. Continue?",
+        "Resetting will clear the result view and current pause point. The next run will check all files from the beginning (skipping those already done). Continue?",
         {
           isConfirm: true,
           onConfirm: async () => {
@@ -1106,13 +1346,13 @@ function updateRowUI(row, status, activeInfo) {
     if (retryBtn) retryBtn.disabled = false;
     if (syncInput) syncInput.disabled = false;
     if (extInput) extInput.disabled = false;
+    setFieldResetsDisabled(false);
 
     runBtn.innerHTML = `${AppIcons.PLAY}<span>${getRunButtonLabel(caseId)}</span>`;
     runBtn.onclick = () => runCase(caseId, runBtn, resultDiv);
 
-    resetBtn.innerHTML = `${AppIcons.RESET}<span>Reset</span>`;
-    resetBtn.classList.remove("stop-btn", "resume-btn");
-    resetBtn.onclick = () => resetCase(resultDiv);
+    resetBtn.style.display = "none"; // Hide reset when no action is ongoing
+    resetBtn.disabled = true;
   }
 }
 
@@ -1142,3 +1382,49 @@ function setOtherRowsActive() {
     tr.removeAttribute("title");
   });
 }
+
+/**
+ * Report Overlay Management
+ */
+window.showReportOverlay = function (event, url) {
+  if (event) event.preventDefault();
+  const overlay = document.getElementById("report-view-overlay");
+  const frame = document.getElementById("report-view-frame");
+  const loader = document.getElementById("report-view-loader");
+
+  if (!overlay || !frame) return;
+
+  overlay.style.display = "flex";
+  overlay.setAttribute("aria-hidden", "false");
+  if (loader) loader.style.display = "flex";
+
+  frame.onload = () => {
+    if (loader) loader.style.display = "none";
+  };
+  frame.src = url;
+
+  // Add close button listener if not already there
+  if (!window._reportOverlayCloseInited) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) window.hideReportOverlay();
+    });
+    window._reportOverlayCloseInited = true;
+  }
+};
+
+window.hideReportOverlay = function () {
+  const overlay = document.getElementById("report-view-overlay");
+  const frame = document.getElementById("report-view-frame");
+  if (!overlay || !frame) return;
+
+  overlay.style.display = "none";
+  overlay.setAttribute("aria-hidden", "true");
+  frame.src = "";
+};
+
+// Global escape key for all overlays
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    window.hideReportOverlay();
+  }
+});
