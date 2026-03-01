@@ -1,8 +1,8 @@
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { ILogger, LogEntry } from "../../core/domain/services/logger.service.js";
 
 export class SqliteLogger implements ILogger {
-  constructor(private repo: ICheckpointRepository) {}
+  constructor(private repo: IExtractionRecordRepository) {}
 
   init(runId: string): void {
     // Database table is already initialized by the repository

@@ -2,13 +2,14 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import {
-  Checkpoint,
-  CheckpointStatus,
-} from "../../core/domain/entities/checkpoint.entity.js";
+  ExtractionRecord,
+  ExtractionStatus,
+} from "../../core/domain/entities/extraction-record.entity.js";
 import {
-  ICheckpointRepository,
+  IExtractionRecordRepository,
   ScheduleLogEntry,
-} from "../../core/domain/repositories/checkpoint.repository.js";
+  EmailLogEntry,
+} from "../../core/domain/repositories/extraction-record.repository.js";
 import { EmailStoredConfig } from "../../core/domain/repositories/app-config-store.repository.js";
 import {
   RegisterFileInput,
@@ -27,9 +28,10 @@ import { SqliteFileRegistryRepository } from "./sqlite-file-registry.repository.
 import { SqliteRunRepository } from "./sqlite-run.repository.js";
 import { SqliteExtractionLogRepository } from "./sqlite-extraction-log.repository.js";
 import { SqliteScheduleAuditRepository } from "./sqlite-schedule-audit.repository.js";
+import { SqliteEmailLogRepository } from "./sqlite-email-log.repository.js";
 
-/** Typed row shape returned by better-sqlite3 for tbl_run_checkpoints */
-interface CheckpointRow {
+/** Typed row shape returned by better-sqlite3 for tbl_run_records */
+interface ExtractionRecordRow {
   filePath: string;
   relativePath: string;
   brand: string;
@@ -50,7 +52,7 @@ interface CheckpointRow {
  * repository implementations. This preserves the existing facade while
  * dramatically improving maintainability and adhering to SRP.
  */
-export class SqliteCheckpointRepository implements ICheckpointRepository {
+export class SqliteExtractionRecordRepository implements IExtractionRecordRepository {
   private _db: Database.Database | null = null;
   private dbPath: string;
 
@@ -60,6 +62,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
   private runRepo!: SqliteRunRepository;
   private logRepo!: SqliteExtractionLogRepository;
   private auditRepo!: SqliteScheduleAuditRepository;
+  private emailLogRepo!: SqliteEmailLogRepository;
 
   constructor(dbPath: string) {
     this.dbPath = dbPath;
@@ -77,8 +80,9 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     this.appConfigRepo = new SqliteAppConfigRepository(this._db);
     this.fileRegistryRepo = new SqliteFileRegistryRepository(this._db);
     this.runRepo = new SqliteRunRepository(this._db);
-    this.logRepo = new SqliteExtractionLogRepository(this._db);
+    this.logRepo = new SqliteExtractionLogRepository();
     this.auditRepo = new SqliteScheduleAuditRepository(this._db);
+    this.emailLogRepo = new SqliteEmailLogRepository(this._db);
 
     return this._db;
   }
@@ -100,32 +104,31 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
       PRAGMA journal_mode = DELETE;
       PRAGMA synchronous = FULL;
 
+      -- Key-value config store (email config, current_run_id, etc.)
       CREATE TABLE IF NOT EXISTS tbl_app_config (
         key   TEXT PRIMARY KEY,
         value TEXT
       );
 
+      -- S3 sync manifest: tracks every file synced from S3 with checksum/etag.
+      -- Only extraction lifecycle fields here; metrics live in tbl_run_records.
       CREATE TABLE IF NOT EXISTS tbl_file_registry (
-        id           TEXT PRIMARY KEY,
-        fullPath     TEXT,
-        brand        TEXT,
-        purchaser    TEXT,
-        size         INTEGER,
-        etag         TEXT,
-        sha256       TEXT,
-        syncedAt     TEXT,
-        registeredAt TEXT,
+        id            TEXT PRIMARY KEY,
+        fullPath      TEXT,
+        brand         TEXT,
+        purchaser     TEXT,
+        size          INTEGER,
+        etag          TEXT,
+        sha256        TEXT,
+        syncedAt      TEXT,
+        registeredAt  TEXT,
         extractStatus TEXT DEFAULT 'pending',
-        extractedAt  TEXT,
-        extractError TEXT,
-        latencyMs    INTEGER,
-        statusCode   INTEGER,
-        patternKey   TEXT,
-        lastRunId    TEXT,
-        fullResponse TEXT
+        extractedAt   TEXT,
+        lastRunId     TEXT
       );
 
-      CREATE TABLE IF NOT EXISTS tbl_run_checkpoints (
+      -- Per-file extraction result per run (source of truth for metrics)
+      CREATE TABLE IF NOT EXISTS tbl_run_records (
         runId        TEXT,
         relativePath TEXT,
         status       TEXT,
@@ -142,6 +145,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
         PRIMARY KEY (runId, relativePath)
       );
 
+      -- Scheduled cron jobs
       CREATE TABLE IF NOT EXISTS tbl_cron_schedules (
         id         TEXT PRIMARY KEY,
         created_at TEXT,
@@ -151,6 +155,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
         timezone   TEXT
       );
 
+      -- Aggregate sync history (one row per sync operation)
       CREATE TABLE IF NOT EXISTS tbl_sync_history (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp  TEXT,
@@ -161,67 +166,125 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
         purchasers TEXT
       );
 
-      CREATE TABLE IF NOT EXISTS tbl_extraction_logs (
-        id        INTEGER PRIMARY KEY AUTOINCREMENT,
-        runId     TEXT,
-        timestamp TEXT,
-        level     TEXT,
-        data      TEXT
-      );
-
+      -- Run lifecycle tracker
       CREATE TABLE IF NOT EXISTS tbl_runs (
-        id         TEXT PRIMARY KEY,
-        startedAt  TEXT,
-        finishedAt TEXT,
-        status     TEXT DEFAULT 'running',
-        origin     TEXT,
-        metadata   TEXT,
+        id           TEXT PRIMARY KEY,
+        startedAt    TEXT,
+        finishedAt   TEXT,
+        status       TEXT DEFAULT 'running',
         summary_json TEXT
       );
 
+      -- Schedule execution audit (full JSON blob only, no duplicate columns)
       CREATE TABLE IF NOT EXISTS tbl_schedule_logs (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp  TEXT NOT NULL,
-        scheduleId TEXT,
-        outcome    TEXT,
-        level      TEXT,
-        message    TEXT,
-        data       TEXT
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        data      TEXT
       );
 
-      CREATE INDEX IF NOT EXISTS idx_run_checkpoints_runId        ON tbl_run_checkpoints(runId);
-      CREATE INDEX IF NOT EXISTS idx_run_checkpoints_status       ON tbl_run_checkpoints(status);
-      CREATE INDEX IF NOT EXISTS idx_run_checkpoints_relativePath ON tbl_run_checkpoints(relativePath);
-      CREATE INDEX IF NOT EXISTS idx_run_checkpoints_finishedAt   ON tbl_run_checkpoints(finishedAt);
-      CREATE INDEX IF NOT EXISTS idx_file_registry_extractStatus  ON tbl_file_registry(extractStatus);
-      CREATE INDEX IF NOT EXISTS idx_extraction_logs_runId_ts     ON tbl_extraction_logs(runId, timestamp);
-      CREATE INDEX IF NOT EXISTS idx_runs_startedAt               ON tbl_runs(startedAt);
-      CREATE INDEX IF NOT EXISTS idx_schedule_logs_timestamp      ON tbl_schedule_logs(timestamp);
+      -- Email notification audit trail
+      CREATE TABLE IF NOT EXISTS tbl_email_logs (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        runId     TEXT,
+        recipient TEXT,
+        subject   TEXT,
+        status    TEXT,
+        error     TEXT
+      );
+
+      -- Indexes
+      CREATE INDEX IF NOT EXISTS idx_run_records_runId           ON tbl_run_records(runId);
+      CREATE INDEX IF NOT EXISTS idx_run_records_status          ON tbl_run_records(status);
+      CREATE INDEX IF NOT EXISTS idx_run_records_relativePath    ON tbl_run_records(relativePath);
+      CREATE INDEX IF NOT EXISTS idx_run_records_startedAt       ON tbl_run_records(startedAt);
+      CREATE INDEX IF NOT EXISTS idx_run_records_brand_purchaser ON tbl_run_records(brand, purchaser);
+      CREATE INDEX IF NOT EXISTS idx_file_registry_extractStatus ON tbl_file_registry(extractStatus);
+      CREATE INDEX IF NOT EXISTS idx_email_logs_timestamp        ON tbl_email_logs(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_email_logs_runId            ON tbl_email_logs(runId);
     `);
 
-    // Migration: Add summary_json to tbl_runs if it doesn't exist
+    // ── Migrations for existing databases ─────────────────────────────────────
+
+    // M1: Add summary_json to tbl_runs if it doesn't exist (legacy)
     try {
       db.prepare("SELECT summary_json FROM tbl_runs LIMIT 1").get();
     } catch (_) {
       db.exec("ALTER TABLE tbl_runs ADD COLUMN summary_json TEXT;");
     }
 
-    // Migration: Normalize ALL paths in DB to ignore leading/trailing slashes and backslashes
+    // M2: Drop obsolete columns from tbl_runs (origin, metadata — never used)
     try {
-      db.exec(`
-        UPDATE tbl_run_checkpoints 
-        SET relativePath = LTRIM(REPLACE(relativePath, '\\', '/'), '/')
-        WHERE relativePath LIKE '/%' OR relativePath LIKE '%\\%';
-
-        -- Note: tbl_file_registry normalization is trickier due to PRIMARY KEY conflicts.
-        -- We'll just do a best-effort update for non-critical cases or allow NEW insertions to override.
-        -- For now, cleaning up run checkpoints fixes the "Missing Run ID" in inventory.
-      `);
+      const runCols = (
+        db.prepare("PRAGMA table_info(tbl_runs)").all() as any[]
+      ).map((c) => c.name);
+      if (runCols.includes("origin"))
+        db.exec("ALTER TABLE tbl_runs DROP COLUMN origin;");
+      if (runCols.includes("metadata"))
+        db.exec("ALTER TABLE tbl_runs DROP COLUMN metadata;");
     } catch (e) {
       console.warn(
-        "Path normalization migration failed (likely PK conflict); skipping:",
+        "[Migration M2] Could not drop dead columns from tbl_runs:",
         e,
       );
+    }
+
+    // M3: Drop duplicate metric columns from tbl_file_registry
+    // (latencyMs, statusCode, patternKey, fullResponse, extractError — all lived in tbl_run_records)
+    try {
+      const regCols = (
+        db.prepare("PRAGMA table_info(tbl_file_registry)").all() as any[]
+      ).map((c) => c.name);
+      const toDrop = [
+        "latencyMs",
+        "statusCode",
+        "patternKey",
+        "fullResponse",
+        "extractError",
+      ];
+      for (const col of toDrop) {
+        if (regCols.includes(col)) {
+          db.exec(`ALTER TABLE tbl_file_registry DROP COLUMN ${col};`);
+        }
+      }
+    } catch (e) {
+      console.warn(
+        "[Migration M3] Could not drop duplicate columns from tbl_file_registry:",
+        e,
+      );
+    }
+
+    // M4: Drop tbl_extraction_logs — written every file, never read by any controller
+    try {
+      db.exec("DROP TABLE IF EXISTS tbl_extraction_logs;");
+    } catch (e) {
+      console.warn("[Migration M4] Could not drop tbl_extraction_logs:", e);
+    }
+
+    // M5: Simplify tbl_schedule_logs — drop redundant structured columns, keep only id+timestamp+data
+    try {
+      const schCols = (
+        db.prepare("PRAGMA table_info(tbl_schedule_logs)").all() as any[]
+      ).map((c) => c.name);
+      const legacyCols = ["scheduleId", "outcome", "level", "message"];
+      for (const col of legacyCols) {
+        if (schCols.includes(col)) {
+          db.exec(`ALTER TABLE tbl_schedule_logs DROP COLUMN ${col};`);
+        }
+      }
+    } catch (e) {
+      console.warn("[Migration M5] Could not simplify tbl_schedule_logs:", e);
+    }
+
+    // M6: Normalize paths in tbl_run_records
+    try {
+      db.exec(`
+        UPDATE tbl_run_records 
+        SET relativePath = LTRIM(REPLACE(relativePath, '\\', '/'), '/')
+        WHERE relativePath LIKE '/%' OR relativePath LIKE '%\\%';
+      `);
+    } catch (e) {
+      console.warn("[Migration M6] Path normalization failed:", e);
     }
   }
 
@@ -261,7 +324,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
   }
   async updateFileStatus(
     id: string,
-    status: CheckpointStatus,
+    status: ExtractionStatus,
     metrics?: FileStatusMetrics,
   ): Promise<void> {
     this.getDb();
@@ -331,74 +394,86 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     return this.auditRepo.getScheduleLogs(limit);
   }
 
-  // Core Checkpoint logic (maintained here as it's the bridge)
+  // IEmailLogStore
+  async saveEmailLog(entry: EmailLogEntry): Promise<void> {
+    this.getDb();
+    return this.emailLogRepo.saveEmailLog(entry);
+  }
+  async getEmailLogs(limit?: number): Promise<EmailLogEntry[]> {
+    this.getDb();
+    return this.emailLogRepo.getEmailLogs(limit);
+  }
+
+  // Core ExtractionRecord logic (maintained here as it's the bridge)
   // ──────────────────────────────────────────────
 
-  async upsertCheckpoint(checkpoint: Checkpoint): Promise<void> {
+  async upsertRecord(record: ExtractionRecord): Promise<void> {
     const db = this.getDb();
     db.transaction(() => {
+      // Write full extraction result to run_records (single source of truth for metrics)
       db.prepare(
-        `
-        INSERT OR REPLACE INTO tbl_run_checkpoints
+        `INSERT OR REPLACE INTO tbl_run_records
         (filePath, relativePath, brand, status, startedAt, finishedAt, latencyMs, statusCode, errorMessage, patternKey, runId, purchaser, fullResponse)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
-        checkpoint.filePath,
-        checkpoint.relativePath,
-        checkpoint.brand,
-        checkpoint.status,
-        checkpoint.startedAt,
-        checkpoint.finishedAt,
-        checkpoint.latencyMs,
-        checkpoint.statusCode,
-        checkpoint.errorMessage,
-        checkpoint.patternKey,
-        checkpoint.runId,
-        checkpoint.purchaser,
-        checkpoint.fullResponse
-          ? JSON.stringify(checkpoint.fullResponse)
-          : null,
+        record.filePath,
+        record.relativePath,
+        record.brand,
+        record.status,
+        record.startedAt,
+        record.finishedAt,
+        record.latencyMs ?? null,
+        record.statusCode ?? null,
+        record.errorMessage ?? null,
+        record.patternKey ?? null,
+        record.runId,
+        record.purchaser ?? null,
+        record.fullResponse ? JSON.stringify(record.fullResponse) : null,
       );
 
+      // Update file registry — only lifecycle fields (no duplicated metrics)
       db.prepare(
-        `
-        UPDATE tbl_file_registry
-        SET extractStatus = ?, extractedAt = ?, extractError = ?, latencyMs = ?, statusCode = ?, patternKey = ?, lastRunId = ?, fullResponse = ?
-        WHERE id = ?
-      `,
+        `UPDATE tbl_file_registry
+         SET extractStatus = ?,
+             extractedAt   = ?,
+             lastRunId     = ?,
+             brand         = ?,
+             purchaser     = ?,
+             fullPath      = ?
+         WHERE id = ?`,
       ).run(
-        checkpoint.status,
-        checkpoint.finishedAt,
-        checkpoint.errorMessage,
-        checkpoint.latencyMs,
-        checkpoint.statusCode,
-        checkpoint.patternKey,
-        checkpoint.runId,
-        checkpoint.fullResponse
-          ? JSON.stringify(checkpoint.fullResponse)
-          : null,
-        checkpoint.relativePath,
+        record.status,
+        record.finishedAt ?? null,
+        record.runId,
+        record.brand,
+        record.purchaser ?? null,
+        record.filePath,
+        record.relativePath,
       );
     })();
   }
 
-  async upsertCheckpoints(checkpoints: Checkpoint[]): Promise<void> {
+  async upsertRecords(records: ExtractionRecord[]): Promise<void> {
     const db = this.getDb();
-    const stmtCp = db.prepare(`
-      INSERT OR REPLACE INTO tbl_run_checkpoints
-      (filePath, relativePath, brand, status, startedAt, finishedAt, latencyMs, statusCode, errorMessage, patternKey, runId, purchaser, fullResponse)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const stmtFile = db.prepare(`
-      UPDATE tbl_file_registry
-      SET extractStatus = ?, extractedAt = ?, extractError = ?, latencyMs = ?, statusCode = ?, patternKey = ?, lastRunId = ?, fullResponse = ?
-      WHERE id = ?
-    `);
+    const stmtRecord = db.prepare(
+      `INSERT OR REPLACE INTO tbl_run_records
+       (filePath, relativePath, brand, status, startedAt, finishedAt, latencyMs, statusCode, errorMessage, patternKey, runId, purchaser, fullResponse)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const stmtRegistry = db.prepare(
+      `UPDATE tbl_file_registry
+       SET extractStatus = ?,
+           extractedAt   = ?,
+           lastRunId     = ?,
+           brand         = ?,
+           purchaser     = ?,
+           fullPath      = ?
+       WHERE id = ?`,
+    );
 
     db.transaction(() => {
-      for (const cp of checkpoints) {
-        stmtCp.run(
+      for (const cp of records) {
+        stmtRecord.run(
           cp.filePath,
           cp.relativePath,
           cp.brand,
@@ -413,35 +488,33 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
           cp.purchaser ?? null,
           cp.fullResponse ? JSON.stringify(cp.fullResponse) : null,
         );
-        stmtFile.run(
+        stmtRegistry.run(
           cp.status === "done" ? "done" : "error",
           cp.finishedAt ?? null,
-          cp.errorMessage ?? null,
-          cp.latencyMs ?? null,
-          cp.statusCode ?? null,
-          cp.patternKey ?? null,
           cp.runId,
-          cp.fullResponse ? JSON.stringify(cp.fullResponse) : null,
+          cp.brand,
+          cp.purchaser ?? null,
+          cp.filePath,
           cp.relativePath,
         );
       }
     })();
   }
 
-  async getRecordsForRun(runId: string): Promise<Checkpoint[]> {
+  async getRecordsForRun(runId: string): Promise<ExtractionRecord[]> {
     const db = this.getDb();
     const rows = db
-      .prepare("SELECT * FROM tbl_run_checkpoints WHERE runId = ?")
-      .all(runId) as CheckpointRow[];
+      .prepare("SELECT * FROM tbl_run_records WHERE runId = ?")
+      .all(runId) as ExtractionRecordRow[];
     return rows.map((r) => this.mapToEntity(r));
   }
 
-  async getAllCheckpoints(
+  async getAllRecords(
     limit?: number,
     offset?: number,
-  ): Promise<Checkpoint[]> {
+  ): Promise<ExtractionRecord[]> {
     const db = this.getDb();
-    let query = "SELECT * FROM tbl_run_checkpoints";
+    let query = "SELECT * FROM tbl_run_records";
     const params: any[] = [];
     if (limit !== undefined && offset !== undefined) {
       query += " LIMIT ? OFFSET ?";
@@ -450,14 +523,14 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
       query += " LIMIT ?";
       params.push(limit);
     }
-    const rows = db.prepare(query).all(...params) as CheckpointRow[];
+    const rows = db.prepare(query).all(...params) as ExtractionRecordRow[];
     return rows.map((r) => this.mapToEntity(r));
   }
 
   async getCompletedPaths(runId?: string): Promise<Set<string>> {
     const db = this.getDb();
     let query =
-      "SELECT filePath FROM tbl_run_checkpoints WHERE (status = 'done' OR status = 'skipped')";
+      "SELECT filePath FROM tbl_run_records WHERE (status = 'done' OR status = 'skipped')";
     const params: string[] = [];
     if (runId) {
       query += " AND runId = ?";
@@ -472,7 +545,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
   async getProcessedPaths(runId?: string): Promise<Set<string>> {
     const db = this.getDb();
     let query =
-      "SELECT filePath FROM tbl_run_checkpoints WHERE (status = 'done' OR status = 'skipped' OR status = 'error')";
+      "SELECT filePath FROM tbl_run_records WHERE (status = 'done' OR status = 'skipped' OR status = 'error')";
     const params: string[] = [];
     if (runId) {
       query += " AND runId = ?";
@@ -488,7 +561,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     const db = this.getDb();
     const row = db
       .prepare(
-        "SELECT COUNT(DISTINCT filePath) as count FROM tbl_run_checkpoints WHERE status = 'done' OR status = 'skipped'",
+        "SELECT COUNT(DISTINCT filePath) as count FROM tbl_run_records WHERE status = 'done' OR status = 'skipped'",
       )
       .get() as { count: number };
     return row.count;
@@ -498,7 +571,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     const db = this.getDb();
     const rows = db
       .prepare(
-        "SELECT relativePath FROM tbl_run_checkpoints WHERE runId = ? AND status = 'error'",
+        "SELECT relativePath FROM tbl_run_records WHERE runId = ? AND status = 'error'",
       )
       .all(runId) as Array<{ relativePath: string }>;
     return new Set(rows.map((r) => r.relativePath));
@@ -512,7 +585,7 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     const db = this.getDb();
     let query = `
       SELECT filePath, relativePath, brand, purchaser
-      FROM tbl_run_checkpoints
+      FROM tbl_run_records
       WHERE status = 'error'
     `;
     const params: (string | number)[] = [];
@@ -551,12 +624,12 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
       }));
   }
 
-  private mapToEntity(row: CheckpointRow): Checkpoint {
+  private mapToEntity(row: ExtractionRecordRow): ExtractionRecord {
     return {
       filePath: row.filePath,
       relativePath: row.relativePath,
       brand: row.brand,
-      status: row.status as CheckpointStatus,
+      status: row.status as ExtractionStatus,
       startedAt: row.startedAt ?? undefined,
       finishedAt: row.finishedAt ?? undefined,
       latencyMs: row.latencyMs ?? undefined,

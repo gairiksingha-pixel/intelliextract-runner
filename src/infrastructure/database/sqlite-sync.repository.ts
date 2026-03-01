@@ -27,10 +27,17 @@ export class SqliteSyncRepository implements ISyncRepository {
     const manifest: Record<string, ManifestEntry> = {};
     try {
       const rows = db
-        .prepare("SELECT id, sha256, etag, size FROM tbl_file_registry")
+        .prepare(
+          "SELECT id, sha256, etag, size, fullPath FROM tbl_file_registry",
+        )
         .all() as any[];
       for (const r of rows) {
-        manifest[r.id] = { sha256: r.sha256, etag: r.etag, size: r.size };
+        manifest[r.id] = {
+          sha256: r.sha256,
+          etag: r.etag,
+          size: r.size,
+          fullPath: r.fullPath,
+        };
       }
       return manifest;
     } catch (_) {
@@ -62,30 +69,53 @@ export class SqliteSyncRepository implements ISyncRepository {
     try {
       const row = db
         .prepare(
-          "SELECT sha256, etag, size FROM tbl_file_registry WHERE id = ?",
+          "SELECT sha256, etag, size, fullPath FROM tbl_file_registry WHERE id = ?",
         )
         .get(key) as any;
       if (!row) return null;
-      return { sha256: row.sha256, etag: row.etag, size: row.size };
+      return {
+        sha256: row.sha256,
+        etag: row.etag,
+        size: row.size,
+        fullPath: row.fullPath,
+      };
     } catch (_) {
       return null;
     }
   }
 
-  async upsertManifestEntry(key: string, entry: ManifestEntry): Promise<void> {
+  async upsertManifestEntry(
+    key: string,
+    entry: ManifestEntry,
+    brand?: string,
+    purchaser?: string,
+    fullPath?: string,
+  ): Promise<void> {
     const db = this.getDb();
     const now = new Date().toISOString();
     db.prepare(
       `
-      INSERT INTO tbl_file_registry (id, sha256, etag, size, syncedAt)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO tbl_file_registry (id, sha256, etag, size, syncedAt, brand, purchaser, fullPath)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
-        sha256   = excluded.sha256,
-        etag     = excluded.etag,
-        size     = excluded.size,
-        syncedAt = excluded.syncedAt
+        sha256    = excluded.sha256,
+        etag      = excluded.etag,
+        size      = excluded.size,
+        syncedAt  = excluded.syncedAt,
+        brand     = COALESCE(excluded.brand, tbl_file_registry.brand),
+        purchaser = COALESCE(excluded.purchaser, tbl_file_registry.purchaser),
+        fullPath  = COALESCE(excluded.fullPath, tbl_file_registry.fullPath)
     `,
-    ).run(key, entry.sha256, entry.etag || "", entry.size || 0, now);
+    ).run(
+      key,
+      entry.sha256,
+      entry.etag || "",
+      entry.size || 0,
+      now,
+      brand || null,
+      purchaser || null,
+      fullPath || null,
+    );
   }
 
   async deleteManifestEntry(key: string): Promise<void> {

@@ -4,7 +4,9 @@ import { ReportingUseCase } from "./reporting.use-case.js";
 import { DiscoverFilesUseCase } from "./discover-files.use-case.js";
 import { IRunStatusStore } from "../domain/services/run-status-store.service.js";
 import { IReportGenerationService } from "../domain/services/report-generation.service.js";
-import { ICheckpointRepository } from "../domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../domain/repositories/extraction-record.repository.js";
+import { relative } from "node:path";
+import { normalizeRelativePath } from "../../infrastructure/utils/storage.utils.js";
 
 export type WorkflowCaseId = "PIPE" | "SYNC" | "EXTRACT" | "P1" | "P2";
 
@@ -63,7 +65,7 @@ export class ExecuteWorkflowUseCase {
     private runStatusStore: IRunStatusStore,
     private stagingDir: string,
     private reportGenerationService: IReportGenerationService,
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
   ) {}
 
   async execute(
@@ -120,7 +122,9 @@ export class ExecuteWorkflowUseCase {
             filesToExtract.push(
               ...result.files.map((f: string) => ({
                 filePath: f,
-                relativePath: f.split("staging")[1] || f,
+                relativePath: normalizeRelativePath(
+                  relative(this.stagingDir, f),
+                ),
                 brand: pair.tenant,
                 purchaser: pair.purchaser,
               })),
@@ -182,7 +186,7 @@ export class ExecuteWorkflowUseCase {
       onUpdate({ type: "report", ...report });
 
       // Save summary to cache for 10/10 performance
-      await this.checkpointRepo
+      await this.recordRepo
         .saveRunSummary(runId, { metrics: report })
         .catch(() => {});
 

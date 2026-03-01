@@ -34,7 +34,7 @@ export interface S3Config {
 export interface RunConfig {
   concurrency: number;
   requestsPerSecond: number;
-  checkpointPath: string;
+  databasePath: string;
   skipCompleted: boolean;
   /** Max number of retries per file when the API call fails with timeout/5xx/429. Default: 0 (no retries). */
   maxRetries?: number;
@@ -65,18 +65,18 @@ export interface Config {
   report: ReportConfig;
 }
 
-export type CheckpointStatus =
+export type ExtractionStatus =
   | "pending"
   | "running"
   | "done"
   | "error"
   | "skipped";
 
-export interface CheckpointRecord {
+export interface ExtractionRecord {
   filePath: string;
   relativePath: string;
   brand: string;
-  status: CheckpointStatus;
+  status: ExtractionStatus;
   startedAt?: string;
   finishedAt?: string;
   latencyMs?: number;
@@ -191,6 +191,7 @@ export interface ManifestEntry {
   sha256: string;
   etag: string;
   size: number;
+  fullPath?: string;
 }
 
 export interface Schedule {

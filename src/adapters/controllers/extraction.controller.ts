@@ -5,8 +5,8 @@ import {
   IRunStateService,
   RunState,
 } from "../../core/domain/services/run-state.service.js";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
-import { Checkpoint } from "../../core/domain/entities/checkpoint.entity.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
+import { ExtractionRecord } from "../../core/domain/entities/extraction-record.entity.js";
 import { hasOverlap } from "../../infrastructure/utils/concurrency.utils.js";
 
 import { z } from "zod";
@@ -45,7 +45,7 @@ export class ExtractionController {
     private orchestrator: ProcessOrchestrator,
     private runStatusStore: IRunStatusStore,
     private runStateService: IRunStateService,
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
     private resumeCapableCases: Set<string>,
   ) {}
 
@@ -188,19 +188,19 @@ export class ExtractionController {
         }
 
         // Fetch real stats from DB
-        const status = await this.checkpointRepo.getRunStatus();
+        const status = await this.recordRepo.getRunStatus();
         if (status.runId) {
-          const records = await this.checkpointRepo.getRecordsForRun(
+          const records = await this.recordRepo.getRecordsForRun(
             status.runId,
           );
           const doneRecords = records.filter(
-            (r: Checkpoint) => r.status === "done",
+            (r: ExtractionRecord) => r.status === "done",
           );
           const avgLat =
             doneRecords.length > 0
               ? Math.round(
                   doneRecords.reduce(
-                    (a: number, b: Checkpoint) => a + (b.latencyMs || 0),
+                    (a: number, b: ExtractionRecord) => a + (b.latencyMs || 0),
                     0,
                   ) / doneRecords.length,
                 )
@@ -236,7 +236,7 @@ export class ExtractionController {
       } else {
         // Save state for resume if interrupted
         if (this.resumeCapableCases.has(caseId) && result.exitCode !== 0) {
-          const s = await this.checkpointRepo.getRunStatus();
+          const s = await this.recordRepo.getRunStatus();
           if (s.runId) {
             await this.runStateService.updateRunState(caseId, {
               status: "stopped",

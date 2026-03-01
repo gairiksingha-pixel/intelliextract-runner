@@ -145,15 +145,13 @@ export class DataExplorerView {
       overflow-x: auto;
       max-height: 2000px;
       overflow-y: visible;
-      transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
       text-align: left;
     }
-    .expand-row-content { overflow: hidden; height: 0; opacity: 0; transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
-    .expand-row-content.open { height: auto; opacity: 1; }
-    
-    @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-10px); }
-      to   { opacity: 1; transform: translateY(0); }
+    .expand-row-content { 
+      overflow: hidden; 
+      height: 0; 
+      opacity: 0; 
+      transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease; 
     }
     @keyframes slideUp {
       from { opacity: 1; transform: translateY(0); }

@@ -1,22 +1,25 @@
-import { ICheckpointRepository } from "../domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../domain/repositories/extraction-record.repository.js";
+import { ExtractionRecord } from "../domain/entities/extraction-record.entity.js";
 import { ExtractionFileDetails } from "../domain/types.js";
 import { FileMetadataService } from "../domain/services/file-metadata.service.js";
 
 export class GetExtractionDataUseCase {
-  constructor(private checkpointRepo: ICheckpointRepository) {}
+  constructor(private recordRepo: IExtractionRecordRepository) {}
 
   async execute(
     brandPurchasers: Record<string, string[]>,
     options?: { limit?: number; offset?: number },
   ): Promise<ExtractionFileDetails[]> {
-    const allCheckpoints = await this.checkpointRepo.getAllCheckpoints(
+    const allExtractionRecords = await this.recordRepo.getAllRecords(
       options?.limit,
       options?.offset,
     );
 
-    return allCheckpoints
-      .filter((c) => c.status === "done" || c.status === "error")
-      .map((c) => {
+    return allExtractionRecords
+      .filter(
+        (c: ExtractionRecord) => c.status === "done" || c.status === "error",
+      )
+      .map((c: ExtractionRecord) => {
         const fullResponse = c.fullResponse || {};
         const status = (c.status === "done" ? "success" : "failed") as
           | "success"
@@ -72,6 +75,9 @@ export class GetExtractionDataUseCase {
           sourcePurchaser: fullResponse?._purchaser ?? purchaser ?? null,
         };
       })
-      .sort((a, b) => b.mtime - a.mtime);
+      .sort(
+        (a: ExtractionFileDetails, b: ExtractionFileDetails) =>
+          b.mtime - a.mtime,
+      );
   }
 }

@@ -1,14 +1,14 @@
 import { ServerResponse } from "node:http";
 import { DashboardController } from "./dashboard.controller.js";
 import { loadHistoricalRunSummaries } from "../presenters/report.js";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { PageLayout } from "../../infrastructure/views/page-layout.js";
 import { RunSummaryView } from "../../infrastructure/views/run-summary.view.js";
 
 export class ReportPageController {
   constructor(
     private dashboardController: DashboardController,
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
     private appConfig: any,
     private staticAssets: { logo: string; smallLogo: string; favIcon: string },
     private brandPurchasers: Record<string, string[]>,
@@ -17,7 +17,7 @@ export class ReportPageController {
   async getReportHtml(runId: string, res: ServerResponse) {
     try {
       const allSummaries = await loadHistoricalRunSummaries(
-        this.checkpointRepo,
+        this.recordRepo,
         this.appConfig,
       );
       const summaries = allSummaries.filter((s) => s.runId === runId);
@@ -62,7 +62,7 @@ export class ReportPageController {
   async getSummaryReport(res: ServerResponse) {
     try {
       const summaries = await loadHistoricalRunSummaries(
-        this.checkpointRepo,
+        this.recordRepo,
         this.appConfig,
       );
 

@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { CheckpointStatus } from "../../core/domain/entities/checkpoint.entity.js";
+import { ExtractionStatus } from "../../core/domain/entities/extraction-record.entity.js";
 import {
   IFileRegistry,
   RegisterFileInput,
@@ -84,32 +84,17 @@ export class SqliteFileRegistryRepository implements IFileRegistry {
 
   async updateFileStatus(
     id: string,
-    status: CheckpointStatus,
+    status: ExtractionStatus,
     metrics?: FileStatusMetrics,
   ): Promise<void> {
     this.db
       .prepare(
-        `
-      UPDATE tbl_file_registry
-      SET extractStatus = ?,
-          extractedAt   = ?,
-          extractError  = ?,
-          latencyMs     = ?,
-          statusCode    = ?,
-          patternKey    = ?,
-          lastRunId     = ?
-      WHERE id = ?
-    `,
+        `UPDATE tbl_file_registry
+         SET extractStatus = ?,
+             extractedAt   = ?,
+             lastRunId     = ?
+         WHERE id = ?`,
       )
-      .run(
-        status,
-        new Date().toISOString(),
-        metrics?.errorMessage,
-        metrics?.latencyMs,
-        metrics?.statusCode,
-        metrics?.patternKey,
-        metrics?.runId,
-        id,
-      );
+      .run(status, new Date().toISOString(), metrics?.runId ?? null, id);
   }
 }

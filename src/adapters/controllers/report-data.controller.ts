@@ -1,16 +1,16 @@
 import { ServerResponse } from "node:http";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { loadHistoricalRunSummaries } from "../presenters/report.js";
 
 export class ReportDataController {
   constructor(
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
     private appConfig: any,
   ) {}
 
   async listReports(res: ServerResponse) {
     try {
-      const runIds = await this.checkpointRepo.getAllRunIdsOrdered();
+      const runIds = await this.recordRepo.getAllRunIdsOrdered();
       const list = {
         html: runIds.map((id) => ({ name: `report_${id}.html`, runId: id })),
         json: runIds.map((id) => ({ name: `report_${id}.json`, runId: id })),
@@ -26,7 +26,7 @@ export class ReportDataController {
   async getReportJson(runId: string, res: ServerResponse) {
     try {
       const allSummaries = await loadHistoricalRunSummaries(
-        this.checkpointRepo,
+        this.recordRepo,
         this.appConfig,
       );
       const summaries = allSummaries.filter(

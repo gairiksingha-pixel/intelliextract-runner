@@ -105,16 +105,16 @@ export class AwsS3Service implements IS3Service {
         const destPath = purchaser
           ? join(brandDir, purchaser, keyAfterPrefix)
           : join(brandDir, key);
-        const mk = `${brand}/${key}`;
+        const relativePath = normalizeRelativePath(
+          relative(stagingDir, destPath),
+        );
+        const mk = relativePath;
 
         // Fast-skip: already extracted
         if (options?.alreadyExtractedPaths?.has(destPath)) {
           skipped++;
           options.onSyncSkipProgress?.(skipped, skipped + synced);
           if (options.onFileSynced) {
-            const relativePath = normalizeRelativePath(
-              relative(stagingDir, destPath),
-            );
             await options.onFileSynced({
               filePath: destPath,
               relativePath,
@@ -126,17 +126,20 @@ export class AwsS3Service implements IS3Service {
           continue;
         }
 
-        const shouldSkip = await this.skipIfUnchanged(destPath, mk, {
-          etag,
-          size,
-        });
+        const shouldSkip = await this.skipIfUnchanged(
+          destPath,
+          mk,
+          {
+            etag,
+            size,
+          },
+          brand,
+          purchaser || undefined,
+        );
         if (shouldSkip) {
           skipped++;
           options?.onSyncSkipProgress?.(skipped, skipped + synced);
           if (options?.onFileSynced) {
-            const relativePath = normalizeRelativePath(
-              relative(stagingDir, destPath),
-            );
             await options.onFileSynced({
               filePath: destPath,
               relativePath,
@@ -154,7 +157,16 @@ export class AwsS3Service implements IS3Service {
           const sha = await this.computeFileSha256(destPath);
           const entry: ManifestEntry = { sha256: sha, etag, size };
 
-          await this.syncRepo.upsertManifestEntry(mk, entry);
+          const relativePath = normalizeRelativePath(
+            relative(stagingDir, destPath),
+          );
+          await this.syncRepo.upsertManifestEntry(
+            mk,
+            entry,
+            brand,
+            purchaser || undefined,
+            destPath,
+          );
           synced++;
           downloadedFiles.push(destPath);
 
@@ -163,9 +175,6 @@ export class AwsS3Service implements IS3Service {
           options?.onSyncSkipProgress?.(skipped, skipped + synced);
 
           if (options?.onFileSynced) {
-            const relativePath = normalizeRelativePath(
-              relative(stagingDir, destPath),
-            );
             await options.onFileSynced({
               filePath: destPath,
               relativePath,
@@ -236,22 +245,30 @@ export class AwsS3Service implements IS3Service {
     destPath: string,
     keyInManifest: string,
     s3Metadata: { etag: string; size: number },
+    brand: string,
+    purchaser?: string,
   ): Promise<boolean> {
     if (!existsSync(destPath)) return false;
 
     const entry = await this.syncRepo.getManifestEntry(keyInManifest);
     if (entry) {
-      // Modern entry: instant compare via ETag + size
-      if (typeof entry === "object") {
-        return entry.etag === s3Metadata.etag && entry.size === s3Metadata.size;
+      const etagMatches = entry.etag === s3Metadata.etag;
+      const sizeMatches = entry.size === s3Metadata.size;
+
+      if (etagMatches && sizeMatches) {
+        // Data matches, but check if we need to fix missing metadata (like fullPath)
+        if (!entry.fullPath) {
+          await this.syncRepo.upsertManifestEntry(
+            keyInManifest,
+            entry,
+            brand,
+            purchaser,
+            destPath,
+          );
+        }
+        return true;
       }
-      // Legacy entry: string SHA-256 — fall back to disk hash
-      try {
-        const actualSha = await this.computeFileSha256(destPath);
-        return actualSha === entry;
-      } catch {
-        return false;
-      }
+      return false;
     }
 
     // Recovery path: file exists on disk but not in manifest.
@@ -265,7 +282,13 @@ export class AwsS3Service implements IS3Service {
           etag: s3Metadata.etag,
           size: s3Metadata.size,
         };
-        await this.syncRepo.upsertManifestEntry(keyInManifest, entry);
+        await this.syncRepo.upsertManifestEntry(
+          keyInManifest,
+          entry,
+          undefined,
+          undefined,
+          destPath,
+        );
         return true;
       }
     } catch {

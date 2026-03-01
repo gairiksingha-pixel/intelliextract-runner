@@ -6,17 +6,17 @@ import {
   EmailConfig,
   FailureDetail,
 } from "../../core/domain/services/email.service.js";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 
 export class NodemailerEmailService implements IEmailService {
-  constructor(private checkpointRepo: ICheckpointRepository) {}
+  constructor(private recordRepo: IExtractionRecordRepository) {}
 
   async getEmailConfig(): Promise<EmailConfig> {
-    return await this.checkpointRepo.getEmailConfig();
+    return await this.recordRepo.getEmailConfig();
   }
 
   async saveEmailConfig(config: EmailConfig): Promise<void> {
-    await this.checkpointRepo.saveEmailConfig(config);
+    await this.recordRepo.saveEmailConfig(config);
   }
 
   async sendConsolidatedFailureEmail(
@@ -151,8 +151,24 @@ export class NodemailerEmailService implements IEmailService {
         subject,
         html,
       });
-    } catch (error) {
+
+      await this.recordRepo.saveEmailLog({
+        timestamp: new Date().toISOString(),
+        runId,
+        recipient: recipientEmail,
+        subject,
+        status: "sent",
+      });
+    } catch (error: any) {
       console.error("Failed to send consolidated failure email:", error);
+      await this.recordRepo.saveEmailLog({
+        timestamp: new Date().toISOString(),
+        runId,
+        recipient: recipientEmail,
+        subject,
+        status: "failed",
+        error: error.message || String(error),
+      });
     }
   }
 
@@ -250,8 +266,24 @@ export class NodemailerEmailService implements IEmailService {
           ? [{ filename: "logo.png", path: LOGO_PATH, cid: "logo" }]
           : [],
       });
-    } catch (error) {
+
+      await this.recordRepo.saveEmailLog({
+        timestamp: new Date().toISOString(),
+        runId: params.runId,
+        recipient: recipientEmail,
+        subject,
+        status: "sent",
+      });
+    } catch (error: any) {
       console.error("Failed to send failure email:", error);
+      await this.recordRepo.saveEmailLog({
+        timestamp: new Date().toISOString(),
+        runId: params.runId,
+        recipient: recipientEmail,
+        subject,
+        status: "failed",
+        error: error.message || String(error),
+      });
     }
   }
 }

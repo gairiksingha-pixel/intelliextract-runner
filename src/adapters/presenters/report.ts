@@ -17,9 +17,10 @@ import type {
   Config,
   RunMetrics,
   ExecutiveSummary,
-  CheckpointRecord,
+  ExtractionRecord,
 } from "../../core/domain/types.js";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { ViewHelper } from "../../infrastructure/views/view.helper.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { computeMetrics } from "../../infrastructure/utils/metrics.utils.js";
 
 export interface ExtractionResultEntry {
@@ -33,11 +34,13 @@ export interface HistoricalRunSummary {
   runId: string;
   metrics: RunMetrics;
   extractionResults: ExtractionResultEntry[];
-  records: CheckpointRecord[];
+  records: ExtractionRecord[];
   start: Date;
   end: Date;
   brand?: string;
   purchaser?: string;
+  brandDisplayName?: string;
+  purchaserDisplayName?: string;
   runDurationSeconds: number;
   sessions?: Array<{
     runId: string;
@@ -68,7 +71,7 @@ function extractionResultFilenameFromRecord(record: {
  */
 
 function filterExtractionResultsForRecords(
-  records: CheckpointRecord[],
+  records: ExtractionRecord[],
   allResults: ExtractionResultEntry[],
 ): ExtractionResultEntry[] {
   const relevantFilenames = new Set(
@@ -163,7 +166,7 @@ function minMaxDatesFromRecords(
 }
 
 export async function loadHistoricalRunSummaries(
-  repo: ICheckpointRepository,
+  repo: IExtractionRecordRepository,
   config: Config,
 ): Promise<HistoricalRunSummary[]> {
   const runIds = await repo.getAllRunIdsOrdered();
@@ -176,6 +179,8 @@ export async function loadHistoricalRunSummaries(
     end: Date;
     brand?: string;
     purchaser?: string;
+    brandDisplayName?: string;
+    purchaserDisplayName?: string;
     results: ExtractionResultEntry[];
   }> = [];
 
@@ -214,7 +219,7 @@ export async function loadHistoricalRunSummaries(
         };
       });
 
-    const recordsByGroup = new Map<string, CheckpointRecord[]>();
+    const recordsByGroup = new Map<string, ExtractionRecord[]>();
     for (const r of records) {
       let p = r.purchaser;
       if (!p && r.relativePath) {
@@ -251,6 +256,8 @@ export async function loadHistoricalRunSummaries(
         end,
         brand: brand || undefined,
         purchaser: purchaser || undefined,
+        brandDisplayName: ViewHelper.formatBrandDisplayName(brand),
+        purchaserDisplayName: ViewHelper.formatPurchaserDisplayName(purchaser),
         results,
       };
       rawSummaries.push(chunk);
@@ -396,6 +403,8 @@ export async function loadHistoricalRunSummaries(
         runDurationSeconds,
         brand: latestRun.brand,
         purchaser: latestRun.purchaser,
+        brandDisplayName: latestRun.brandDisplayName,
+        purchaserDisplayName: latestRun.purchaserDisplayName,
         sessions,
       };
       out.push(merged);
@@ -489,33 +498,6 @@ function formatDateHuman(d: Date): string {
   );
   const day = istDate.getDate();
   return `${dayOrdinal(day)} ${months[istDate.getMonth()]} ${istDate.getFullYear()}`;
-}
-
-function formatBrandDisplayName(brandId?: string): string {
-  if (!brandId) return "N/A";
-  const b = brandId.toLowerCase();
-  if (b.includes("no-cow")) return "No Cow";
-  if (b.includes("sundia")) return "Sundia";
-  if (b.includes("tractor-beverage")) return "Tractor";
-  if (b === "p3" || b === "pipe") return "PIPE";
-  return brandId;
-}
-
-function formatPurchaserDisplayName(purchaserId?: string): string {
-  if (!purchaserId) return "N/A";
-  const p = purchaserId.toLowerCase();
-  if (p.includes("8c03bc63-a173-49d2-9ef4-d3f4c540fae8")) return "Temp 1";
-  if (p.includes("a451e439-c9d1-41c5-b107-868b65b596b8")) return "Temp 2";
-  if (p.includes("dot_foods")) return "DOT Foods";
-  if (p === "640" || p === "641" || p.includes("640") || p.includes("641"))
-    return "DMC";
-  if (p === "843") return "HPI";
-  if (p === "895") return "HPD";
-  if (p === "897") return "HPM";
-  if (p === "991") return "HPT";
-  if (p.includes("kehe")) return "KeHE";
-  if (p.includes("unfi")) return "UNFI";
-  return purchaserId;
 }
 
 export function buildSummary(metrics: RunMetrics): ExecutiveSummary {
@@ -684,7 +666,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   const failuresByBrandRows = m.failureCountByBrand
     .map(
       (e) =>
-        `<tr><td>${escapeHtml(formatBrandDisplayName(e.brand))}</td><td>${e.count}</td></tr>`,
+        `<tr><td>${escapeHtml(ViewHelper.formatBrandDisplayName(e.brand))}</td><td>${e.count}</td></tr>`,
     )
     .join("");
   const failuresByBrandSection =
@@ -709,7 +691,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
   if (m.failureCountByBrand.length > 0) {
     const topBrand = m.failureCountByBrand[0];
     agentSummaryPoints.push(
-      `Most failures are for brand "${formatBrandDisplayName(topBrand.brand)}" (${
+      `Most failures are for brand "${ViewHelper.formatBrandDisplayName(topBrand.brand)}" (${
         topBrand.count
       } failed file${topBrand.count === 1 ? "" : "s"}).`,
     );
@@ -741,9 +723,11 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       : entry.runId;
   const runLabel = formatRunDateTime(m.startedAt);
 
-  const brandDisplay = entry.brand ? formatBrandDisplayName(entry.brand) : "";
+  const brandDisplay = entry.brand
+    ? ViewHelper.formatBrandDisplayName(entry.brand)
+    : "";
   const purchaserDisplay = entry.purchaser
-    ? formatPurchaserDisplayName(entry.purchaser).replace(/_/g, "-")
+    ? ViewHelper.formatPurchaserDisplayName(entry.purchaser).replace(/_/g, "-")
     : "";
 
   let sectionClass = "run-section history-item";
@@ -1062,8 +1046,8 @@ export function htmlReportFromHistory(
   const allPurchasers = Array.from(
     new Set(historicalSummaries.map((s) => s.purchaser).filter(Boolean)),
   ).sort((a, b) => {
-    const nameA = formatPurchaserDisplayName(a!).toLowerCase();
-    const nameB = formatPurchaserDisplayName(b!).toLowerCase();
+    const nameA = ViewHelper.formatPurchaserDisplayName(a!).toLowerCase();
+    const nameB = ViewHelper.formatPurchaserDisplayName(b!).toLowerCase();
     const isTempA = nameA.includes("temp");
     const isTempB = nameB.includes("temp");
     if (isTempA && !isTempB) return 1;
@@ -1072,10 +1056,13 @@ export function htmlReportFromHistory(
   });
 
   const brandNamesMap: Record<string, string> = {};
-  allBrands.forEach((id) => (brandNamesMap[id!] = formatBrandDisplayName(id!)));
+  allBrands.forEach(
+    (id) => (brandNamesMap[id!] = ViewHelper.formatBrandDisplayName(id!)),
+  );
   const purchaserNamesMap: Record<string, string> = {};
   allPurchasers.forEach(
-    (id) => (purchaserNamesMap[id!] = formatPurchaserDisplayName(id!)),
+    (id) =>
+      (purchaserNamesMap[id!] = ViewHelper.formatPurchaserDisplayName(id!)),
   );
 
   const brandPurchaserMap: Record<string, string[]> = {};
@@ -2992,7 +2979,7 @@ function pruneOldReports(outDir: string, retainCount: number): void {
 
 /**
  * Write reports for a single run ID (e.g. after each file completes so the summary is up to date).
- * Reads current checkpoint state, computes metrics, and calls writeReports.
+ * Reads current record state, computes metrics, and calls writeReports.
  */
 /**
  * Builds the JSON payload for reports, derived from historical summaries.
@@ -3010,6 +2997,8 @@ export function buildReportJsonPayload(
       runId: r.runId,
       metrics: r.metrics,
       runDurationSeconds: r.runDurationSeconds,
+      brand: r.brandDisplayName || r.brand || "",
+      purchaser: r.purchaserDisplayName || r.purchaser || "",
       loadTesting: {
         throughputPerMinute: Math.round(throughputPerMinute * 10) / 10,
         throughputPerSecond: Math.round(throughputPerSecond * 100) / 100,
@@ -3038,7 +3027,7 @@ export function buildReportJsonPayload(
 }
 
 export async function writeReports(
-  repo: ICheckpointRepository,
+  repo: IExtractionRecordRepository,
   config: Config,
   summary: ExecutiveSummary,
 ): Promise<void> {
@@ -3048,7 +3037,7 @@ export async function writeReports(
 }
 
 export async function writeReportsForRunId(
-  repo: ICheckpointRepository,
+  repo: IExtractionRecordRepository,
   config: Config,
   runId: string,
 ): Promise<void> {

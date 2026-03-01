@@ -10,7 +10,7 @@ import {
   getConfigPath,
 } from "./infrastructure/utils/config.utils.js";
 import { Config } from "./core/domain/entities/config.entity.js";
-import { SqliteCheckpointRepository } from "./infrastructure/database/sqlite-checkpoint.repository.js";
+import { SqliteExtractionRecordRepository } from "./infrastructure/database/sqlite-extraction-record.repository.js";
 import { SqliteSyncRepository } from "./infrastructure/database/sqlite-sync.repository.js";
 import { SyncBrandUseCase } from "./core/use-cases/sync-brand.use-case.js";
 import { RunExtractionUseCase } from "./core/use-cases/run-extraction.use-case.js";
@@ -20,6 +20,7 @@ import { SqliteLogger } from "./infrastructure/services/sqlite-logger.service.js
 import { DiscoverFilesUseCase } from "./core/use-cases/discover-files.use-case.js";
 import { NodemailerEmailService } from "./infrastructure/services/nodemailer-email.service.js";
 import { computeMetrics } from "./infrastructure/utils/metrics.utils.js";
+import { normalizeRelativePath } from "./infrastructure/utils/storage.utils.js";
 import { join, dirname, relative } from "node:path";
 import {
   writeFileSync,
@@ -119,7 +120,7 @@ program
       const pairs = parsePairs(opts.pairs);
       validateTenantPurchaser(opts.tenant, opts.purchaser, pairs);
 
-      const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
+      const syncRepo = new SqliteSyncRepository(config.run.databasePath);
       const s3Service = new AwsS3Service(config.s3.region, syncRepo);
       const syncUseCase = new SyncBrandUseCase(s3Service, syncRepo);
 
@@ -251,13 +252,13 @@ program
           ? undefined
           : opts.extractLimit;
 
-      const checkpointRepo = new SqliteCheckpointRepository(
-        config.run.checkpointPath,
+      const recordRepo = new SqliteExtractionRecordRepository(
+        config.run.databasePath,
       );
-      await checkpointRepo.initialize();
-      const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
-      const emailService = new NodemailerEmailService(checkpointRepo);
-      const logger = new SqliteLogger(checkpointRepo);
+      await recordRepo.initialize();
+      const syncRepo = new SqliteSyncRepository(config.run.databasePath);
+      const emailService = new NodemailerEmailService(recordRepo);
+      const logger = new SqliteLogger(recordRepo);
       const extractionService = new IntelliExtractService(
         config,
         EXTRACTIONS_DIR,
@@ -265,12 +266,12 @@ program
       const discoverFiles = new DiscoverFilesUseCase();
       const runExtraction = new RunExtractionUseCase(
         extractionService,
-        checkpointRepo,
+        recordRepo,
         logger,
         emailService,
       );
 
-      const runId = opts.runId || (await checkpointRepo.startNewRun());
+      const runId = opts.runId || (await recordRepo.startNewRun());
       if (stdoutPiped) process.stdout.write(`RUN_ID\t${runId}\n`);
       console.log(`Starting Run: ${runId}`);
 
@@ -292,7 +293,7 @@ program
 
         if (opts.retryFailed) {
           console.log("Fetching previously failed files from database...");
-          filesToExtract = await checkpointRepo.getFailedFiles(filter);
+          filesToExtract = await recordRepo.getFailedFiles(filter);
           if (filesToExtract.length > 0) {
             console.log(
               `Found ${filesToExtract.length} failed file(s) to retry.`,
@@ -302,7 +303,7 @@ program
           }
         } else {
           console.log("Checking for unextracted files in database registry...");
-          filesToExtract = await checkpointRepo.getUnextractedFiles(filter);
+          filesToExtract = await recordRepo.getUnextractedFiles(filter);
           if (filesToExtract.length > 0) {
             console.log(
               `Found ${filesToExtract.length} unextracted files in database.`,
@@ -339,7 +340,7 @@ program
           filesToExtract.push(
             ...res.files.map((f) => ({
               filePath: f,
-              relativePath: relative(STAGING_DIR, f).replace(/\\/g, "/"),
+              relativePath: normalizeRelativePath(relative(STAGING_DIR, f)),
               brand: res.brand,
               purchaser: res.purchaser,
             })),
@@ -348,7 +349,7 @@ program
 
         // Register synced files in database
         if (filesToExtract.length > 0) {
-          await checkpointRepo.registerFiles(
+          await recordRepo.registerFiles(
             filesToExtract.map((f) => ({
               id: f.relativePath,
               fullPath: f.filePath,
@@ -405,7 +406,7 @@ program
 
         // Register discovered files in database so next time they are found in registry
         if (filesToExtract.length > 0) {
-          await checkpointRepo.registerFiles(
+          await recordRepo.registerFiles(
             filesToExtract.map((f) => ({
               id: f.relativePath,
               fullPath: f.filePath,
@@ -441,7 +442,7 @@ program
         },
       });
 
-      await clearPartialFileAndResumeState(checkpointRepo);
+      await clearPartialFileAndResumeState(recordRepo);
       console.log("\nExtraction completed.");
 
       if (doReport) {
@@ -494,13 +495,13 @@ program
           : opts.limit;
       const limitNum = limit !== undefined && limit > 0 ? limit : 0;
 
-      const checkpointRepo = new SqliteCheckpointRepository(
-        config.run.checkpointPath,
+      const recordRepo = new SqliteExtractionRecordRepository(
+        config.run.databasePath,
       );
-      await checkpointRepo.initialize();
-      const syncRepo = new SqliteSyncRepository(config.run.checkpointPath);
-      const emailService = new NodemailerEmailService(checkpointRepo);
-      const logger = new SqliteLogger(checkpointRepo);
+      await recordRepo.initialize();
+      const syncRepo = new SqliteSyncRepository(config.run.databasePath);
+      const emailService = new NodemailerEmailService(recordRepo);
+      const logger = new SqliteLogger(recordRepo);
       const extractionService = new IntelliExtractService(
         config,
         EXTRACTIONS_DIR,
@@ -509,8 +510,8 @@ program
       // Resolve run ID (resume or fresh)
       const runId =
         opts.runId ||
-        (opts.resume ? await checkpointRepo.getCurrentRunId() : null) ||
-        (await checkpointRepo.startNewRun());
+        (opts.resume ? await recordRepo.getCurrentRunId() : null) ||
+        (await recordRepo.startNewRun());
 
       if (stdoutPiped) {
         process.stdout.write(`SYNC_PROGRESS\t0\t${limitNum}\n`);
@@ -519,9 +520,9 @@ program
       }
 
       if (opts.resume) {
-        await clearPartialFileAndResumeState(checkpointRepo);
+        await clearPartialFileAndResumeState(recordRepo);
       } else {
-        await clearPartialFileAndResumeState(checkpointRepo);
+        await clearPartialFileAndResumeState(recordRepo);
       }
 
       if (pairs?.length) console.log(`Scoped to ${pairs.length} pair(s).`);
@@ -530,11 +531,11 @@ program
 
       // Global skipping logic (across all runs) vs Run-specific resume logic
       const globalCompleted = config.run.skipCompleted
-        ? await checkpointRepo.getProcessedPaths()
+        ? await recordRepo.getProcessedPaths()
         : new Set<string>();
 
-      const runCompleted = await checkpointRepo.getProcessedPaths(runId);
-      const runRecords = await checkpointRepo.getRecordsForRun(runId);
+      const runCompleted = await recordRepo.getProcessedPaths(runId);
+      const runRecords = await recordRepo.getRecordsForRun(runId);
 
       if (opts.resume && runCompleted.size > 0) {
         if (stdoutPiped)
@@ -562,7 +563,7 @@ program
         limit: limit,
         alreadyExtractedPaths: globalCompleted,
         onStartDownload: (destPath, manifestKey) => {
-          saveResumeState(checkpointRepo, {
+          saveResumeState(recordRepo, {
             syncInProgressPath: destPath,
             syncInProgressManifestKey: manifestKey,
           });
@@ -585,7 +586,7 @@ program
           ) {
             extractionDone++;
             // Record skip in current run so metrics showing "Extraction overview: Skipped: X" are correct
-            await checkpointRepo.upsertCheckpoint({
+            await recordRepo.upsertRecord({
               ...job,
               status: "skipped",
               runId,
@@ -608,7 +609,7 @@ program
             if (aborted) return;
             try {
               const startedAt = new Date().toISOString();
-              await checkpointRepo.upsertCheckpoint({
+              await recordRepo.upsertRecord({
                 ...job,
                 status: "running",
                 startedAt,
@@ -621,7 +622,7 @@ program
                 runId,
                 job.relativePath,
               );
-              await checkpointRepo.upsertCheckpoint({
+              await recordRepo.upsertRecord({
                 ...job,
                 status: result.success ? "done" : "error",
                 startedAt,
@@ -660,7 +661,7 @@ program
                 return;
               }
               failures.push({ ...job, errorMessage: err.message });
-              await checkpointRepo.upsertCheckpoint({
+              await recordRepo.upsertRecord({
                 ...job,
                 status: "error",
                 startedAt: new Date().toISOString(),
@@ -682,7 +683,7 @@ program
       await extractionQueue.onIdle();
       logger.close();
 
-      const records = await checkpointRepo.getRecordsForRun(runId);
+      const records = await recordRepo.getRecordsForRun(runId);
       const metrics = computeMetrics(runId, records, startTime, new Date());
 
       if (failures.length > 0) {
@@ -727,14 +728,14 @@ program
   .action(async (opts) => {
     try {
       const config = loadConfig(program.opts().config);
-      const checkpointRepo = new SqliteCheckpointRepository(
-        config.run.checkpointPath,
+      const recordRepo = new SqliteExtractionRecordRepository(
+        config.run.databasePath,
       );
-      await checkpointRepo.initialize();
+      await recordRepo.initialize();
 
       let runId = opts.runId;
       if (!runId) {
-        runId = await checkpointRepo.getCurrentRunId();
+        runId = await recordRepo.getCurrentRunId();
       }
       if (!runId) {
         console.error(
@@ -743,7 +744,7 @@ program
         process.exit(1);
       }
 
-      const records = await checkpointRepo.getRecordsForRun(runId);
+      const records = await recordRepo.getRecordsForRun(runId);
       if (records.length === 0) {
         console.error(`No records found for run ${runId}`);
         process.exit(1);

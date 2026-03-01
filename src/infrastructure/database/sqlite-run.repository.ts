@@ -82,7 +82,7 @@ export class SqliteRunRepository implements IRunStore {
     const lastCompleted = await this.getLastCompletedRunId();
 
     const rows = this.db
-      .prepare("SELECT status FROM tbl_run_checkpoints WHERE runId = ?")
+      .prepare("SELECT status FROM tbl_run_records WHERE runId = ?")
       .all(runId) as Array<{ status: string }>;
 
     const done = rows.filter((r) => r.status === "done").length;
@@ -98,7 +98,7 @@ export class SqliteRunRepository implements IRunStore {
     offset?: number,
   ): Promise<string[]> {
     let query =
-      "SELECT DISTINCT runId FROM tbl_run_checkpoints ORDER BY startedAt DESC";
+      "SELECT DISTINCT runId FROM tbl_run_records ORDER BY startedAt DESC";
     const params: any[] = [];
 
     if (limit !== undefined && offset !== undefined) {
@@ -119,7 +119,7 @@ export class SqliteRunRepository implements IRunStore {
     tenant?: string;
     purchaser?: string;
   }): Promise<CumulativeStats> {
-    let query = "SELECT status FROM tbl_run_checkpoints";
+    let query = "SELECT status FROM tbl_run_records";
     const params: string[] = [];
     if (filter?.tenant && filter?.purchaser) {
       query += " WHERE brand = ? AND purchaser = ?";

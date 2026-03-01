@@ -6,7 +6,7 @@ import { mkdirSync } from "node:fs";
 import dotenv from "dotenv";
 
 // Clean Architecture Components
-import { SqliteCheckpointRepository } from "./infrastructure/database/sqlite-checkpoint.repository.js";
+import { SqliteExtractionRecordRepository } from "./infrastructure/database/sqlite-extraction-record.repository.js";
 import { SqliteSyncRepository } from "./infrastructure/database/sqlite-sync.repository.js";
 import { SqliteScheduleRepository } from "./infrastructure/database/sqlite-schedule.repository.js";
 import { GetExtractionDataUseCase } from "./core/use-cases/get-extraction-data.use-case.js";
@@ -59,47 +59,46 @@ const appConfig = configService.getConfig();
 const REPORTS_DIR = join(ROOT, "output", "reports");
 const EXTRACTIONS_DIR = join(ROOT, "output", "extractions");
 const STAGING_DIR = join(ROOT, "output", "staging");
-const _rawCheckpointPath =
-  appConfig.run.checkpointPath ||
-  join(ROOT, "output", "checkpoints", "intelliextract.db");
+const _rawExtractionRecordPath =
+  appConfig.run.databasePath || join(ROOT, "output", "intelliextract.db");
 // Always resolve relative to ROOT so the path is absolute regardless of cwd
-const CHECKPOINT_PATH = resolve(ROOT, _rawCheckpointPath);
+const DATABASE_PATH = resolve(ROOT, _rawExtractionRecordPath);
 
 // Ensure required directories exist
-[STAGING_DIR, join(CHECKPOINT_PATH, "..")].forEach((dir) =>
+[STAGING_DIR, dirname(DATABASE_PATH)].forEach((dir) =>
   mkdirSync(dir, { recursive: true }),
 );
 
 // 2. Initialize Repositories
-const checkpointRepo = new SqliteCheckpointRepository(CHECKPOINT_PATH);
-await checkpointRepo.initialize();
-const syncRepo = new SqliteSyncRepository(CHECKPOINT_PATH);
-const scheduleRepo = new SqliteScheduleRepository(CHECKPOINT_PATH);
-const logger = new SqliteLogger(checkpointRepo);
+const recordRepo = new SqliteExtractionRecordRepository(DATABASE_PATH);
+await recordRepo.initialize();
+const syncRepo = new SqliteSyncRepository(DATABASE_PATH);
+const scheduleRepo = new SqliteScheduleRepository(DATABASE_PATH);
+const logger = new SqliteLogger(recordRepo);
 
 // 3. Initialize Use Cases
-const getExtractionDataUseCase = new GetExtractionDataUseCase(checkpointRepo);
+const getExtractionDataUseCase = new GetExtractionDataUseCase(recordRepo);
 const getInventoryDataUseCase = new GetInventoryDataUseCase(
-  checkpointRepo,
+  recordRepo,
   syncRepo,
   STAGING_DIR,
 );
 const discoverFilesUseCase = new DiscoverFilesUseCase();
-const reportingUseCase = new ReportingUseCase(checkpointRepo);
+const reportingUseCase = new ReportingUseCase(recordRepo);
 // 4. Initialize Services
 const s3Service = new AwsS3Service(appConfig.s3.region, syncRepo);
 const extractionService = new IntelliExtractService(appConfig);
 const runStatusStore = new RunStatusStore(new Map());
 const notificationService = new NodemailerService(
-  await checkpointRepo.getEmailConfig(),
+  await recordRepo.getEmailConfig(),
 );
-const runStateService = new RunStateService(checkpointRepo);
+const runStateService = new RunStateService(recordRepo);
 
 const syncBrandUseCase = new SyncBrandUseCase(s3Service, syncRepo);
-const emailService = new NodemailerEmailService(checkpointRepo);
+const emailService = new NodemailerEmailService(recordRepo);
 const runExtractionUseCase = new RunExtractionUseCase(
   extractionService,
-  checkpointRepo,
+  recordRepo,
   logger,
   emailService,
 );
@@ -114,12 +113,12 @@ const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
   runStatusStore,
   STAGING_DIR,
   reportGenerationService,
-  checkpointRepo,
+  recordRepo,
 );
 
 const caseCommands = getCaseCommands(ROOT, async () => {
   try {
-    return await checkpointRepo.getCurrentRunId();
+    return await recordRepo.getCurrentRunId();
   } catch (err) {
     console.error("[server] Failed to get current run ID:", err);
     return null;
@@ -134,7 +133,7 @@ const cronManager = new CronManager(
   runStatusStore,
   scheduleRepo,
   runStateService,
-  checkpointRepo,
+  recordRepo,
   BRAND_PURCHASERS,
   RESUME_CAPABLE_CASES,
 );
@@ -148,7 +147,7 @@ const extractionController = new ExtractionController(
   orchestrator,
   runStatusStore,
   runStateService,
-  checkpointRepo,
+  recordRepo,
   RESUME_CAPABLE_CASES,
 );
 
@@ -157,23 +156,20 @@ const staticAssets = loadStaticAssets(ROOT);
 const scheduleController = new ScheduleController(
   scheduleRepo,
   cronManager,
-  checkpointRepo,
+  recordRepo,
 );
 const reportPageController = new ReportPageController(
   dashboardController,
-  checkpointRepo,
+  recordRepo,
   appConfig,
   staticAssets,
   BRAND_PURCHASERS,
 );
-const reportDataController = new ReportDataController(
-  checkpointRepo,
-  appConfig,
-);
+const reportDataController = new ReportDataController(recordRepo, appConfig);
 const projectController = new ProjectController(
   dashboardController,
   runStatusStore,
-  checkpointRepo,
+  recordRepo,
   runStateService,
   notificationService,
   orchestrator,
@@ -185,7 +181,7 @@ const projectController = new ProjectController(
 );
 
 const exportController = new ExportController(
-  checkpointRepo,
+  recordRepo,
   ROOT,
   EXTRACTIONS_DIR,
   STAGING_DIR,

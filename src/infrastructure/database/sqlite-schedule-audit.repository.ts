@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { ScheduleLogEntry } from "../../core/domain/repositories/checkpoint.repository.js";
+import { ScheduleLogEntry } from "../../core/domain/repositories/extraction-record.repository.js";
 
 /**
  * Concrete implementation for schedule audit logging (SQLite backed).
@@ -10,23 +10,11 @@ export class SqliteScheduleAuditRepository {
   appendScheduleLog(entry: Record<string, unknown>): void {
     try {
       const timestamp = (entry.timestamp as string) || new Date().toISOString();
-      const outcome = (entry.outcome as string) || "executed";
-      const level = (entry.level as string) || "info";
-      const message = (entry.message as string) || "";
-      const scheduleId = (entry.scheduleId as string) || null;
       this.db
         .prepare(
-          `INSERT INTO tbl_schedule_logs (timestamp, scheduleId, outcome, level, message, data)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO tbl_schedule_logs (timestamp, data) VALUES (?, ?)`,
         )
-        .run(
-          timestamp,
-          scheduleId,
-          outcome,
-          level,
-          message,
-          JSON.stringify(entry),
-        );
+        .run(timestamp, JSON.stringify(entry));
     } catch (err) {
       console.error(
         "[SqliteScheduleAuditRepository] appendScheduleLog failed:",

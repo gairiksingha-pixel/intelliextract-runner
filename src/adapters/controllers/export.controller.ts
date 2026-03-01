@@ -4,7 +4,8 @@ import { existsSync, statSync, createReadStream } from "node:fs";
 import { URL } from "node:url";
 // @ts-ignore
 import archiver from "archiver";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
+import { ExtractionRecord } from "../../core/domain/entities/extraction-record.entity.js";
 import { z } from "zod";
 
 const ExportZipSchema = z.object({
@@ -18,7 +19,7 @@ const ExportByRunsSchema = z.object({
 
 export class ExportController {
   constructor(
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
     private rootDir: string,
     private extractionsDir: string,
     private stagingDir: string,
@@ -56,11 +57,11 @@ export class ExportController {
         if (fileId.includes("output/extractions/")) {
           const filename = basename(fileId);
           // Extraction filenames are brand_relativePath.json
-          // We can try to find a match in tbl_run_checkpoints or tbl_file_registry
-          // A robust way is to search for a checkpoint where record.brand + "_" + relativePath_transformed matches filename
+          // We can try to find a match in tbl_run_records or tbl_file_registry
+          // A robust way is to search for a record where record.brand + "_" + relativePath_transformed matches filename
           // But since we have all summaries, we can use the same logic as the ZIP export
-          const records = await this.checkpointRepo.getAllCheckpoints();
-          const match = records.find((r) => {
+          const records = await this.recordRepo.getAllRecords();
+          const match = records.find((r: ExtractionRecord) => {
             const safe = (r.relativePath || "")
               .replace(/[\\\/]/g, "_")
               .replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -184,7 +185,7 @@ export class ExportController {
       archive.pipe(res);
 
       for (const runId of parse.data.runIds) {
-        const records = await this.checkpointRepo.getRecordsForRun(runId);
+        const records = await this.recordRepo.getRecordsForRun(runId);
         for (const r of records) {
           if (!r.fullResponse) continue;
 
@@ -220,7 +221,7 @@ export class ExportController {
       const archive = archiver("zip", { zlib: { level: 9 } });
       archive.pipe(res);
 
-      const records = await this.checkpointRepo.getAllCheckpoints();
+      const records = await this.recordRepo.getAllRecords();
       for (const r of records) {
         if (!r.fullResponse) continue;
 

@@ -3,7 +3,7 @@ import { resolve, join, normalize, extname } from "node:path";
 import { ServerResponse } from "node:http";
 import { DashboardController } from "./dashboard.controller.js";
 import { IRunStatusStore } from "../../core/domain/services/run-status-store.service.js";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { IRunStateService } from "../../core/domain/services/run-state.service.js";
 import { INotificationService } from "../../core/domain/services/notification.service.js";
 import { ProcessOrchestrator } from "../../infrastructure/services/process-orchestrator.service.js";
@@ -24,7 +24,7 @@ export class ProjectController {
   constructor(
     private dashboardController: DashboardController,
     private runStatusStore: IRunStatusStore,
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
     private runStateService: IRunStateService,
     private notificationService: INotificationService,
     private orchestrator: ProcessOrchestrator,
@@ -105,7 +105,7 @@ export class ProjectController {
 
   async getEmailConfig(res: ServerResponse) {
     try {
-      const config = await this.checkpointRepo.getEmailConfig();
+      const config = await this.recordRepo.getEmailConfig();
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(config));
     } catch (e: any) {
@@ -134,7 +134,7 @@ export class ProjectController {
           }
         }
       }
-      await this.checkpointRepo.saveEmailConfig(data);
+      await this.recordRepo.saveEmailConfig(data);
       this.notificationService.updateConfig(data);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ success: true }));
@@ -184,7 +184,7 @@ export class ProjectController {
           }),
         );
       } else {
-        const pipelineStatus = await this.checkpointRepo.getRunStatus();
+        const pipelineStatus = await this.recordRepo.getRunStatus();
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(pipelineStatus));
       }

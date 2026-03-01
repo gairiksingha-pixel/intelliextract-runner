@@ -405,6 +405,8 @@ function handleStreamData(caseId, data) {
     showResult(div, null, false, { ...state, caseId });
   } else if (data.type === "report") {
     showResult(div, data, true, { caseId });
+  } else if (data.type === "run_id") {
+    state.runId = data.runId;
   } else if (data.type === "error") {
     showResult(div, data, false, { caseId });
   }
@@ -563,6 +565,8 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
       parsed.cumTotal = m[3];
     }
   }
+  if (!parsed.runId && data && (data.runId || data.run_id))
+    parsed.runId = data.runId || data.run_id;
 
   // Apply server-provided sync summary so run output always shows counts (e.g. P1 sync-only)
   if (data && data.syncSummary && typeof data.syncSummary === "object") {
@@ -775,7 +779,16 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     ]);
   }
 
-  if (parsed.reportsPath || parsed.extractionResultsPath) {
+  if (parsed.runId) {
+    const reportUrl = `/reports/summary#history?runId=${parsed.runId}`;
+    rows.push([
+      "Operation report",
+      `<a href="${reportUrl}" class="view-report-btn" target="_self">
+        ${AppIcons.SUMMARY}
+        <span>Click to view report</span>
+      </a>`,
+    ]);
+  } else if (parsed.reportsPath || parsed.extractionResultsPath) {
     rows.push([
       "Operation report",
       "The reports and extracted data are ready. You can check them in the <b>Reports</b> toolbar.",
@@ -828,6 +841,7 @@ function showResult(div, data, pass, options) {
 
   if (data) {
     const caseId = (options && options.caseId) || "";
+    if (!data.runId && options && options.runId) data.runId = options.runId;
     if (data.type === "report" || data.type === "error") {
       // Use built-in structured table logic for both success and error/interrupt reports
       const stdout = data.stdout

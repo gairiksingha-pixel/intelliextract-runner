@@ -1,5 +1,5 @@
 import { existsSync, unlinkSync } from "node:fs";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 
 export interface ResumeState {
   syncInProgressPath?: string;
@@ -7,7 +7,7 @@ export interface ResumeState {
 }
 
 export async function loadResumeState(
-  repo: ICheckpointRepository,
+  repo: IExtractionRecordRepository,
 ): Promise<ResumeState> {
   try {
     const raw = await repo.getMeta("resume_state");
@@ -20,20 +20,20 @@ export async function loadResumeState(
 }
 
 export async function saveResumeState(
-  repo: ICheckpointRepository,
+  repo: IExtractionRecordRepository,
   state: ResumeState,
 ): Promise<void> {
   await repo.setMeta("resume_state", JSON.stringify(state));
 }
 
 export async function clearResumeState(
-  repo: ICheckpointRepository,
+  repo: IExtractionRecordRepository,
 ): Promise<void> {
   await saveResumeState(repo, {});
 }
 
 export async function clearPartialFileAndResumeState(
-  repo: ICheckpointRepository,
+  repo: IExtractionRecordRepository,
 ): Promise<void> {
   const state = await loadResumeState(repo);
   const path = state.syncInProgressPath;

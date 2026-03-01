@@ -19,13 +19,12 @@ s3:
   stagingDir: ./output/staging
   region: us-west-2
   syncLimit: 0
-  syncManifestPath: ./output/checkpoints/sync-manifest.json
 
 # Extraction run settings
 run:
   concurrency: 5
   requestsPerSecond: 10
-  checkpointPath: ./output/checkpoints/intelliextract.db
+  databasePath: ./output/intelliextract.db
   skipCompleted: true
   # Optional: API retry settings (for timeouts/5xx/429). Defaults: maxRetries=0, retryBackoffMs=500.
   maxRetries: 2

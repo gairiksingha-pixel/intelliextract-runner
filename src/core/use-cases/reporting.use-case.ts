@@ -1,5 +1,5 @@
-import { ICheckpointRepository } from "../domain/repositories/checkpoint.repository.js";
-import { Checkpoint } from "../domain/entities/checkpoint.entity.js";
+import { IExtractionRecordRepository } from "../domain/repositories/extraction-record.repository.js";
+import { ExtractionRecord } from "../domain/entities/extraction-record.entity.js";
 
 export interface ReportMetrics {
   runId: string;
@@ -11,10 +11,10 @@ export interface ReportMetrics {
 }
 
 export class ReportingUseCase {
-  constructor(private checkpointRepo: ICheckpointRepository) {}
+  constructor(private recordRepo: IExtractionRecordRepository) {}
 
   async execute(runId: string): Promise<ReportMetrics> {
-    const records = await this.checkpointRepo.getRecordsForRun(runId);
+    const records = await this.recordRepo.getRecordsForRun(runId);
     if (records.length === 0) {
       throw new Error(`No records found for run ${runId}`);
     }

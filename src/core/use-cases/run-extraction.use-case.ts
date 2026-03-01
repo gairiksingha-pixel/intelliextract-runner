@@ -3,8 +3,8 @@ import {
   IExtractionService,
   NetworkAbortError,
 } from "../domain/services/extraction.service.js";
-import { ICheckpointRepository } from "../domain/repositories/checkpoint.repository.js";
-import { Checkpoint } from "../domain/entities/checkpoint.entity.js";
+import { IExtractionRecordRepository } from "../domain/repositories/extraction-record.repository.js";
+import { ExtractionRecord } from "../domain/entities/extraction-record.entity.js";
 import { ILogger } from "../domain/services/logger.service.js";
 import {
   IEmailService,
@@ -34,7 +34,7 @@ export interface RunExtractionRequest {
 export class RunExtractionUseCase {
   constructor(
     private extractionService: IExtractionService,
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
     private logger: ILogger,
     private emailService: IEmailService,
   ) {}
@@ -48,7 +48,7 @@ export class RunExtractionUseCase {
 
     // 1. Determine files to actually process
     // If skipCompleted is true, we check globally. Otherwise, we only check within this run (for resume).
-    const completedPaths = await this.checkpointRepo.getCompletedPaths(
+    const completedPaths = await this.recordRepo.getCompletedPaths(
       request.skipCompleted ? undefined : runId,
     );
 
@@ -80,9 +80,7 @@ export class RunExtractionUseCase {
       }));
 
     if (skippedRecords.length > 0) {
-      await this.checkpointRepo.upsertCheckpoints(
-        skippedRecords as Checkpoint[],
-      );
+      await this.recordRepo.upsertRecords(skippedRecords as ExtractionRecord[]);
     }
 
     if (total === 0) {
@@ -110,12 +108,12 @@ export class RunExtractionUseCase {
         if (aborted) return;
         const startedAt = new Date().toISOString();
 
-        await this.checkpointRepo.upsertCheckpoint({
+        await this.recordRepo.upsertRecord({
           ...file,
           status: "running",
           startedAt,
           runId,
-        } as Checkpoint);
+        } as ExtractionRecord);
 
         try {
           const result = await this.extractionService.extractFile(
@@ -126,7 +124,7 @@ export class RunExtractionUseCase {
             file.relativePath,
           );
 
-          await this.checkpointRepo.upsertCheckpoint({
+          await this.recordRepo.upsertRecord({
             ...file,
             status: result.success ? "done" : "error",
             startedAt,
@@ -137,7 +135,7 @@ export class RunExtractionUseCase {
             patternKey: result.patternKey,
             fullResponse: result.fullResponse,
             runId,
-          } as Checkpoint);
+          } as ExtractionRecord);
 
           if (!result.success) {
             failures.push({
@@ -180,14 +178,14 @@ export class RunExtractionUseCase {
             purchaser: file.purchaser,
             errorMessage: errorMsg,
           });
-          await this.checkpointRepo.upsertCheckpoint({
+          await this.recordRepo.upsertRecord({
             ...file,
             status: "error",
             startedAt,
             finishedAt: new Date().toISOString(),
             errorMessage: errorMsg,
             runId,
-          } as Checkpoint);
+          } as ExtractionRecord);
         } finally {
           done++;
           if (request.onProgress) request.onProgress(done, total);
@@ -198,7 +196,7 @@ export class RunExtractionUseCase {
     await queue.onIdle();
 
     // 6. Report generation and consolidated email
-    const records = await this.checkpointRepo.getRecordsForRun(runId);
+    const records = await this.recordRepo.getRecordsForRun(runId);
     const metrics = computeMetrics(runId, records, startTime, new Date());
 
     if (failures.length > 0) {
@@ -211,9 +209,7 @@ export class RunExtractionUseCase {
 
     // 7. Cumulative metrics signal
     if (stdoutPiped) {
-      const cumStats = await this.checkpointRepo.getCumulativeStats(
-        request.filter,
-      );
+      const cumStats = await this.recordRepo.getCumulativeStats(request.filter);
       process.stdout.write(
         `CUMULATIVE_METRICS\tsuccess=${cumStats.success},failed=${cumStats.failed},total=${cumStats.total}\n`,
       );

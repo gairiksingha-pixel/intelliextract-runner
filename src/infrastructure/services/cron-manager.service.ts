@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { ProcessOrchestrator } from "./process-orchestrator.service.js";
 import { IRunStatusStore } from "../../core/domain/services/run-status-store.service.js";
 import { IScheduleRepository } from "../../core/domain/repositories/schedule.repository.js";
-import { ICheckpointRepository } from "../../core/domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { IRunStateService } from "../../core/domain/services/run-state.service.js";
 import { getPairsForSchedule } from "../utils/tenant.utils.js";
 import { SCHEDULE_TIMEZONES } from "../views/constants.js";
@@ -18,7 +18,7 @@ export class CronManager {
     private runStatusStore: IRunStatusStore,
     private scheduleRepo: IScheduleRepository,
     private runStateService: IRunStateService,
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
     private brandPurchaserMap: Record<string, string[]>,
     private resumeCapableCases: Set<string>,
   ) {}
@@ -30,7 +30,7 @@ export class CronManager {
 
   registerJob(schedule: any) {
     if (!schedule.cron || !cron.validate(schedule.cron)) {
-      this.checkpointRepo.appendScheduleLog({
+      this.recordRepo.appendScheduleLog({
         outcome: "skipped",
         level: "error",
         message: "Invalid cron expression",
@@ -41,7 +41,7 @@ export class CronManager {
     }
 
     if (!SCHEDULE_TIMEZONES.includes(schedule.timezone)) {
-      this.checkpointRepo.appendScheduleLog({
+      this.recordRepo.appendScheduleLog({
         outcome: "skipped",
         level: "warn",
         message: "Invalid timezone for schedule; skipping",
@@ -81,7 +81,7 @@ export class CronManager {
         if (overlappingRun) {
           const runType =
             overlappingRun.origin === "manual" ? "manual" : "scheduled";
-          this.checkpointRepo.appendScheduleLog({
+          this.recordRepo.appendScheduleLog({
             timestamp: start,
             outcome: "skipped",
             level: "warn",
@@ -102,7 +102,7 @@ export class CronManager {
         }
 
         if (pausedCase) {
-          this.checkpointRepo.appendScheduleLog({
+          this.recordRepo.appendScheduleLog({
             outcome: "skipped",
             level: "warn",
             message: `Scheduled job skipped — a process (${pausedCase}) is in paused (resume) mode`,
@@ -114,7 +114,7 @@ export class CronManager {
         }
 
         const now = new Date().toISOString();
-        this.checkpointRepo.appendScheduleLog({
+        this.recordRepo.appendScheduleLog({
           timestamp: now,
           outcome: "executed",
           level: "info",
@@ -173,7 +173,7 @@ export class CronManager {
           this.runStatusStore.unregisterRun(caseId);
           this.childProcesses.delete(activeRunKey);
 
-          this.checkpointRepo.appendScheduleLog({
+          this.recordRepo.appendScheduleLog({
             timestamp: new Date().toISOString(),
             outcome: "executed",
             level: "info",
@@ -187,7 +187,7 @@ export class CronManager {
           this.runStatusStore.unregisterRun(caseId);
           this.childProcesses.delete(activeRunKey);
 
-          this.checkpointRepo.appendScheduleLog({
+          this.recordRepo.appendScheduleLog({
             timestamp: new Date().toISOString(),
             outcome: "executed",
             level: "error",

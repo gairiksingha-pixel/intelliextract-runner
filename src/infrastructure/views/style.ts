@@ -454,4 +454,24 @@ export const commonStyles = `
       outline: none; border-color: var(--primary);
       box-shadow: 0 0 0 1.7px rgba(45, 157, 95, 0.2), 0 1.7px 3.4px rgba(0, 0, 0, 0.08), inset 0 0.85px 0.85px rgba(255, 255, 255, 0.9);
     }
+
+    /* Enterprise View Report Button - Refined Ghost Style */
+    .view-report-btn {
+      height: 34px;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 0 1.2rem; background: #ffffff; color: var(--header-bg) !important;
+      text-decoration: none; border-radius: var(--radius-sm); font-weight: 700;
+      font-size: 0.78rem; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1.5px solid var(--header-bg);
+      margin: 2px 0; 
+    }
+    .view-report-btn:hover {
+      background: var(--header-bg);
+      color: #ffffff !important;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(33, 108, 109, 0.15);
+    }
+    .view-report-btn:active { transform: translateY(0); }
+    .view-report-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+    .view-report-btn span { white-space: nowrap; letter-spacing: 0.02em; }
 `;

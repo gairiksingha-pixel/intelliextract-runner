@@ -1,15 +1,15 @@
-export type CheckpointStatus =
+export type ExtractionStatus =
   | "pending"
   | "running"
   | "done"
   | "error"
   | "skipped";
 
-export interface Checkpoint {
+export interface ExtractionRecord {
   filePath: string;
   relativePath: string;
   brand: string;
-  status: CheckpointStatus;
+  status: ExtractionStatus;
   startedAt?: string;
   finishedAt?: string;
   latencyMs?: number;

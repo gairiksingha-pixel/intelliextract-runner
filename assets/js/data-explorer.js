@@ -353,9 +353,16 @@ function render() {
       if (existingExpand) {
         var container = existingExpand.querySelector(".expand-row-content");
         if (container) {
+          // Smooth collapse
+          const currentH = container.scrollHeight;
+          container.style.height = currentH + "px";
+          container.offsetHeight; // reflow
           container.style.height = "0";
           container.style.opacity = "0";
-          setTimeout(() => existingExpand.remove(), 350);
+
+          setTimeout(() => {
+            existingExpand.remove();
+          }, 350);
         } else {
           existingExpand.remove();
         }
@@ -371,18 +378,28 @@ function render() {
         this.parentNode.insertBefore(expandTr, this.nextSibling);
 
         var container = expandTr.querySelector(".expand-row-content");
+        // Smooth expand
+        const highlighted = syntaxHighlight(r.json);
+        const viewerHtml = `<div class="json-viewer"><pre>${highlighted}</pre></div>`;
+
+        // Temporarily inject to measure height
+        const temp = document.createElement("div");
+        temp.style.position = "absolute";
+        temp.style.visibility = "hidden";
+        temp.style.width = container.offsetWidth + "px";
+        temp.innerHTML = viewerHtml;
+        document.body.appendChild(temp);
+        const targetH = temp.scrollHeight;
+        document.body.removeChild(temp);
+
         this.classList.add("expanded");
         expandedRows.add(idx);
 
-        setTimeout(() => {
-          const highlighted = syntaxHighlight(r.json);
-          container.innerHTML =
-            '<div class="json-viewer" style="animation: slideDown 0.3s ease-out;"><pre>' +
-            highlighted +
-            "</pre></div>";
-          container.style.height = "auto";
+        requestAnimationFrame(() => {
+          container.innerHTML = viewerHtml;
+          container.style.height = targetH + "px";
           container.style.opacity = "1";
-        }, 60);
+        });
       }
     };
   });

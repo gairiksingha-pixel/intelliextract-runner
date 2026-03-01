@@ -21,7 +21,7 @@ export interface S3Config {
 export interface RunConfig {
   concurrency: number;
   requestsPerSecond: number;
-  checkpointPath: string;
+  databasePath: string;
   skipCompleted: boolean;
   maxRetries?: number;
   retryBackoffMs?: number;

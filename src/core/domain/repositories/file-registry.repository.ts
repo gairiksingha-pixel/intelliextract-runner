@@ -1,4 +1,4 @@
-import { CheckpointStatus } from "../entities/checkpoint.entity.js";
+import { ExtractionStatus } from "../entities/extraction-record.entity.js";
 
 /**
  * Segregated interface: master registry of all discovered/synced files.
@@ -21,10 +21,7 @@ export interface UnextractedFile {
 }
 
 export interface FileStatusMetrics {
-  latencyMs?: number;
-  statusCode?: number;
-  errorMessage?: string;
-  patternKey?: string;
+  /** The run that produced this status update */
   runId?: string;
 }
 
@@ -37,7 +34,7 @@ export interface IFileRegistry {
   }): Promise<UnextractedFile[]>;
   updateFileStatus(
     id: string,
-    status: CheckpointStatus,
+    status: ExtractionStatus,
     metrics?: FileStatusMetrics,
   ): Promise<void>;
 }

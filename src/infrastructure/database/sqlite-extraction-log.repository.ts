@@ -1,36 +1,21 @@
-import Database from "better-sqlite3";
 import {
   IExtractionLogStore,
   LogEntry,
 } from "../../core/domain/repositories/extraction-log-store.repository.js";
 
+/**
+ * tbl_extraction_logs was dropped in Migration M4 (it was written on every file
+ * extraction but never read by any controller or use-case — pure dead storage).
+ * This implementation is now a no-op to keep the interface contract intact.
+ */
 export class SqliteExtractionLogRepository implements IExtractionLogStore {
-  constructor(private db: Database.Database) {}
-
-  async saveLog(entry: LogEntry): Promise<void> {
-    const timestamp = (entry.timestamp as string) || new Date().toISOString();
-    const runId = (entry.runId as string) || "";
-    this.db
-      .prepare(
-        "INSERT INTO tbl_extraction_logs (runId, timestamp, level, data) VALUES (?, ?, ?, ?)",
-      )
-      .run(runId, timestamp, "info", JSON.stringify(entry));
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async saveLog(_entry: LogEntry): Promise<void> {
+    // No-op: tbl_extraction_logs was removed in DB cleanup (M4).
   }
 
-  async getLogsForRun(runId: string): Promise<LogEntry[]> {
-    try {
-      const rows = this.db
-        .prepare(
-          "SELECT data FROM tbl_extraction_logs WHERE runId = ? ORDER BY timestamp ASC",
-        )
-        .all(runId) as Array<{ data: string }>;
-      return rows.map((r) => JSON.parse(r.data) as LogEntry);
-    } catch (err) {
-      console.error(
-        `[SqliteExtractionLogRepository] getLogsForRun(${runId}) failed:`,
-        err,
-      );
-      return [];
-    }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async getLogsForRun(_runId: string): Promise<LogEntry[]> {
+    return [];
   }
 }

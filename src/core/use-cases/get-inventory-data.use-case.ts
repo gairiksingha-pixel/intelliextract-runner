@@ -1,12 +1,12 @@
 import { readdirSync, existsSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { ICheckpointRepository } from "../domain/repositories/checkpoint.repository.js";
+import { IExtractionRecordRepository } from "../domain/repositories/extraction-record.repository.js";
 import { ISyncRepository } from "../domain/repositories/sync.repository.js";
 import { InventoryDataDTO, InventoryFileDetails } from "../domain/types.js";
 
 export class GetInventoryDataUseCase {
   constructor(
-    private checkpointRepo: ICheckpointRepository,
+    private recordRepo: IExtractionRecordRepository,
     private syncRepo: ISyncRepository,
     private stagingDir: string,
   ) {}
@@ -19,7 +19,7 @@ export class GetInventoryDataUseCase {
     );
     rawFiles.sort((a, b) => b.mtime - a.mtime);
 
-    const cpRecords = await this.checkpointRepo.getAllCheckpoints();
+    const cpRecords = await this.recordRepo.getAllRecords();
     const pathToRunId: Record<string, string> = {};
     cpRecords.forEach((c) => {
       const key = (c.relativePath || "").replace(/\\/g, "/");

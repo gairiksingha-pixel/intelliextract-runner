@@ -121,7 +121,7 @@ export function getCaseCommands(
     N3: (p, runOpts) => syncArgs(p, runOpts, root),
     E1: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts, root),
     E2: (p) => {
-      const dbPath = join(root, "output", "checkpoints", "intelliextract.db");
+      const dbPath = join(root, "output", "records", "intelliextract.db");
       if (existsSync(dbPath)) {
         try {
           copyFileSync(dbPath, dbPath + ".bak");
