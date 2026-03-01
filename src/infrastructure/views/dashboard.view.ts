@@ -6,15 +6,17 @@ export class DashboardView {
       /* Dashboard table layout - exact match to reference index.html */
       .table-section {
         flex: 1 1 0%; min-height: 0; overflow: auto; display: flex; flex-direction: column;
-        background: var(--surface); border: 1px solid rgba(176, 191, 201, 0.55);
+        background: var(--surface); border: 0.85px solid rgba(176, 191, 201, 0.55);
         border-radius: var(--radius); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
       }
       .table-section table {
         height: 100%; width: 100%; table-layout: fixed; border-collapse: collapse;
         font-size: 0.9rem; background: var(--surface); border-radius: var(--radius);
       }
-      th, td { padding: var(--cell-pad); text-align: center; border: 1px solid rgba(176, 191, 201, 0.55); vertical-align: middle; }
+      th, td { padding: var(--cell-pad); text-align: center; border: 0.85px solid rgba(176, 191, 201, 0.55); vertical-align: middle; }
       .op-name { text-align: center; }
+      thead th:first-child { border-top-left-radius: 0; }
+      thead th:last-child { border-top-right-radius: 0; }
       .table-section th:first-child, .table-section td:first-child { border-left: none !important; }
       .table-section th:last-child, .table-section td:last-child { border-right: none !important; }
       thead tr { height: 40.8px; }
@@ -26,10 +28,9 @@ export class DashboardView {
       .table-section thead th {
         background: var(--header-bg); color: var(--header-text);
         font-weight: 700; font-size: 0.8rem; text-transform: none; letter-spacing: 0.02em;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important; border-top: none !important; border-bottom: none !important; text-align: center;
+        border: 0.85px solid rgba(255, 255, 255, 0.1); border-top: none !important; border-bottom: none; text-align: center;
       }
-      .table-section thead th.run-cell { border-right: none !important; }
-      .table-section thead th.result-header { border-left: none !important; }
+      .table-section tbody tr:last-child td { border-bottom: none !important; }
       tbody tr { background: #f0f9f4; animation: rowEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
       tbody tr.row-inactive { opacity: 0.85; pointer-events: none; }
       tbody tr.row-inactive td { border-color: rgba(33, 108, 109, 0.45); }
@@ -39,7 +40,14 @@ export class DashboardView {
       tbody tr:nth-child(3) { animation-delay: 0.15s; }
       tbody tr:nth-child(4) { animation-delay: 0.2s; }
       tbody tr:nth-child(5) { animation-delay: 0.25s; }
-      tbody td.op-name { background: var(--header-bg); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); }
+      tbody tr:nth-child(6) { animation-delay: 0.3s; }
+      tbody tr:nth-child(7) { animation-delay: 0.35s; }
+      tbody tr:nth-child(8) { animation-delay: 0.4s; }
+      tbody tr:nth-child(9) { animation-delay: 0.45s; }
+      tbody tr:nth-child(10) { animation-delay: 0.5s; }
+      tbody tr:nth-child(11) { animation-delay: 0.55s; }
+      tbody tr:nth-child(12) { animation-delay: 0.6s; }
+      tbody td.op-name { background: var(--header-bg); color: #ffffff; border: 0.85px solid rgba(255, 255, 255, 0.15); }
       tbody td.op-name .op-icon-wrap { color: #ffffff; }
 
       .op-name { width: 181.9px; min-width: 181.9px; max-width: 181.9px; font-weight: 700; }
@@ -98,7 +106,7 @@ export class DashboardView {
       .run-cell .btn-group > .btn-row > button { min-width: 0; }
 
       button.run {
-        background: var(--primary); color: #fff; border: 1px solid rgba(45, 157, 95, 0.25);
+        background: var(--primary); color: #fff; border: 0.85px solid rgba(45, 157, 95, 0.25);
         border-radius: var(--radius-sm); height: 38px; padding: 0 1.062rem;
         font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: inherit;
         box-shadow: var(--shadow-btn); width: 100%; min-width: 0; box-sizing: border-box;
@@ -128,7 +136,7 @@ export class DashboardView {
         box-sizing: border-box; padding: 0.552rem 1.062rem; font-size: 0.9rem;
       }
 
-      .btn-group .retry-failed-btn { background: var(--header-bg); color: #ffffff; border: 1px solid var(--header-border); }
+      .btn-group .retry-failed-btn { background: var(--header-bg); color: #ffffff; border: 0.85px solid var(--header-border); }
       .btn-group .retry-failed-btn:hover { background: #1a5758; color: #ffffff; border-color: #1a5758; box-shadow: 0 2px 5px rgba(33, 108, 109, 0.2); }
       .btn-group .retry-failed-btn:disabled { background: var(--surface); color: var(--muted); border-color: var(--border-light); box-shadow: none; }
 
@@ -138,7 +146,7 @@ export class DashboardView {
         position: absolute; top: 0.722rem; left: 0.85rem; right: 0.85rem; bottom: 0.722rem;
         font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
         font-size: 0.8rem; padding: 0.51rem 0.637rem; white-space: pre-wrap; word-break: break-word;
-        border: 1px solid rgba(203, 213, 225, 0.25); border-radius: var(--radius);
+        border: 0.85px solid rgba(203, 213, 225, 0.25); border-radius: var(--radius);
         background: #fafafa; overflow: auto; box-sizing: border-box; box-shadow: var(--shadow-sm); text-align: center;
       }
       .result.pass { background: var(--pass-bg); border-color: #b8e0c8; }
@@ -156,7 +164,7 @@ export class DashboardView {
       @keyframes loading-dots { 0%, 20% { content: ""; } 40% { content: "."; } 60% { content: ".."; } 80%, 100% { content: "..."; } }
       .result.result-placeholder {
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: #f8fafc; border: 1px dashed rgba(176, 191, 201, 0.5); color: var(--muted);
+        background: #f8fafc; border: 0.85px dashed rgba(176, 191, 201, 0.5); color: var(--muted);
         text-align: center; padding: 1rem; padding-bottom: calc(1rem + 5%);
         height: calc(100% - 1.444rem); box-sizing: border-box;
       }
@@ -164,10 +172,11 @@ export class DashboardView {
       .result-placeholder::before { content: "📋"; font-size: 1.5rem; margin-bottom: 0.5rem; filter: grayscale(1); opacity: 0.3; }
       .result.result-placeholder .result-placeholder-text { color: var(--muted); font-size: 0.85rem; font-style: normal; }
       .result.result-placeholder.result-validation-alert {
-        background: #fffbeb; border-color: rgba(245, 158, 11, 0.5); border-style: dashed;
+        background: #f1f5f9; border-color: rgba(107, 124, 133, 0.35); border-style: solid;
       }
-      .result.result-placeholder.result-validation-alert::before { content: "⚠️"; filter: none; opacity: 0.8; }
-      .result.result-placeholder.result-validation-alert .result-placeholder-text { color: #92400e; }
+      .result.result-placeholder.result-validation-alert::before { display: none; }
+      .alert-icon-wrap { display: flex; align-items: center; justify-content: center; margin-bottom: 0.6rem; color: var(--muted); opacity: 0.9; }
+      .result.result-placeholder.result-validation-alert .result-placeholder-text { color: var(--text-secondary); font-weight: 600; }
       .result .exit { font-weight: 700; margin-bottom: 0.2rem; color: var(--text); width: 100%; text-align: center; }
       .result.running .exit { font-size: 0.825rem; display: block; }
       .result .out { color: var(--text-secondary); }
@@ -205,7 +214,7 @@ export class DashboardView {
         width: 100%; height: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.8rem;
         table-layout: fixed; border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow-inset);
       }
-      .result-table-wrap th, .result-table-wrap td { padding: 0.425rem 0.51rem; text-align: left; vertical-align: middle; border: 1px solid rgba(203, 213, 225, 0.2); }
+      .result-table-wrap th, .result-table-wrap td { padding: 0.425rem 0.51rem; text-align: left; vertical-align: middle; border: 0.85px solid rgba(203, 213, 225, 0.2); }
       .result-table-wrap th { background: var(--header-bg) !important; color: #ffffff !important; font-weight: 800; width: 195.5px; min-width: 195.5px; border-bottom: none; text-transform: uppercase; font-size: 0.725rem; letter-spacing: 0.05em; }
       .result-table-wrap td { background: var(--surface); color: var(--text-secondary); word-break: break-word; white-space: pre-wrap; font-weight: 500; }
       .result-table-wrap tr { height: 1px; }

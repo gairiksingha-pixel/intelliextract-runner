@@ -188,8 +188,7 @@ async function runCase(caseId, btn, resultDiv, options = {}) {
 
   if (SELECTED_BRANDS.length === 0 && SELECTED_PURCHASERS.length === 0) {
     resultDiv.className = "result result-placeholder result-validation-alert";
-    resultDiv.innerHTML =
-      '<span class="result-placeholder-text">Please select at least one brand or purchaser from filter.</span>';
+    resultDiv.innerHTML = `<span class="alert-icon-wrap">${AppIcons.ALERT}</span><span class="result-placeholder-text">Please select at least one brand or purchaser from filter.</span>`;
     return;
   }
 
@@ -200,8 +199,7 @@ async function runCase(caseId, btn, resultDiv, options = {}) {
     pairs.length === 0
   ) {
     resultDiv.className = "result result-placeholder result-validation-alert";
-    resultDiv.innerHTML =
-      '<span class="result-placeholder-text">No valid brand/purchaser combination for the selected filter. Use Reset filter and try again.</span>';
+    resultDiv.innerHTML = `<span class="alert-icon-wrap">${AppIcons.ALERT}</span><span class="result-placeholder-text">No valid brand/purchaser combination for the selected filter. Use Reset filter and try again.</span>`;
     return;
   }
 
@@ -642,7 +640,7 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
   ) {
     identity = parsed.brandAndPurchaserList.join(", ");
   }
-  if (identity) rows.push(["Identity", identity]);
+  if (identity) rows.push(["Brand and purchaser", identity]);
 
   // Sync Progress Row
   if (parsed.protocol.sync) {
@@ -711,7 +709,7 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
         "\nBy brand (staging path → counts):\n  " +
         parsed.syncBucketDetails.join("\n  ");
     }
-    const labelName = caseId === "P1" ? "Sync Summary" : "Output";
+    const labelName = caseId === "P1" ? "Download overview" : "Output";
     rows.push([labelName, output.trim()]);
   }
 
@@ -742,6 +740,7 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
         " (Total: " +
         AppUtils.esc(parsed.cumTotal) +
         ")";
+      rows.push(["Overall status", cumDetail]);
     }
   }
 
@@ -776,14 +775,10 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     ]);
   }
 
-  if (parsed.reportsPath) {
-    const runId = parsed.runId || "";
+  if (parsed.reportsPath || parsed.extractionResultsPath) {
     rows.push([
-      "History View",
-      `<button class="btn-secondary" style="height:28px; padding:0 10px; font-size: 0.75rem; gap: 2px;" onclick="window.location.href='/reports/summary#history?runId=${runId}'">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        View in History
-      </button>`,
+      "Operation report",
+      "The reports and extracted data are ready. You can check them in the <b>Reports</b> toolbar.",
     ]);
   }
 
@@ -794,18 +789,21 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     "Sync Progress",
     "Extraction",
     "Resumed State",
-    "History View",
+    "Overall status",
+    "Operation report",
   ]);
   const METRIC_ROWS = new Set([
     "Status",
-    "Identity",
     "Brand and purchaser",
     "Staging path",
+    "Download overview",
     "Extraction overview",
     "Message",
     "Sync Progress",
     "Extraction",
     "Resumed State",
+    "Overall status",
+    "Operation report",
   ]);
 
   const tableRows = rows.map((r) => {

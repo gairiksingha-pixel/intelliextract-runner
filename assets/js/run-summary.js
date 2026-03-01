@@ -1,6 +1,7 @@
 // run-summary.js — Dynamic Run Summary page
 // SUMMARY_DATA is injected by the server as window.SUMMARY_DATA
 import { AppIcons } from "./icons.js";
+import { AppUtils } from "./common.js";
 
 const MONTH_NAMES = [
   "Jan",
@@ -224,7 +225,7 @@ function initFilters() {
   BRANDS.forEach((b) => {
     const div = document.createElement("div");
     div.className = "filter-dropdown-option";
-    div.innerHTML = `<input type="checkbox" value="${escapeHtml(b)}"> <span>${escapeHtml(b)}</span>`;
+    div.innerHTML = `<input type="checkbox" value="${escapeHtml(b)}"> <span>${escapeHtml(AppUtils.formatBrandName(b))}</span>`;
     div.onclick = (e) => {
       if (e.target.tagName !== "INPUT")
         div.querySelector("input").checked =
@@ -238,7 +239,7 @@ function initFilters() {
   PURCHASERS.forEach((p) => {
     const div = document.createElement("div");
     div.className = "filter-dropdown-option";
-    div.innerHTML = `<input type="checkbox" value="${escapeHtml(p)}"> <span>${escapeHtml(p)}</span>`;
+    div.innerHTML = `<input type="checkbox" value="${escapeHtml(p)}"> <span>${escapeHtml(AppUtils.formatPurchaserName(p))}</span>`;
     div.onclick = (e) => {
       if (e.target.tagName !== "INPUT")
         div.querySelector("input").checked =
@@ -301,7 +302,7 @@ function updateFilters() {
     selectedBrands.length === 0
       ? "Select brand"
       : selectedBrands.length === 1
-        ? selectedBrands[0]
+        ? AppUtils.formatBrandName(selectedBrands[0])
         : selectedBrands.length + " Brands";
 
   const pTrigger = document.getElementById("purchaser-dropdown-trigger");
@@ -309,7 +310,7 @@ function updateFilters() {
     selectedPurchasers.length === 0
       ? "Select purchaser"
       : selectedPurchasers.length === 1
-        ? selectedPurchasers[0]
+        ? AppUtils.formatPurchaserName(selectedPurchasers[0])
         : selectedPurchasers.length + " Purchasers";
 
   // Cascading: disable purchasers not in selected brands
@@ -609,8 +610,8 @@ function buildRunSection(s) {
     .join("");
 
   const runIdSafe = escapeHtml(s.runId);
-  const brandDisplay = s.brand || "";
-  const purchaserDisplay = s.purchaser || "";
+  const brandDisplay = AppUtils.formatBrandName(s.brand || "");
+  const purchaserDisplay = AppUtils.formatPurchaserName(s.purchaser || "");
 
   return `
   <details class="run-section history-item" data-runid="${runIdSafe}" data-brand="${escapeHtml(s.brand || "")}" data-purchaser="${escapeHtml(s.purchaser || "")}" data-status="${status}">
