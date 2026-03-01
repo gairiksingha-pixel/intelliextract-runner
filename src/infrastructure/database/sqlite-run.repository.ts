@@ -70,7 +70,14 @@ export class SqliteRunRepository implements IRunStore {
   async getRunStatus(): Promise<RunStats> {
     const runId = await this.getCurrentRunId();
     if (!runId)
-      return { canResume: false, runId: null, done: 0, failed: 0, total: 0 };
+      return {
+        canResume: false,
+        runId: null,
+        done: 0,
+        failed: 0,
+        skipped: 0,
+        total: 0,
+      };
 
     const lastCompleted = await this.getLastCompletedRunId();
 
@@ -80,9 +87,10 @@ export class SqliteRunRepository implements IRunStore {
 
     const done = rows.filter((r) => r.status === "done").length;
     const failed = rows.filter((r) => r.status === "error").length;
+    const skipped = rows.filter((r) => r.status === "skipped").length;
     const canResume = rows.length > 0 && runId !== lastCompleted;
 
-    return { canResume, runId, done, failed, total: rows.length };
+    return { canResume, runId, done, failed, skipped, total: rows.length };
   }
 
   async getAllRunIdsOrdered(

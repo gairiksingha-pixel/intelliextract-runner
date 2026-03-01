@@ -18,3 +18,8 @@ export function listStagingFiles(
   }
   return results;
 }
+
+export function normalizeRelativePath(p: string): string {
+  if (!p) return "";
+  return p.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+}

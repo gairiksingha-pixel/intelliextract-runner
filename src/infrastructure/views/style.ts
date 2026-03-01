@@ -329,7 +329,11 @@ export const commonStyles = `
     th, td { padding: var(--cell-pad); text-align: center; border: 1px solid rgba(176, 191, 201, 0.55); vertical-align: middle; }
     .table-section th:first-child, .table-section td:first-child { border-left: none !important; }
     .table-section th:last-child, .table-section td:last-child { border-right: none !important; }
-    .table-section thead th { border-top: none !important; background: var(--header-bg); color: var(--header-text); font-weight: 700; font-size: 0.8rem; height: 40.8px; }
+    .table-section thead th {
+      background: var(--header-bg); color: var(--header-text);
+      font-weight: 700; font-size: 0.8rem; height: 40.8px;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important; border-top: none !important; border-bottom: none !important;
+    }
     .table-section tbody tr:last-child td { border-bottom: none !important; }
     tbody tr { height: 33.333%; background: #f0f9f4; animation: rowEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
     tbody tr.row-inactive { opacity: 0.85; pointer-events: none; }

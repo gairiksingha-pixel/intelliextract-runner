@@ -1,9 +1,6 @@
 import { Checkpoint, CheckpointStatus } from "../entities/checkpoint.entity.js";
 import { IAppConfigStore } from "./app-config-store.repository.js";
-import {
-  IFileRegistry,
-  UnextractedFile,
-} from "./file-registry.repository.js";
+import { IFileRegistry, UnextractedFile } from "./file-registry.repository.js";
 import { IRunStore } from "./run-store.repository.js";
 import { IExtractionLogStore } from "./extraction-log-store.repository.js";
 
@@ -27,6 +24,8 @@ export interface ICheckpointRepository
   getRecordsForRun(runId: string): Promise<Checkpoint[]>;
   getAllCheckpoints(limit?: number, offset?: number): Promise<Checkpoint[]>;
   getCompletedPaths(runId?: string): Promise<Set<string>>;
+  /** Paths already processed (done, skipped, or error) in this run or globally. */
+  getProcessedPaths(runId?: string): Promise<Set<string>>;
   getGlobalSkipCount(): Promise<number>;
   getErrorPaths(runId: string): Promise<Set<string>>;
   /** Files that have status 'error' in any run (for retry failed). */

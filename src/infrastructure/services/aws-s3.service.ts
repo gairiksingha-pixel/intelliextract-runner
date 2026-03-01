@@ -11,6 +11,7 @@ import {
   statSync,
 } from "node:fs";
 import { join, dirname, relative } from "node:path";
+import { normalizeRelativePath } from "../utils/storage.utils.js";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
@@ -111,9 +112,8 @@ export class AwsS3Service implements IS3Service {
           skipped++;
           options.onSyncSkipProgress?.(skipped, skipped + synced);
           if (options.onFileSynced) {
-            const relativePath = relative(brandDir, destPath).replace(
-              /\\/g,
-              "/",
+            const relativePath = normalizeRelativePath(
+              relative(stagingDir, destPath),
             );
             await options.onFileSynced({
               filePath: destPath,
@@ -134,9 +134,8 @@ export class AwsS3Service implements IS3Service {
           skipped++;
           options?.onSyncSkipProgress?.(skipped, skipped + synced);
           if (options?.onFileSynced) {
-            const relativePath = relative(brandDir, destPath).replace(
-              /\\/g,
-              "/",
+            const relativePath = normalizeRelativePath(
+              relative(stagingDir, destPath),
             );
             await options.onFileSynced({
               filePath: destPath,
@@ -164,9 +163,8 @@ export class AwsS3Service implements IS3Service {
           options?.onSyncSkipProgress?.(skipped, skipped + synced);
 
           if (options?.onFileSynced) {
-            const relativePath = relative(brandDir, destPath).replace(
-              /\\/g,
-              "/",
+            const relativePath = normalizeRelativePath(
+              relative(stagingDir, destPath),
             );
             await options.onFileSynced({
               filePath: destPath,

@@ -1,5 +1,6 @@
 import { join, relative } from "node:path";
 import { readdirSync, statSync, existsSync } from "node:fs";
+import { normalizeRelativePath } from "../../infrastructure/utils/storage.utils.js";
 
 export interface DiscoverFilesRequest {
   stagingDir: string;
@@ -21,7 +22,9 @@ export class DiscoverFilesUseCase {
           this.walkDir(purchaserPath, (filePath) => {
             files.push({
               filePath,
-              relativePath: relative(request.stagingDir, filePath),
+              relativePath: normalizeRelativePath(
+                relative(request.stagingDir, filePath),
+              ),
               brand: pair.brand,
               purchaser: pair.purchaser,
             });
@@ -47,7 +50,9 @@ export class DiscoverFilesUseCase {
           this.walkDir(purchaserPath, (filePath) => {
             files.push({
               filePath,
-              relativePath: relative(request.stagingDir, filePath),
+              relativePath: normalizeRelativePath(
+                relative(request.stagingDir, filePath),
+              ),
               brand,
               purchaser,
             });

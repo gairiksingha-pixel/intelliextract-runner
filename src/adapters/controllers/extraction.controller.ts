@@ -211,6 +211,8 @@ export class ExtractionController {
             message: "Operation completed successfully.",
             runId: status.runId,
             successCount: status.done,
+            skippedCount: status.skipped,
+            failedCount: status.failed,
             avgLatency: avgLat,
             stdout: result.stdout,
             stderr: result.stderr,
@@ -228,8 +230,7 @@ export class ExtractionController {
             stdout: result.stdout,
             stderr: result.stderr,
             syncSummary:
-              runInfo.syncSummary ||
-              parseSyncSummaryFromStdout(result.stdout),
+              runInfo.syncSummary || parseSyncSummaryFromStdout(result.stdout),
           });
         }
       } else {

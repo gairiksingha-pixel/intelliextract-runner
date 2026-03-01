@@ -10,6 +10,7 @@ let ALL_PURCHASERS = [];
 let SELECTED_BRANDS = [];
 let SELECTED_PURCHASERS = [];
 let CURRENT_ACTIVE_RUNS = [];
+let STAGING_COUNT = null;
 
 const ROWS = [
   {
@@ -99,7 +100,9 @@ function renderRow(c) {
   const resultDiv = document.createElement("div");
   resultDiv.id = `result-${c.id}`;
   resultDiv.className = "result result-placeholder";
-  resultDiv.innerHTML = `<span class="result-placeholder-text">${getPlaceholderText(c.id)}</span>`;
+  resultDiv.innerHTML = `<span class="result-placeholder-text">${getPlaceholderText(
+    c.id,
+  )}</span>`;
   resultCell.appendChild(resultDiv);
 
   const btn = document.createElement("button");
@@ -281,7 +284,9 @@ async function runCase(caseId, btn, resultDiv, options = {}) {
         // Handled by Stop logic
       } else {
         resultDiv.className = "result fail";
-        resultDiv.innerHTML = `<span class="exit">Error: ${AppUtils.esc(e.message)}</span>`;
+        resultDiv.innerHTML = `<span class="exit">Error: ${AppUtils.esc(
+          e.message,
+        )}</span>`;
       }
     } finally {
       btn.disabled = false;
@@ -444,7 +449,8 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
 
   const allLines = stdoutStr ? stdoutStr.split("\n") : [];
   for (let i = 0; i < allLines.length; i++) {
-    const line = (allLines[i] || "").trim().replace(/\r$/, "");
+    const lineRaw = (allLines[i] || "").replace(/\r$/, "");
+    const line = lineRaw.trim();
     if (!line) continue;
 
     // 1. Capture Protocol Markers (Last wins)
@@ -483,19 +489,22 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
       // ignore divider
     } else if (
       (m = /^(?:Downloaded|Synced)\s*\(new\):\s*(\d+)\s*/i.exec(line)) ||
-      (m = /^Downloaded:\s*(\d+)\s*/i.exec(line))
+      (m = /^Downloaded:\s*(\d+)\s*/i.exec(lineRaw))
     ) {
       parsed.downloadedNew = m[1];
     } else if (
       (m = /^Skipped\s*\(already\s*present[^:]*:\s*(\d+)\s*/i.exec(line)) ||
-      (m = /^Skipped:\s*(\d+)\s*/i.exec(line))
+      (m = /^Skipped:\s*(\d+)\s*/i.exec(lineRaw))
     ) {
       parsed.skipped = m[1];
-    } else if ((m = /^Errors:\s*(\d+)\s*/i.exec(line))) {
+    } else if (
+      (m = /^Errors:\s*(\d+)\s*/i.exec(line)) ||
+      (m = /^Errors:\s*(\d+)\s*/i.exec(lineRaw))
+    ) {
       parsed.errors = m[1];
     } else if ((m = /^Download limit:\s*(.+)$/.exec(line))) {
       parsed.downloadLimit = m[1];
-    } else if ((m = /^\s+Staging path:\s*(.+)$/.exec(line))) {
+    } else if ((m = /^\s+Staging path:\s*(.+)$/.exec(lineRaw))) {
       if (!parsed.stagingPaths) parsed.stagingPaths = [];
       parsed.stagingPaths.push(m[1].trim());
     } else if (
@@ -503,10 +512,10 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     ) {
       parsed.brandAndPurchaser = (m[1].trim() + " / " + m[2].trim()).trim();
     } else if (
-      (m = /^\s{2}([^:\s][^:/]*\/[^:\s][^:]*)(?::\s*(.*))?$/.exec(line)) &&
-      line.indexOf("/") !== -1 &&
+      (m = /^\s{2}([^:\s][^:/]*\/[^:\s][^:]*)(?::\s*(.*))?$/.exec(lineRaw)) &&
+      lineRaw.indexOf("/") !== -1 &&
       !/Staging path|Downloaded:|Skipped:|Errors:|Sync Summary|Limit:/.test(
-        line,
+        lineRaw,
       )
     ) {
       if (!parsed.syncBucketDetails) parsed.syncBucketDetails = [];
@@ -523,7 +532,7 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
       }
     } else if (
       (m = /^ {4}(Downloaded:\s*\d+,\s*Skipped:\s*\d+,\s*Errors:\s*\d+)$/.exec(
-        line,
+        lineRaw,
       ))
     ) {
       if (parsed.syncBucketDetails && parsed.syncBucketDetails.length > 0) {
@@ -560,25 +569,44 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
   // Apply server-provided sync summary so run output always shows counts (e.g. P1 sync-only)
   if (data && data.syncSummary && typeof data.syncSummary === "object") {
     const s = data.syncSummary;
-    if (parsed.downloadedNew == null) parsed.downloadedNew = String(s.downloaded ?? 0);
+    if (parsed.downloadedNew == null)
+      parsed.downloadedNew = String(s.downloaded ?? 0);
     if (parsed.skipped == null) parsed.skipped = String(s.skipped ?? 0);
     if (parsed.errors == null) parsed.errors = String(s.errors ?? 0);
     if (!parsed.syncSummaryLine) parsed.syncSummaryLine = "Sync Summary";
     if (!parsed.downloadLimit) parsed.downloadLimit = "no limit";
   }
 
-  const stdoutFiltered = stdoutStr
+  let stdoutFiltered = stdoutStr
     ? stdoutStr.split("\n").filter(filterResultLine).join("\n").trim()
     : "";
-  const stderrFiltered = stderrStr
+  let stderrFiltered = stderrStr
     ? stderrStr.split("\n").filter(filterResultLine).join("\n").trim()
     : "";
+  if (caseId === "P3") {
+    const stripKeys = (text) =>
+      text
+        .split("\n")
+        .filter((line) => {
+          const trimmed = line.trim();
+          return (
+            !/^Download overview\b/i.test(trimmed) &&
+            !/^Overall status\b/i.test(trimmed)
+          );
+        })
+        .join("\n")
+        .trim();
+    stdoutFiltered = stripKeys(stdoutFiltered);
+    stderrFiltered = stripKeys(stderrFiltered);
+  }
 
   // Also extract from structured report data if stdout wasn't parsed
   if (data.successCount !== undefined && parsed.extractSuccess === undefined) {
     parsed.extractSuccess = String(data.successCount);
-    // Be careful here: if we have successCount from data, we might not have the others
-    // unless they are also in the data. For now, we only set success if missing.
+    if (data.skippedCount !== undefined)
+      parsed.extractSkipped = String(data.skippedCount);
+    if (data.failedCount !== undefined)
+      parsed.extractFailed = String(data.failedCount);
   }
 
   const hasSync = !!caseId && SYNC_CASES.indexOf(caseId) !== -1;
@@ -632,11 +660,6 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
 
   // Skipped (Resumed) Row
   if (parsed.protocol.skipSync) {
-    const { done, total } = parsed.protocol.skipSync;
-    rows.push([
-      "Resumed State",
-      `Resuming... Skipped ${done} already-synced files.`,
-    ]);
   }
 
   if (parsed.stagingPaths && parsed.stagingPaths.length)
@@ -672,7 +695,6 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
 
   if (hasSync && hasSyncDetails) {
     let output = "";
-    if (parsed.syncSummaryLine) output += "Sync Summary\n";
     if (parsed.downloadLimit)
       output += "Download limit: " + parsed.downloadLimit + "\n";
     if (parsed.downloadedNew != null)
@@ -683,41 +705,14 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     if (parsed.errors != null) output += "Errors: " + parsed.errors + "\n";
     const downNum = parseInt(parsed.downloadedNew || "0", 10);
     const skipNum = parseInt(parsed.skipped || "0", 10);
-    const totalInv = data?.syncSummary?.totalInInventory ?? downNum + skipNum;
-    output += "Total in inventory: " + totalInv + "\n";
 
     if (parsed.syncBucketDetails && parsed.syncBucketDetails.length) {
       output +=
         "\nBy brand (staging path → counts):\n  " +
         parsed.syncBucketDetails.join("\n  ");
     }
-    rows.push(["Output", output.trim()]);
-  } else if (hasSync) {
-    const overview = [];
-    const downNew = parseInt(parsed.downloadedNew || "0", 10);
-    const skipped = parseInt(parsed.skipped || "0", 10);
-    const totalInventory =
-      (data && data.syncSummary && data.syncSummary.totalInInventory) != null
-        ? data.syncSummary.totalInInventory
-        : downNew + skipped;
-
-    overview.push("Downloaded (this run): " + downNew);
-    overview.push("Skipped (already present): " + skipped);
-    overview.push("Total in inventory: " + totalInventory);
-
-    if (parsed.errors != null && parsed.errors !== "0") {
-      overview.push("Errors: " + AppUtils.esc(parsed.errors));
-    }
-
-    if (parsed.errors != null && parsed.errors !== "0") {
-      overview.push("Errors: " + AppUtils.esc(parsed.errors));
-    }
-
-    if (overview.length) {
-      rows.push(["Download overview", overview.join(", ")]);
-    } else if (caseId === "P1") {
-      rows.push(["Download overview", "Check complete. No files found."]);
-    }
+    const labelName = caseId === "P1" ? "Sync Summary" : "Output";
+    rows.push([labelName, output.trim()]);
   }
 
   if (hasExtract) {
@@ -747,7 +742,6 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
         " (Total: " +
         AppUtils.esc(parsed.cumTotal) +
         ")";
-      rows.push(["Overall status", cumDetail]);
     }
   }
 
@@ -796,9 +790,7 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
   const LABEL_HTML_SAFE = new Set([
     "Standard error",
     "Output",
-    "Download overview",
     "Extraction overview",
-    "Overall status",
     "Sync Progress",
     "Extraction",
     "Resumed State",
@@ -809,9 +801,7 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     "Identity",
     "Brand and purchaser",
     "Staging path",
-    "Download overview",
     "Extraction overview",
-    "Overall status",
     "Message",
     "Sync Progress",
     "Extraction",
@@ -826,7 +816,9 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
     const val = LABEL_HTML_SAFE.has(label)
       ? r[1]
       : AppUtils.esc(r[1]).replace(/\n/g, "<br>");
-    return `<tr${cls ? ` class="${cls.trim()}"` : ""}><th>${label}</th><td>${val}</td></tr>`;
+    return `<tr${
+      cls ? ` class="${cls.trim()}"` : ""
+    }><th>${label}</th><td>${val}</td></tr>`;
   });
 
   return `<table class="result-table-wrap">${tableRows.join("")}</table>`;
@@ -854,7 +846,12 @@ function showResult(div, data, pass, options) {
         ["Status", "Failed"],
         ["Output", AppUtils.esc(errMsg)],
       ];
-      div.innerHTML = `<table class="result-table-wrap">${rows.map((r) => `<tr class="status-row metric-row"><th>${r[0]}</th><td>${r[1]}</td></tr>`).join("")}</table>`;
+      div.innerHTML = `<table class="result-table-wrap">${rows
+        .map(
+          (r) =>
+            `<tr class="status-row metric-row"><th>${r[0]}</th><td>${r[1]}</td></tr>`,
+        )
+        .join("")}</table>`;
     }
     return;
   }
@@ -881,8 +878,12 @@ function showResult(div, data, pass, options) {
     const total = Number(resumeSkipSyncProgress.total) || 0;
     const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
     extra += `
-      <div class="sync-progress-wrap skip-progress-wrap">Runner is skipping synced files: ${total > 0 ? done + " / " + total : done + " file(s)"} skipped</div>
-      <div class="sync-progress-bar"><div class="sync-progress-fill skip-fill ${done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 0}%"></div></div>
+      <div class="sync-progress-wrap skip-progress-wrap">Runner is skipping synced files: ${
+        total > 0 ? done + " / " + total : done + " file(s)"
+      } skipped</div>
+      <div class="sync-progress-bar"><div class="sync-progress-fill skip-fill ${
+        done === 0 ? "sync-progress-indeterminate" : ""
+      }" style="width:${total > 0 ? pct : 0}%"></div></div>
     `;
   }
 
@@ -891,8 +892,12 @@ function showResult(div, data, pass, options) {
     const total = Number(resumeSkipExtractProgress.total) || 0;
     const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
     extra += `
-      <div class="sync-progress-wrap skip-progress-wrap">Runner is skipping extracted files: ${total > 0 ? done + " / " + total : done + " file(s)"} skipped</div>
-      <div class="sync-progress-bar"><div class="sync-progress-fill skip-fill ${done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 0}%"></div></div>
+      <div class="sync-progress-wrap skip-progress-wrap">Runner is skipping extracted files: ${
+        total > 0 ? done + " / " + total : done + " file(s)"
+      } skipped</div>
+      <div class="sync-progress-bar"><div class="sync-progress-fill skip-fill ${
+        done === 0 ? "sync-progress-indeterminate" : ""
+      }" style="width:${total > 0 ? pct : 0}%"></div></div>
     `;
   }
 
@@ -901,8 +906,12 @@ function showResult(div, data, pass, options) {
     const total = Number(syncProgress.total) || 0;
     const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
     extra += `
-      <div class="sync-progress-wrap">Runner is syncing file: ${total > 0 ? done + " / " + total : done + " file(s)"}</div>
-      <div class="sync-progress-bar"><div class="sync-progress-fill ${done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 0}%"></div></div>
+      <div class="sync-progress-wrap">Runner is syncing file: ${
+        total > 0 ? done + " / " + total : done + " file(s)"
+      }</div>
+      <div class="sync-progress-bar"><div class="sync-progress-fill ${
+        done === 0 ? "sync-progress-indeterminate" : ""
+      }" style="width:${total > 0 ? pct : 0}%"></div></div>
     `;
   }
 
@@ -911,8 +920,12 @@ function showResult(div, data, pass, options) {
     const total = Number(extractionProgress.total) || 0;
     const pct = total > 0 ? Math.min(100, Math.round((100 * done) / total)) : 0;
     extra += `
-      <div class="sync-progress-wrap extraction-progress-wrap">Runner is extracting: ${total > 0 ? done + " / " + total : done + " file(s)"}</div>
-      <div class="sync-progress-bar"><div class="sync-progress-fill ${done === 0 ? "sync-progress-indeterminate" : ""}" style="width:${total > 0 ? pct : 0}%"></div></div>
+      <div class="sync-progress-wrap extraction-progress-wrap">Runner is extracting: ${
+        total > 0 ? done + " / " + total : done + " file(s)"
+      }</div>
+      <div class="sync-progress-bar"><div class="sync-progress-fill ${
+        done === 0 ? "sync-progress-indeterminate" : ""
+      }" style="width:${total > 0 ? pct : 0}%"></div></div>
     `;
   }
 
@@ -957,7 +970,11 @@ function showResult(div, data, pass, options) {
     <span class="exit">
       ${AppUtils.esc(label)}<span class="loading-dots"></span>
     </span>
-    ${showActiveState ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:0%"></div></div>' : ""}
+    ${
+      showActiveState
+        ? '<div class="sync-progress-bar"><div class="sync-progress-fill sync-progress-indeterminate" style="width:0%"></div></div>'
+        : ""
+    }
     ${extra}
   `;
 }
@@ -994,7 +1011,9 @@ function resetCase(div) {
   const caseId = div.id.replace("result-", "");
   clearRowProgress(caseId);
   div.className = "result result-placeholder";
-  div.innerHTML = `<span class="result-placeholder-text">${getPlaceholderText(caseId)}</span>`;
+  div.innerHTML = `<span class="result-placeholder-text">${getPlaceholderText(
+    caseId,
+  )}</span>`;
 }
 
 function getPlaceholderText(caseId) {
@@ -1273,6 +1292,11 @@ async function updateSystemStatus() {
     const activeData = await activeRes.json();
     const activeRuns = activeData.activeRuns || [];
     CURRENT_ACTIVE_RUNS = activeRuns;
+    try {
+      const invRes = await fetch("/api/staging-stats");
+      const invData = await invRes.json();
+      if (typeof invData.count === "number") STAGING_COUNT = invData.count;
+    } catch (_) {}
 
     const statusText = document.getElementById("system-status-text");
     const pill = document.querySelector(".system-status-pill");
@@ -1381,7 +1405,10 @@ function updateRowUI(row, status, activeInfo) {
   if (status.isRunning) {
     // RUNNING state
     runBtn.disabled = true;
-    if (retryBtn) retryBtn.disabled = true;
+    if (retryBtn) {
+      retryBtn.disabled = true;
+      retryBtn.innerHTML = `${AppIcons.RETRY}<span>Retry Failed</span>`;
+    }
     if (syncInput) syncInput.disabled = true;
     if (extInput) extInput.disabled = true;
     setFieldResetsDisabled(true);
@@ -1446,7 +1473,12 @@ function updateRowUI(row, status, activeInfo) {
   } else if (status.canResume) {
     // RESUMABLE state
     runBtn.disabled = false;
-    if (retryBtn) retryBtn.disabled = false;
+    if (retryBtn) {
+      retryBtn.disabled = false;
+      retryBtn.innerHTML = `${AppIcons.RETRY}<span>Retry Failed</span>`;
+      retryBtn.onclick = () =>
+        runCase(caseId, retryBtn, resultDiv, { retryFailed: true });
+    }
     if (syncInput) syncInput.disabled = false;
     if (extInput) extInput.disabled = false;
     setFieldResetsDisabled(false);
@@ -1479,12 +1511,19 @@ function updateRowUI(row, status, activeInfo) {
   } else {
     // READY / IDLE state
     runBtn.disabled = false;
-    if (retryBtn) retryBtn.disabled = false;
+    if (retryBtn) {
+      retryBtn.disabled = false;
+      retryBtn.innerHTML = `${AppIcons.RETRY}<span>Retry Failed</span>`;
+      retryBtn.onclick = () =>
+        runCase(caseId, retryBtn, resultDiv, { retryFailed: true });
+    }
     if (syncInput) syncInput.disabled = false;
     if (extInput) extInput.disabled = false;
     setFieldResetsDisabled(false);
 
-    runBtn.innerHTML = `${AppIcons.PLAY}<span>${getRunButtonLabel(caseId)}</span>`;
+    runBtn.innerHTML = `${AppIcons.PLAY}<span>${getRunButtonLabel(
+      caseId,
+    )}</span>`;
     runBtn.onclick = () => runCase(caseId, runBtn, resultDiv);
 
     resetBtn.style.display = "none"; // Hide reset when no action is ongoing

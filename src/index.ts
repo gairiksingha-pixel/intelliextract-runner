@@ -20,7 +20,7 @@ import { SqliteLogger } from "./infrastructure/services/sqlite-logger.service.js
 import { DiscoverFilesUseCase } from "./core/use-cases/discover-files.use-case.js";
 import { NodemailerEmailService } from "./infrastructure/services/nodemailer-email.service.js";
 import { computeMetrics } from "./infrastructure/utils/metrics.utils.js";
-import { join, dirname } from "node:path";
+import { join, dirname, relative } from "node:path";
 import {
   writeFileSync,
   readFileSync,
@@ -154,9 +154,18 @@ program
 
       printSyncResults(results, syncLimit);
       if (stdoutPiped) {
-        const totalSynced = results.reduce((s: number, r: any) => s + r.synced, 0);
-        const totalSkipped = results.reduce((s: number, r: any) => s + r.skipped, 0);
-        const totalErrors = results.reduce((s: number, r: any) => s + r.errors, 0);
+        const totalSynced = results.reduce(
+          (s: number, r: any) => s + r.synced,
+          0,
+        );
+        const totalSkipped = results.reduce(
+          (s: number, r: any) => s + r.skipped,
+          0,
+        );
+        const totalErrors = results.reduce(
+          (s: number, r: any) => s + r.errors,
+          0,
+        );
         process.stdout.write(
           `SYNC_SUMMARY\t${totalSynced}\t${totalSkipped}\t${totalErrors}\n`,
           () => {},
@@ -273,7 +282,12 @@ program
       if (opts.sync === false) {
         const filter =
           pairs && pairs.length > 0
-            ? { pairs: pairs.map((p) => ({ brand: p.tenant, purchaser: p.purchaser })) }
+            ? {
+                pairs: pairs.map((p) => ({
+                  brand: p.tenant,
+                  purchaser: p.purchaser,
+                })),
+              }
             : { brand: tenant, purchaser };
 
         if (opts.retryFailed) {
@@ -325,7 +339,7 @@ program
           filesToExtract.push(
             ...res.files.map((f) => ({
               filePath: f,
-              relativePath: f.split("staging")[1] || f,
+              relativePath: relative(STAGING_DIR, f).replace(/\\/g, "/"),
               brand: res.brand,
               purchaser: res.purchaser,
             })),
@@ -516,10 +530,10 @@ program
 
       // Global skipping logic (across all runs) vs Run-specific resume logic
       const globalCompleted = config.run.skipCompleted
-        ? await checkpointRepo.getCompletedPaths()
+        ? await checkpointRepo.getProcessedPaths()
         : new Set<string>();
 
-      const runCompleted = await checkpointRepo.getCompletedPaths(runId);
+      const runCompleted = await checkpointRepo.getProcessedPaths(runId);
       const runRecords = await checkpointRepo.getRecordsForRun(runId);
 
       if (opts.resume && runCompleted.size > 0) {
@@ -563,10 +577,22 @@ program
               `RESUME_SKIP_SYNC\t${skipped}\t${totalProcessed}\n`,
             );
         },
-        onFileSynced: (job) => {
+        onFileSynced: async (job) => {
           if (aborted) return;
-          if (globalCompleted.has(job.filePath)) {
+          if (
+            globalCompleted.has(job.filePath) ||
+            runCompleted.has(job.filePath)
+          ) {
             extractionDone++;
+            // Record skip in current run so metrics showing "Extraction overview: Skipped: X" are correct
+            await checkpointRepo.upsertCheckpoint({
+              ...job,
+              status: "skipped",
+              runId,
+              startedAt: new Date().toISOString(),
+              finishedAt: new Date().toISOString(),
+            } as any);
+
             if (stdoutPiped) {
               process.stdout.write(
                 `RESUME_SKIP_SYNC\t${extractionDone}\t${++extractionQueued}\n`,
@@ -674,7 +700,7 @@ program
       }
 
       console.log(
-        `\nSync-extract complete — success=${metrics.success}, skipped=${metrics.skipped}, failed=${metrics.failed}`,
+        `\nExtraction metrics: success=${metrics.success}, skipped=${metrics.skipped}, failed=${metrics.failed}`,
       );
 
       if (doReport) {

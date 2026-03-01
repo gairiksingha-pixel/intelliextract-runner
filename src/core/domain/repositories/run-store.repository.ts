@@ -6,6 +6,7 @@ export interface RunStats {
   runId: string | null;
   done: number;
   failed: number;
+  skipped: number;
   total: number;
 }
 

@@ -44,10 +44,20 @@ export class SyncBrandUseCase {
 
     // Per-bucket progress so we can report cumulative progress across all buckets
     const bucketProgress: Record<number, { done: number; total: number }> = {};
-    const reportCumulativeProgress = (bucketIndex: number, done: number, total: number) => {
+    const reportCumulativeProgress = (
+      bucketIndex: number,
+      done: number,
+      total: number,
+    ) => {
       bucketProgress[bucketIndex] = { done, total };
-      const cumDone = Object.values(bucketProgress).reduce((a, p) => a + (p?.done ?? 0), 0);
-      const cumTotal = Object.values(bucketProgress).reduce((a, p) => a + (p?.total ?? 0), 0);
+      const cumDone = Object.values(bucketProgress).reduce(
+        (a, p) => a + (p?.done ?? 0),
+        0,
+      );
+      const cumTotal = Object.values(bucketProgress).reduce(
+        (a, p) => a + (p?.total ?? 0),
+        0,
+      );
       request.onProgress?.(cumDone, Math.max(cumDone, cumTotal));
     };
 
@@ -57,8 +67,6 @@ export class SyncBrandUseCase {
       const bucket = request.buckets[i];
       const bucketIndex = i;
       queue.add(async () => {
-        if (limitRemaining.value <= 0) return;
-
         const result = await this.s3Service.syncBucket(
           bucket,
           request.stagingDir,

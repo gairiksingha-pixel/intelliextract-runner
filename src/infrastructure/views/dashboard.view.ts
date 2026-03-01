@@ -17,18 +17,19 @@ export class DashboardView {
       .op-name { text-align: center; }
       .table-section th:first-child, .table-section td:first-child { border-left: none !important; }
       .table-section th:last-child, .table-section td:last-child { border-right: none !important; }
-      .table-section thead th { border-top: none !important; }
-      .table-section tbody tr:last-child td { border-bottom: none !important; }
       thead tr { height: 40.8px; }
       thead th { height: 40.8px; box-sizing: border-box; }
       tbody { height: 100%; }
       tbody tr { height: 33.333%; }
       tbody td { height: 33.333%; box-sizing: border-box; }
-      thead th {
+      .table-section thead th.result-header { height: 40.8px; }
+      .table-section thead th {
         background: var(--header-bg); color: var(--header-text);
         font-weight: 700; font-size: 0.8rem; text-transform: none; letter-spacing: 0.02em;
-        border: 1px solid rgba(255, 255, 255, 0.1); border-bottom: none; text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important; border-top: none !important; border-bottom: none !important; text-align: center;
       }
+      .table-section thead th.run-cell { border-right: none !important; }
+      .table-section thead th.result-header { border-left: none !important; }
       tbody tr { background: #f0f9f4; animation: rowEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
       tbody tr.row-inactive { opacity: 0.85; pointer-events: none; }
       tbody tr.row-inactive td { border-color: rgba(33, 108, 109, 0.45); }

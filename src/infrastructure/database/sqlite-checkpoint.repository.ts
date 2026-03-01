@@ -205,6 +205,24 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     } catch (_) {
       db.exec("ALTER TABLE tbl_runs ADD COLUMN summary_json TEXT;");
     }
+
+    // Migration: Normalize ALL paths in DB to ignore leading/trailing slashes and backslashes
+    try {
+      db.exec(`
+        UPDATE tbl_run_checkpoints 
+        SET relativePath = LTRIM(REPLACE(relativePath, '\\', '/'), '/')
+        WHERE relativePath LIKE '/%' OR relativePath LIKE '%\\%';
+
+        -- Note: tbl_file_registry normalization is trickier due to PRIMARY KEY conflicts.
+        -- We'll just do a best-effort update for non-critical cases or allow NEW insertions to override.
+        -- For now, cleaning up run checkpoints fixes the "Missing Run ID" in inventory.
+      `);
+    } catch (e) {
+      console.warn(
+        "Path normalization migration failed (likely PK conflict); skipping:",
+        e,
+      );
+    }
   }
 
   // Delegate Methods
@@ -440,6 +458,21 @@ export class SqliteCheckpointRepository implements ICheckpointRepository {
     const db = this.getDb();
     let query =
       "SELECT filePath FROM tbl_run_checkpoints WHERE (status = 'done' OR status = 'skipped')";
+    const params: string[] = [];
+    if (runId) {
+      query += " AND runId = ?";
+      params.push(runId);
+    }
+    const rows = db.prepare(query).all(...params) as Array<{
+      filePath: string;
+    }>;
+    return new Set(rows.map((r) => r.filePath));
+  }
+
+  async getProcessedPaths(runId?: string): Promise<Set<string>> {
+    const db = this.getDb();
+    let query =
+      "SELECT filePath FROM tbl_run_checkpoints WHERE (status = 'done' OR status = 'skipped' OR status = 'error')";
     const params: string[] = [];
     if (runId) {
       query += " AND runId = ?";

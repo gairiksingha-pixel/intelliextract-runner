@@ -22,7 +22,7 @@ export class GetInventoryDataUseCase {
     const cpRecords = await this.checkpointRepo.getAllCheckpoints();
     const pathToRunId: Record<string, string> = {};
     cpRecords.forEach((c) => {
-      const key = (c.brand + "/" + (c.relativePath || "")).replace(/\\/g, "/");
+      const key = (c.relativePath || "").replace(/\\/g, "/");
       pathToRunId[key] = c.runId;
     });
 
