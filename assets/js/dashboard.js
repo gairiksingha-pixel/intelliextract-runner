@@ -11,6 +11,7 @@ let SELECTED_BRANDS = [];
 let SELECTED_PURCHASERS = [];
 let CURRENT_ACTIVE_RUNS = [];
 let STAGING_COUNT = null;
+let IS_UNLOADING = false;
 
 const ROWS = [
   {
@@ -38,6 +39,12 @@ const ROWS = [
 
 // --- Initializer ---
 document.addEventListener("DOMContentLoaded", () => {
+  // Clear state if this is a browser reload (user requested refresh to clear)
+  const navEntries = performance.getEntriesByType("navigation");
+  if (navEntries.length > 0 && navEntries[0].type === "reload") {
+    sessionStorage.removeItem("dashboardState");
+  }
+
   const tbody = document.getElementById("rows");
   if (tbody) {
     ROWS.forEach((c) => tbody.appendChild(renderRow(c)));
@@ -72,22 +79,124 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof window.initScheduleModal === "function")
     window.initScheduleModal();
 
+  // Load state before starting polling
+  loadDashboardState();
+
   // System status polling
   updateSystemStatus();
   setInterval(updateSystemStatus, 3000);
 
+  // Auto-save state on any input change
+  document.addEventListener("input", (e) => {
+    if (e.target.matches(".limit-sync, .limit-extract")) {
+      saveDashboardState();
+    }
+  });
+
   // Auto-pause on reload/leave
-  window.addEventListener("beforeunload", () => {
+  window.addEventListener("beforeunload", (e) => {
+    const manualRuns = CURRENT_ACTIVE_RUNS.filter((r) => r.origin === "manual");
+
+    // If there's an active manual run and we haven't already confirmed via custom modal
+    if (manualRuns.length > 0 && !window.BYPASS_LOAD_CHECK) {
+      e.preventDefault();
+      // Most modern browsers show a generic message regardless of what we put here
+      e.returnValue =
+        "An operation is currently running. Leaving will pause your progress.";
+    }
+
+    IS_UNLOADING = true;
+    saveDashboardState();
+
     // Only stop manual runs, as scheduled ones should be persistent theoretically,
     // but the user requirement implies all current dashboard-visible ops should pause.
-    const manualRuns = CURRENT_ACTIVE_RUNS.filter((r) => r.origin === "manual");
     for (const run of manualRuns) {
       const payload = JSON.stringify({ caseId: run.caseId, origin: "manual" });
       const blob = new Blob([payload], { type: "application/json" });
       navigator.sendBeacon("/api/stop-run", blob);
     }
   });
+
+  // Expose check to global scope for common.js navigation interceptor
+  window.checkActiveRuns = function () {
+    return CURRENT_ACTIVE_RUNS.filter((r) => r.origin === "manual").length > 0;
+  };
 });
+
+/**
+ * Persist dashboard state to sessionStorage
+ */
+function saveDashboardState() {
+  const state = {
+    filters: {
+      brands: SELECTED_BRANDS,
+      purchasers: SELECTED_PURCHASERS,
+    },
+    rows: {},
+  };
+
+  document.querySelectorAll("tr[data-case-id]").forEach((row) => {
+    const caseId = row.getAttribute("data-case-id");
+    const resultDiv = document.getElementById(`result-${caseId}`);
+    const syncInput = row.querySelector(".limit-sync");
+    const extInput = row.querySelector(".limit-extract");
+
+    state.rows[caseId] = {
+      syncLimit: syncInput?.value || "0",
+      extractLimit: extInput?.value || "0",
+      resultHtml: resultDiv?.innerHTML || "",
+      resultClass: resultDiv?.className || "result result-placeholder",
+    };
+  });
+
+  sessionStorage.setItem("dashboardState", JSON.stringify(state));
+}
+
+/**
+ * Load dashboard state from sessionStorage
+ */
+function loadDashboardState() {
+  const saved = sessionStorage.getItem("dashboardState");
+  if (!saved) return;
+
+  try {
+    const state = JSON.parse(saved);
+    if (!state) return;
+
+    // Restore Filters
+    if (state.filters) {
+      SELECTED_BRANDS = state.filters.brands || [];
+      SELECTED_PURCHASERS = state.filters.purchasers || [];
+      updateDropdownTriggers();
+      // Panels might need re-rendering if they were open (unlikely on load, but for completeness)
+      const bp = document.getElementById("brand-dropdown-panel");
+      const pp = document.getElementById("purchaser-dropdown-panel");
+      if (bp) renderBrandOptions(bp);
+      if (pp) renderPurchaserOptions(pp);
+    }
+
+    // Restore Rows
+    if (state.rows) {
+      Object.entries(state.rows).forEach(([caseId, rowData]) => {
+        const row = document.querySelector(`tr[data-case-id="${caseId}"]`);
+        if (!row) return;
+
+        const syncInput = row.querySelector(".limit-sync");
+        const extInput = row.querySelector(".limit-extract");
+        const resultDiv = document.getElementById(`result-${caseId}`);
+
+        if (syncInput) syncInput.value = rowData.syncLimit;
+        if (extInput) extInput.value = rowData.extractLimit;
+        if (resultDiv) {
+          resultDiv.innerHTML = rowData.resultHtml;
+          resultDiv.className = rowData.resultClass;
+        }
+      });
+    }
+  } catch (e) {
+    console.error("Failed to load dashboard state:", e);
+  }
+}
 
 // --- Core Dashboard Logic ---
 
@@ -226,6 +335,15 @@ async function runCase(caseId, btn, resultDiv, options = {}) {
     resetBtn.disabled = true;
     resetBtn.style.display = "none"; // Instant hide
 
+    // Mark as active immediately so navigation guards work before the first poll
+    if (!CURRENT_ACTIVE_RUNS.find((r) => r.caseId === caseId)) {
+      CURRENT_ACTIVE_RUNS.push({
+        caseId,
+        origin: "manual",
+        status: "starting",
+      });
+    }
+
     try {
       const response = await fetch("/run", {
         method: "POST",
@@ -278,6 +396,7 @@ async function runCase(caseId, btn, resultDiv, options = {}) {
         }
       }
     } catch (e) {
+      if (IS_UNLOADING) return;
       if (e.name === "AbortError" || e.message?.includes("aborted")) {
         // Handled by Stop logic
       } else {
@@ -346,6 +465,12 @@ async function stopCase(caseId, row, resultDiv, origin = "manual") {
         if (resetBtn) {
           resetBtn.style.display = "flex";
           resetBtn.disabled = false;
+        }
+
+        // Update local state immediately so navigation guard reflects the pause
+        if (isManual) {
+          const run = CURRENT_ACTIVE_RUNS.find((r) => r.caseId === caseId);
+          if (run) run.status = "paused";
         }
       } catch (e) {
         showAppAlert("Error", "Failed to stop process: " + e.message, true);
@@ -865,6 +990,7 @@ function showResult(div, data, pass, options) {
         )
         .join("")}</table>`;
     }
+    saveDashboardState();
     return;
   }
 
@@ -989,6 +1115,7 @@ function showResult(div, data, pass, options) {
     }
     ${extra}
   `;
+  saveDashboardState();
 }
 
 const ICON_MINI_RESET =
@@ -1026,6 +1153,7 @@ function resetCase(div) {
   div.innerHTML = `<span class="result-placeholder-text">${getPlaceholderText(
     caseId,
   )}</span>`;
+  saveDashboardState();
 }
 
 function getPlaceholderText(caseId) {
@@ -1258,6 +1386,7 @@ function updateDropdownTriggers() {
       else pt.textContent = SELECTED_PURCHASERS.length + " selected";
     }
   }
+  saveDashboardState();
 }
 
 // --- External Actions (Global Bindings) ---
@@ -1364,19 +1493,21 @@ async function updateSystemStatus() {
       // We will handle row inactivation after updating all rows to ensure consistent state
     }
 
-    // 2. Update each row UI based on status
+    // 2. Update each row UI based on status (Parallel)
     const rows = document.querySelectorAll("tr[data-case-id]");
-    for (const row of rows) {
-      const caseId = row.getAttribute("data-case-id");
-      const statusRes = await fetch(`/api/run-status?caseId=${caseId}`);
-      const status = await statusRes.json();
+    await Promise.all(
+      Array.from(rows).map(async (row) => {
+        const caseId = row.getAttribute("data-case-id");
+        const statusRes = await fetch(`/api/run-status?caseId=${caseId}`);
+        const status = await statusRes.json();
 
-      updateRowUI(
-        row,
-        status,
-        activeRuns.find((r) => r.caseId === caseId),
-      );
-    }
+        updateRowUI(
+          row,
+          status,
+          activeRuns.find((r) => r.caseId === caseId),
+        );
+      }),
+    );
 
     // 3. Finalize row states based on global system status
     const activeCaseId = activeRuns.length > 0 ? activeRuns[0].caseId : null;
@@ -1481,6 +1612,13 @@ function updateRowUI(row, status, activeInfo) {
           ...activeInfo.progress,
         });
       }
+
+      // Final fallback: Ensure we show 'Running' UI even if active-runs has no progress yet.
+      // We always call this to ensure the UI is in sync with server status regardless of restored state.
+      handleStreamData(caseId, { type: "progress" });
+    } else {
+      // Runner says it's active but it's not in active-runs yet (timing gap)
+      handleStreamData(caseId, { type: "progress" });
     }
   } else if (status.canResume) {
     // RESUMABLE state
@@ -1494,6 +1632,12 @@ function updateRowUI(row, status, activeInfo) {
     if (syncInput) syncInput.disabled = false;
     if (extInput) extInput.disabled = false;
     setFieldResetsDisabled(false);
+
+    // If the UI is stuck in 'running' mode but the operation is actually just resumable (paused)
+    if (resultDiv.classList.contains("running")) {
+      resultDiv.className = "result result-placeholder";
+      resultDiv.innerHTML = `<span class="result-placeholder-text">Operation paused. Click Resume to continue.</span>`;
+    }
 
     runBtn.innerHTML = `${AppIcons.PLAY}<span>Resume</span>`;
     runBtn.onclick = () => runCase(caseId, runBtn, resultDiv, { resume: true });

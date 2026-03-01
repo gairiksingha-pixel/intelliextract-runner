@@ -359,15 +359,38 @@ document.addEventListener("click", function (e) {
     currentUrl === targetUrl + "/";
 
   if (!isSamePage) {
-    e.preventDefault();
-    var href = t.href;
-    AppUtils.showLoader();
-    // Give the browser one animation frame to paint the loader before navigating
-    requestAnimationFrame(function () {
-      setTimeout(function () {
-        window.location.href = href;
-      }, 80);
-    });
+    const performNavigation = () => {
+      // Set bypass flag so beforeunload doesn't prompt again for this navigation
+      window.BYPASS_LOAD_CHECK = true;
+      e.preventDefault();
+      var href = t.href;
+      AppUtils.showLoader();
+      // Give the browser one animation frame to paint the loader before navigating
+      requestAnimationFrame(function () {
+        setTimeout(function () {
+          window.location.href = href;
+        }, 80);
+      });
+    };
+
+    // Check for active operations (currently only defined on Dashboard)
+    if (
+      typeof window.checkActiveRuns === "function" &&
+      window.checkActiveRuns()
+    ) {
+      e.preventDefault();
+      showAppAlert(
+        "Active Operation",
+        "Navigating to a new page will pause the ongoing operation. Do you want to continue?",
+        {
+          isConfirm: true,
+          confirmText: "Yes, Pause & Exit",
+          onConfirm: performNavigation,
+        },
+      );
+    } else {
+      performNavigation();
+    }
   }
 });
 
