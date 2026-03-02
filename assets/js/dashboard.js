@@ -12,6 +12,11 @@ let SELECTED_PURCHASERS = [];
 let CURRENT_ACTIVE_RUNS = [];
 let STAGING_COUNT = null;
 let IS_UNLOADING = false;
+/** Set to true by common.js via 'intelliextract:bypassunload' event when user confirmed navigation via the app modal. */
+let BYPASS_UNLOAD_CHECK = false;
+document.addEventListener("intelliextract:bypassunload", () => {
+  BYPASS_UNLOAD_CHECK = true;
+});
 
 const ROWS = [
   {
@@ -98,7 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const manualRuns = CURRENT_ACTIVE_RUNS.filter((r) => r.origin === "manual");
 
     // If there's an active manual run and we haven't already confirmed via custom modal
-    if (manualRuns.length > 0 && !window.BYPASS_LOAD_CHECK) {
+    if (manualRuns.length > 0 && !BYPASS_UNLOAD_CHECK) {
       e.preventDefault();
       // Most modern browsers show a generic message regardless of what we put here
       e.returnValue =
@@ -117,10 +122,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Expose check to global scope for common.js navigation interceptor
-  window.checkActiveRuns = function () {
-    return CURRENT_ACTIVE_RUNS.filter((r) => r.origin === "manual").length > 0;
-  };
+  // Decouple dashboard ↔ common.js communication via custom DOM events.
+  // common.js dispatches 'intelliextract:checkactiveruns' and reads e.detail.hasActiveRuns.
+  document.addEventListener("intelliextract:checkactiveruns", (e) => {
+    const hasActive =
+      CURRENT_ACTIVE_RUNS.filter((r) => r.origin === "manual").length > 0;
+    // Write back into the event detail so the dispatcher can read it synchronously
+    if (e.detail) e.detail.hasActiveRuns = hasActive;
+  });
 });
 
 /**

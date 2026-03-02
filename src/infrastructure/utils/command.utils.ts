@@ -1,7 +1,39 @@
 import { join } from "node:path";
 import { existsSync, copyFileSync, unlinkSync } from "node:fs";
 
-export function addPairArgs(base: string[], p: any) {
+/** Runtime parameters for a case run (CLI flags). */
+export interface RunParams {
+  syncLimit?: number;
+  extractLimit?: number;
+  tenant?: string;
+  purchaser?: string;
+  pairs?: { tenant: string; purchaser: string }[];
+  retryFailed?: boolean;
+  skipCompleted?: boolean;
+  concurrency?: number;
+  requestsPerSecond?: number;
+  caseId?: string;
+}
+
+/** Options passed at invocation time (resume state, run key, etc.). */
+export interface RunOptions {
+  resume?: boolean;
+  runId?: string;
+  runKey?: string;
+  lastSyncDone?: number;
+  status?: string;
+}
+
+/** The tuple returned by a case command builder: [cmd, args, spawnOpts]. */
+export type SpawnArgs = [string, string[], Record<string, unknown>];
+
+/** Case command builder function signature. */
+export type CaseCommandFn = (
+  params?: RunParams,
+  runOpts?: RunOptions,
+) => Promise<SpawnArgs> | SpawnArgs;
+
+export function addPairArgs(base: string[], p: RunParams | undefined) {
   if (p?.pairs && Array.isArray(p.pairs) && p.pairs.length > 0) {
     base.push("--pairs", JSON.stringify(p.pairs));
   } else {
@@ -11,16 +43,17 @@ export function addPairArgs(base: string[], p: any) {
 }
 
 export function syncArgs(
-  p: any,
-  runOpts: any,
+  p: RunParams | undefined,
+  runOpts: RunOptions | null,
   root: string,
-): [string, string[], any] {
+): SpawnArgs {
   const base = ["dist/index.js", "sync"];
   let limit = p?.syncLimit;
 
   if (
     runOpts &&
     runOpts.resume &&
+    limit !== undefined &&
     limit > 0 &&
     runOpts.lastSyncDone !== undefined &&
     runOpts.lastSyncDone > 0
@@ -28,21 +61,23 @@ export function syncArgs(
     limit = Math.max(0, limit - runOpts.lastSyncDone);
   }
 
-  if (limit > 0) base.push("--limit", String(limit));
+  if (limit !== undefined && limit > 0) base.push("--limit", String(limit));
   addPairArgs(base, p);
   return ["node", base, { cwd: root }];
 }
 
 export function runArgs(
-  p: any,
+  p: RunParams | undefined,
   extra: string[] = [],
-  runOpts: any = null,
+  runOpts: RunOptions | null = null,
   root: string,
-): [string, string[], any] {
+): SpawnArgs {
   const base = ["dist/index.js", "run", ...extra];
-  if (runOpts && runOpts.runId) base.push("--run-id", runOpts.runId);
-  if (p?.syncLimit > 0) base.push("--sync-limit", String(p.syncLimit));
-  if (p?.extractLimit > 0) base.push("--extract-limit", String(p.extractLimit));
+  if (runOpts?.runId) base.push("--run-id", runOpts.runId);
+  if (p?.syncLimit && p.syncLimit > 0)
+    base.push("--sync-limit", String(p.syncLimit));
+  if (p?.extractLimit && p.extractLimit > 0)
+    base.push("--extract-limit", String(p.extractLimit));
   if (p?.retryFailed) base.push("--retry-failed");
   if (p?.skipCompleted) base.push("--skip-completed");
   addPairArgs(base, p);
@@ -50,10 +85,10 @@ export function runArgs(
 }
 
 export function pipelineArgs(
-  p: any,
-  opts: any = {},
+  p: RunParams | undefined,
+  opts: RunOptions = {},
   root: string,
-): [string, string[], any] {
+): SpawnArgs {
   const base = ["dist/index.js", "sync-extract"];
   if (opts.resume) base.push("--resume");
   if (opts.runId) base.push("--run-id", opts.runId);
@@ -71,31 +106,25 @@ export function pipelineArgs(
 export function getCaseCommands(
   root: string,
   lastRunIdProvider: () => Promise<string | null>,
-): Record<
-  string,
-  (
-    p?: any,
-    runOpts?: any,
-  ) => Promise<[string, string[], any]> | [string, string[], any]
-> {
+): Record<string, CaseCommandFn> {
   return {
-    P1: (p, runOpts) => syncArgs(p, runOpts, root),
-    P2: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts, root),
-    PIPE: (p, opts) => pipelineArgs(p, opts || {}, root),
+    P1: (p, runOpts) => syncArgs(p, runOpts ?? null, root),
+    P2: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts ?? null, root),
+    PIPE: (p, opts) => pipelineArgs(p, opts ?? {}, root),
     P3: () => ["node", ["dist/index.js", "report"], { cwd: root }],
     P4: (p, runOpts) => {
       const base = ["dist/index.js", "sync", "-c", "config/config.yaml"];
       let limit = p?.syncLimit;
       if (
-        runOpts &&
-        runOpts.resume &&
+        runOpts?.resume &&
+        limit !== undefined &&
         limit > 0 &&
         runOpts.lastSyncDone !== undefined &&
         runOpts.lastSyncDone > 0
       ) {
         limit = Math.max(0, limit - runOpts.lastSyncDone);
       }
-      if (limit > 0) base.push("--limit", String(limit));
+      if (limit !== undefined && limit > 0) base.push("--limit", String(limit));
       return ["node", base, { cwd: root }];
     },
     P5: (p, runOpts) => runArgs(p, [], runOpts, root),
@@ -118,8 +147,8 @@ export function getCaseCommands(
       ["dist/index.js", "report", "--run-id", "run_0000000000_fake"],
       { cwd: root },
     ],
-    N3: (p, runOpts) => syncArgs(p, runOpts, root),
-    E1: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts, root),
+    N3: (p, runOpts) => syncArgs(p, runOpts ?? null, root),
+    E1: (p, runOpts) => runArgs(p, ["--no-sync"], runOpts ?? null, root),
     E2: (p) => {
       const dbPath = join(root, "output", "records", "intelliextract.db");
       if (existsSync(dbPath)) {
@@ -130,14 +159,14 @@ export function getCaseCommands(
       }
       return runArgs(p, ["--no-sync"], null, root);
     },
-    E3: (p, runOpts) => syncArgs(p, runOpts, root),
+    E3: (p, runOpts) => syncArgs(p, runOpts ?? null, root),
     E4: async () => {
       const runId = (await lastRunIdProvider()) || "run_0000000000_fake";
       return [
         "node",
         ["dist/index.js", "report", "--run-id", runId],
         { cwd: root },
-      ] as [string, string[], any];
+      ] as SpawnArgs;
     },
     E5: (p) => runArgs(p, ["--no-sync"], null, root),
   };

@@ -11,33 +11,29 @@ import { hasOverlap } from "../../infrastructure/utils/concurrency.utils.js";
 
 import { z } from "zod";
 import { RunRequestSchema } from "../validation.js";
+import { parseSyncSummaryFromStdout } from "../../infrastructure/utils/stdout-parser.utils.js";
+import type { RunOptions } from "../../infrastructure/utils/command.utils.js";
 
 export type RunRequest = z.infer<typeof RunRequestSchema>;
 
-function parseSyncSummaryFromStdout(stdout: string): {
-  downloaded: number;
-  skipped: number;
-  errors: number;
-  totalInInventory: number;
-} | null {
-  if (!stdout || typeof stdout !== "string") return null;
-  const downloadedM = /Downloaded\s*\(new\):\s*(\d+)/i.exec(stdout);
-  const skippedM =
-    /Skipped\s*\(already\s*present[^:]*:\s*(\d+)/i.exec(stdout) ||
-    /Skipped:\s*(\d+)/i.exec(stdout);
-  const errorsM = /Errors:\s*(\d+)/i.exec(stdout);
-  const downloaded = downloadedM ? parseInt(downloadedM[1], 10) : 0;
-  const skipped = skippedM ? parseInt(skippedM[1], 10) : 0;
-  const errors = errorsM ? parseInt(errorsM[1], 10) : 0;
-  if (downloadedM || skippedM || errorsM) {
-    return {
-      downloaded,
-      skipped,
-      errors,
-      totalInInventory: downloaded + skipped,
-    };
-  }
-  return null;
+/** Typed shape for the in-memory active run info object. */
+interface ActiveRunInfo {
+  caseId: string;
+  params: Record<string, unknown>;
+  startTime: string;
+  status: "running" | "syncing" | "extracting";
+  origin: "manual";
+  runId?: string;
+  syncProgress?: { done: number; total: number };
+  extractProgress?: { done: number; total: number };
+  resumeSkipSyncProgress?: { skipped: number; total: number };
+  resumeSkipExtractProgress?: { skipped: number; total: number };
+  syncSummary?: {
+    downloaded: number;
+    skipped: number;
+    errors: number;
+    totalInInventory: number;
+  };
 }
 
 export class ExtractionController {
@@ -106,14 +102,14 @@ export class ExtractionController {
       caseId,
       syncLimit,
       extractLimit,
-      tenant,
-      purchaser,
-      pairs,
+      tenant: tenant ?? undefined,
+      purchaser: purchaser ?? undefined,
+      pairs: pairs ?? undefined,
       retryFailed,
     };
 
     // Check resume state
-    let runOpts: any = null;
+    let runOpts: RunOptions | null = null;
     if (this.resumeCapableCases.has(caseId)) {
       const state = await this.runStateService.getRunState(caseId);
       if (state && state.status === "stopped" && state.runId) {
@@ -125,7 +121,7 @@ export class ExtractionController {
       }
     }
 
-    const runInfo: any = {
+    const runInfo: ActiveRunInfo = {
       caseId,
       params,
       startTime: new Date().toISOString(),
@@ -190,9 +186,7 @@ export class ExtractionController {
         // Fetch real stats from DB
         const status = await this.recordRepo.getRunStatus();
         if (status.runId) {
-          const records = await this.recordRepo.getRecordsForRun(
-            status.runId,
-          );
+          const records = await this.recordRepo.getRecordsForRun(status.runId);
           const doneRecords = records.filter(
             (r: ExtractionRecord) => r.status === "done",
           );

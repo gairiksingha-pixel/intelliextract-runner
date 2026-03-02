@@ -361,7 +361,7 @@ document.addEventListener("click", function (e) {
   if (!isSamePage) {
     const performNavigation = () => {
       // Set bypass flag so beforeunload doesn't prompt again for this navigation
-      window.BYPASS_LOAD_CHECK = true;
+      document.dispatchEvent(new CustomEvent("intelliextract:bypassunload"));
       e.preventDefault();
       var href = t.href;
       AppUtils.showLoader();
@@ -373,11 +373,15 @@ document.addEventListener("click", function (e) {
       });
     };
 
-    // Check for active operations (currently only defined on Dashboard)
-    if (
-      typeof window.checkActiveRuns === "function" &&
-      window.checkActiveRuns()
-    ) {
+    // Check for active operations using a custom event (no window global needed)
+    // The dashboard listens for this event and writes back hasActiveRuns to detail.
+    const activeRunDetail = { hasActiveRuns: false };
+    document.dispatchEvent(
+      new CustomEvent("intelliextract:checkactiveruns", {
+        detail: activeRunDetail,
+      }),
+    );
+    if (activeRunDetail.hasActiveRuns) {
       e.preventDefault();
       showAppAlert(
         "Active Operation",

@@ -1,4 +1,10 @@
 import { spawn, ChildProcess } from "node:child_process";
+import type {
+  CaseCommandFn,
+  RunParams,
+  RunOptions,
+  SpawnArgs,
+} from "../utils/command.utils.js";
 
 export interface ProcessOrchestratorCallbacks {
   onProgress?: (percent: number, done: number, total: number) => void;
@@ -8,11 +14,7 @@ export interface ProcessOrchestratorCallbacks {
   onResumeSkipSync?: (skipped: number, total: number) => void;
   onRunId?: (runId: string) => void;
   /** Sync-only summary: downloaded, skipped, errors (from SYNC_SUMMARY line). */
-  onSyncSummary?: (
-    downloaded: number,
-    skipped: number,
-    errors: number,
-  ) => void;
+  onSyncSummary?: (downloaded: number, skipped: number, errors: number) => void;
   onChild?: (child: ChildProcess) => void;
 }
 
@@ -36,30 +38,22 @@ const SYNC_SUMMARY_PREFIX = "SYNC_SUMMARY\t";
 export class ProcessOrchestrator {
   private activeProcesses = new Map<string, ChildProcess>();
 
-  constructor(
-    private caseCommands: Record<
-      string,
-      (
-        p?: any,
-        runOpts?: any,
-      ) => Promise<[string, string[], any]> | [string, string[], any]
-    >,
-  ) {}
+  constructor(private caseCommands: Record<string, CaseCommandFn>) {}
 
   async runCase(
     caseId: string,
-    params: any = {},
+    params: RunParams = {},
     callbacks: ProcessOrchestratorCallbacks = {},
-    runOpts: any = null,
+    runOpts: RunOptions | null = null,
   ): Promise<RunCaseResult> {
     const def = this.caseCommands[caseId];
     if (!def) {
       throw new Error(`Unknown case: ${caseId}`);
     }
 
-    const resolved =
+    const resolved: SpawnArgs =
       typeof def === "function"
-        ? await (def as Function)(params, runOpts)
+        ? await def(params as RunParams, runOpts as RunOptions)
         : def;
     const [cmd, args, opts] = resolved;
     const displayCmd = args ? [cmd, ...args].join(" ") : cmd;
@@ -161,10 +155,7 @@ export class ProcessOrchestrator {
               if (callbacks.onRunId) callbacks.onRunId(runId);
             }
           }
-          if (
-            callbacks.onSyncSummary &&
-            line.startsWith(SYNC_SUMMARY_PREFIX)
-          ) {
+          if (callbacks.onSyncSummary && line.startsWith(SYNC_SUMMARY_PREFIX)) {
             const parts = line.slice(SYNC_SUMMARY_PREFIX.length).split("\t");
             if (parts.length >= 3) {
               const downloaded = Number(parts[0]);

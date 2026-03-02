@@ -6,7 +6,7 @@ import { IRunStatusStore } from "../domain/services/run-status-store.service.js"
 import { IReportGenerationService } from "../domain/services/report-generation.service.js";
 import { IExtractionRecordRepository } from "../domain/repositories/extraction-record.repository.js";
 import { relative } from "node:path";
-import { normalizeRelativePath } from "../../infrastructure/utils/storage.utils.js";
+import { normalizeRelativePath } from "../domain/utils.js";
 
 export type WorkflowCaseId = "PIPE" | "SYNC" | "EXTRACT" | "P1" | "P2";
 
@@ -26,6 +26,8 @@ export interface WorkflowRequest {
   concurrency?: number;
   requestsPerSecond?: number;
   skipCompleted?: boolean;
+  /** Override the S3 bucket name. Defaults to "intelliextract-staging". */
+  bucketName?: string;
 }
 
 export type WorkflowProgressType =
@@ -100,7 +102,7 @@ export class ExecuteWorkflowUseCase {
           const results = await this.syncBrand.execute({
             buckets: [
               {
-                bucket: "intelliextract-staging",
+                bucket: request.bucketName ?? "intelliextract-staging",
                 prefix: `${pair.tenant}/`,
                 name: pair.tenant,
                 purchaser: pair.purchaser,

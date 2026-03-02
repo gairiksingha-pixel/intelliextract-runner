@@ -48,7 +48,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PORT = 8767;
+const PORT = parseInt(process.env.PORT ?? "8767", 10);
 const ROOT = resolve(__dirname, "..");
 const BRAND_PURCHASERS = loadBrandPurchasers();
 
@@ -71,7 +71,12 @@ const DATABASE_PATH = resolve(ROOT, _rawExtractionRecordPath);
 
 // 2. Initialize Repositories
 const recordRepo = new SqliteExtractionRecordRepository(DATABASE_PATH);
-await recordRepo.initialize();
+try {
+  await recordRepo.initialize();
+} catch (err) {
+  console.error("[server] FATAL: Could not initialize database:", err);
+  process.exit(1);
+}
 const syncRepo = new SqliteSyncRepository(DATABASE_PATH);
 const scheduleRepo = new SqliteScheduleRepository(DATABASE_PATH);
 const logger = new SqliteLogger(recordRepo);
@@ -199,9 +204,25 @@ const router = new Router(
 );
 
 // 7. Start the HTTP Server
-createServer(async (req, res) => {
+const httpServer = createServer(async (req, res) => {
   await router.handleRequest(req, res);
 }).listen(PORT, () => {
   console.log(`IntelliExtract app: http://localhost:${PORT}/`);
   cronManager.bootstrap();
 });
+
+// Graceful shutdown — drain in-flight requests before exiting
+function shutdown(signal: string) {
+  console.log(`[server] Received ${signal}. Shutting down gracefully...`);
+  httpServer.close(async () => {
+    try {
+      await recordRepo.close();
+    } catch (_) {}
+    console.log("[server] HTTP server closed. Exiting.");
+    process.exit(0);
+  });
+  // Force exit if shutdown takes too long
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
