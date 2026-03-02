@@ -4,12 +4,13 @@ import { loadHistoricalRunSummaries } from "../presenters/report.js";
 import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { PageLayout } from "../../infrastructure/views/page-layout.js";
 import { RunSummaryView } from "../../infrastructure/views/run-summary.view.js";
+import { Config } from "../../core/domain/entities/config.entity.js";
 
 export class ReportPageController {
   constructor(
     private dashboardController: DashboardController,
     private recordRepo: IExtractionRecordRepository,
-    private appConfig: any,
+    private appConfig: Config,
     private staticAssets: { logo: string; smallLogo: string; favIcon: string },
     private brandPurchasers: Record<string, string[]>,
   ) {}
@@ -53,9 +54,10 @@ export class ReportPageController {
 
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(html);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end("Error generating report: " + (e.message || "Unknown error"));
+      res.end("Error generating report: " + (msg || "Unknown error"));
     }
   }
 
@@ -91,11 +93,10 @@ export class ReportPageController {
 
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(html);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end(
-        "Error generating summary report: " + (e.message || "Unknown error"),
-      );
+      res.end("Error generating summary report: " + (msg || "Unknown error"));
     }
   }
 
@@ -107,11 +108,10 @@ export class ReportPageController {
       });
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(html);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end(
-        "Error generating explorer page: " + (e.message || "Unknown error"),
-      );
+      res.end("Error generating explorer page: " + (msg || "Unknown error"));
     }
   }
 
@@ -123,11 +123,10 @@ export class ReportPageController {
       });
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(html);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       res.writeHead(500, { "Content-Type": "text/plain" });
-      res.end(
-        "Error generating inventory report: " + (e.message || "Unknown error"),
-      );
+      res.end("Error generating inventory report: " + (msg || "Unknown error"));
     }
   }
 }

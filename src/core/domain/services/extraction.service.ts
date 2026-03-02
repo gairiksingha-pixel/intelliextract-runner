@@ -11,7 +11,7 @@ export interface ExtractionResult {
   latencyMs: number;
   patternKey?: string;
   errorMessage?: string;
-  fullResponse?: any;
+  fullResponse?: unknown;
 }
 
 export interface IExtractionService {

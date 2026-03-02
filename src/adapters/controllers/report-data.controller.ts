@@ -1,11 +1,12 @@
 import { ServerResponse } from "node:http";
 import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { loadHistoricalRunSummaries } from "../presenters/report.js";
+import { Config } from "../../core/domain/entities/config.entity.js";
 
 export class ReportDataController {
   constructor(
     private recordRepo: IExtractionRecordRepository,
-    private appConfig: any,
+    private appConfig: Config,
   ) {}
 
   async listReports(res: ServerResponse) {
@@ -17,9 +18,10 @@ export class ReportDataController {
       };
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(list));
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: String(e.message || "Unknown error") }));
+      res.end(JSON.stringify({ error: msg || "Unknown error" }));
     }
   }
 
@@ -49,9 +51,10 @@ export class ReportDataController {
         "Content-Disposition": `attachment; filename="report_${runId}.json"`,
       });
       res.end(JSON.stringify(jsonPayload, null, 2));
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: String(e.message || "Unknown error") }));
+      res.end(JSON.stringify({ error: msg || "Unknown error" }));
     }
   }
 }

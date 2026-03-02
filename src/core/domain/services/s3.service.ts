@@ -14,9 +14,11 @@ export interface SyncFileSyncedJob {
   purchaser?: string;
 }
 
+import type { BucketConfig } from "../../use-cases/sync-brand.use-case.js";
+
 export interface IS3Service {
   syncBucket(
-    bucketConfig: any,
+    bucketConfig: BucketConfig,
     localDir: string,
     options?: {
       /** Max new downloads. Skipped (unchanged) files do not count. */

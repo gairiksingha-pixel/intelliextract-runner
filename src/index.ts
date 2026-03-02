@@ -11,14 +11,19 @@ import {
 } from "./infrastructure/utils/config.utils.js";
 import { Config } from "./core/domain/entities/config.entity.js";
 import { SqliteExtractionRecordRepository } from "./infrastructure/database/sqlite-extraction-record.repository.js";
+import { ExtractionRecord } from "./core/domain/entities/extraction-record.entity.js";
 import { SqliteSyncRepository } from "./infrastructure/database/sqlite-sync.repository.js";
 import { SyncBrandUseCase } from "./core/use-cases/sync-brand.use-case.js";
-import { RunExtractionUseCase } from "./core/use-cases/run-extraction.use-case.js";
+import {
+  RunExtractionUseCase,
+  RunExtractionRequest,
+} from "./core/use-cases/run-extraction.use-case.js";
 import { AwsS3Service } from "./infrastructure/services/aws-s3.service.js";
 import { IntelliExtractService } from "./infrastructure/services/intelli-extract.service.js";
 import { SqliteLogger } from "./infrastructure/services/sqlite-logger.service.js";
 import { DiscoverFilesUseCase } from "./core/use-cases/discover-files.use-case.js";
 import { NodemailerEmailService } from "./infrastructure/services/nodemailer-email.service.js";
+import { FailureDetail } from "./core/domain/services/email.service.js";
 import { computeMetrics } from "./infrastructure/utils/metrics.utils.js";
 import { normalizeRelativePath } from "./infrastructure/utils/storage.utils.js";
 import { join, dirname, relative } from "node:path";
@@ -155,18 +160,9 @@ program
 
       printSyncResults(results, syncLimit);
       if (stdoutPiped) {
-        const totalSynced = results.reduce(
-          (s: number, r: any) => s + r.synced,
-          0,
-        );
-        const totalSkipped = results.reduce(
-          (s: number, r: any) => s + r.skipped,
-          0,
-        );
-        const totalErrors = results.reduce(
-          (s: number, r: any) => s + r.errors,
-          0,
-        );
+        const totalSynced = results.reduce((s: number, r) => s + r.synced, 0);
+        const totalSkipped = results.reduce((s: number, r) => s + r.skipped, 0);
+        const totalErrors = results.reduce((s: number, r) => s + r.errors, 0);
         process.stdout.write(
           `SYNC_SUMMARY\t${totalSynced}\t${totalSkipped}\t${totalErrors}\n`,
           () => {},
@@ -178,7 +174,16 @@ program
     }
   });
 
-function printSyncResults(results: any[], syncLimit?: number) {
+function printSyncResults(
+  results: Array<{
+    brand: string;
+    purchaser?: string;
+    synced: number;
+    skipped: number;
+    errors: number;
+  }>,
+  syncLimit?: number,
+) {
   const totalSynced = results.reduce((s, r) => s + r.synced, 0);
   const totalSkipped = results.reduce((s, r) => s + r.skipped, 0);
   const totalErrors = results.reduce((s, r) => s + r.errors, 0);
@@ -275,7 +280,7 @@ program
       if (stdoutPiped) process.stdout.write(`RUN_ID\t${runId}\n`);
       console.log(`Starting Run: ${runId}`);
 
-      let filesToExtract: any[] = [];
+      let filesToExtract: RunExtractionRequest["files"] = [];
 
       // Operation 2: Extract Only (no sync)
       // Check database first for files synced but not yet extracted (Start Operation)
@@ -550,7 +555,7 @@ program
       let extractionDone = 0;
       let aborted = false;
       const startTime = new Date();
-      const failures: any[] = [];
+      const failures: FailureDetail[] = [];
       logger.init(runId);
 
       const s3Service = new AwsS3Service(config.s3.region, syncRepo);
@@ -587,12 +592,12 @@ program
             extractionDone++;
             // Record skip in current run so metrics showing "Extraction overview: Skipped: X" are correct
             await recordRepo.upsertRecord({
-              ...job,
+              ...(job as any),
               status: "skipped",
               runId,
               startedAt: new Date().toISOString(),
               finishedAt: new Date().toISOString(),
-            } as any);
+            });
 
             if (stdoutPiped) {
               process.stdout.write(
@@ -610,11 +615,11 @@ program
             try {
               const startedAt = new Date().toISOString();
               await recordRepo.upsertRecord({
-                ...job,
+                ...(job as any),
                 status: "running",
                 startedAt,
                 runId,
-              } as any);
+              });
               const result = await extractionService.extractFile(
                 job.filePath,
                 job.brand,
@@ -623,7 +628,7 @@ program
                 job.relativePath,
               );
               await recordRepo.upsertRecord({
-                ...job,
+                ...(job as any),
                 status: result.success ? "done" : "error",
                 startedAt,
                 finishedAt: new Date().toISOString(),
@@ -633,7 +638,7 @@ program
                 patternKey: result.patternKey,
                 fullResponse: result.fullResponse,
                 runId,
-              } as any);
+              });
               if (!result.success) {
                 failures.push({ ...job, ...result });
               }
@@ -662,13 +667,13 @@ program
               }
               failures.push({ ...job, errorMessage: err.message });
               await recordRepo.upsertRecord({
-                ...job,
+                ...(job as any),
                 status: "error",
                 startedAt: new Date().toISOString(),
                 finishedAt: new Date().toISOString(),
                 errorMessage: err.message || String(err),
                 runId,
-              } as any);
+              });
             } finally {
               extractionDone++;
               if (stdoutPiped)

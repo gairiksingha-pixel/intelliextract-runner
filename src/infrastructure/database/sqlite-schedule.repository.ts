@@ -4,6 +4,15 @@ import { dirname } from "node:path";
 import { Schedule } from "../../core/domain/entities/schedule.entity.js";
 import { IScheduleRepository } from "../../core/domain/repositories/schedule.repository.js";
 
+interface ScheduleRow {
+  id: string;
+  created_at: string;
+  brands: string;
+  purchasers: string;
+  cron: string;
+  timezone: string;
+}
+
 export class SqliteScheduleRepository implements IScheduleRepository {
   private _db: Database.Database | null = null;
 
@@ -23,8 +32,8 @@ export class SqliteScheduleRepository implements IScheduleRepository {
     const db = this.getDb();
     const rows = db
       .prepare("SELECT * FROM tbl_cron_schedules ORDER BY created_at DESC")
-      .all();
-    return rows.map((r: any) => ({
+      .all() as ScheduleRow[];
+    return rows.map((r: ScheduleRow) => ({
       id: r.id,
       createdAt: r.created_at,
       brands: JSON.parse(r.brands),

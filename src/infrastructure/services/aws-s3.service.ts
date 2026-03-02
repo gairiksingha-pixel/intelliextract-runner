@@ -24,6 +24,7 @@ import {
   ISyncRepository,
   ManifestEntry,
 } from "../../core/domain/repositories/sync.repository.js";
+import { BucketConfig } from "../../core/use-cases/sync-brand.use-case.js";
 
 export class AwsS3Service implements IS3Service {
   private s3Client: S3Client;
@@ -36,7 +37,7 @@ export class AwsS3Service implements IS3Service {
   }
 
   async syncBucket(
-    bucketConfig: any,
+    bucketConfig: BucketConfig,
     stagingDir: string,
     options?: {
       limitRemaining?: { value: number };

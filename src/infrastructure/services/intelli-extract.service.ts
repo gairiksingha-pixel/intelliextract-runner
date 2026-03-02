@@ -74,7 +74,7 @@ export class IntelliExtractService implements IExtractionService {
             ? `${baseErrorSnippet} (after ${attempts} attempt${attempts === 1 ? "" : "s"})`
             : baseErrorSnippet);
 
-    let fullResponse: any = undefined;
+    let fullResponse: unknown = undefined;
     if (result.body) {
       try {
         fullResponse = JSON.parse(result.body);

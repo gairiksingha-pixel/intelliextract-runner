@@ -2,6 +2,11 @@ import nodemailer from "nodemailer";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { INotificationService } from "../../core/domain/services/notification.service.js";
+import {
+  EmailConfig,
+  ExtractionRecord,
+  RunMetrics,
+} from "../../core/domain/types.js";
 
 export class NodemailerService implements INotificationService {
   private logoPath: string;
@@ -16,14 +21,14 @@ export class NodemailerService implements INotificationService {
     this.logoPath = join(process.cwd(), "assets", "logo.png");
   }
 
-  updateConfig(config: any) {
+  updateConfig(config: EmailConfig) {
     this.config = config;
   }
 
   async sendFailureNotification(
     runId: string,
-    failures: any[],
-    metrics?: any,
+    failures: ExtractionRecord[],
+    metrics?: RunMetrics,
   ): Promise<void> {
     if (failures.length === 0) return;
 

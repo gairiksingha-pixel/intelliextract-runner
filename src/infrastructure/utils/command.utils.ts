@@ -1,28 +1,7 @@
 import { join } from "node:path";
 import { existsSync, copyFileSync, unlinkSync } from "node:fs";
-
-/** Runtime parameters for a case run (CLI flags). */
-export interface RunParams {
-  syncLimit?: number;
-  extractLimit?: number;
-  tenant?: string;
-  purchaser?: string;
-  pairs?: { tenant: string; purchaser: string }[];
-  retryFailed?: boolean;
-  skipCompleted?: boolean;
-  concurrency?: number;
-  requestsPerSecond?: number;
-  caseId?: string;
-}
-
-/** Options passed at invocation time (resume state, run key, etc.). */
-export interface RunOptions {
-  resume?: boolean;
-  runId?: string;
-  runKey?: string;
-  lastSyncDone?: number;
-  status?: string;
-}
+import { RunParams, RunOptions } from "../../core/domain/types.js";
+export { RunParams, RunOptions };
 
 /** The tuple returned by a case command builder: [cmd, args, spawnOpts]. */
 export type SpawnArgs = [string, string[], Record<string, unknown>];

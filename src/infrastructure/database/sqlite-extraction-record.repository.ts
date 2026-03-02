@@ -216,7 +216,9 @@ export class SqliteExtractionRecordRepository implements IExtractionRecordReposi
     // M2: Drop obsolete columns from tbl_runs (origin, metadata — never used)
     try {
       const runCols = (
-        db.prepare("PRAGMA table_info(tbl_runs)").all() as any[]
+        db.prepare("PRAGMA table_info(tbl_runs)").all() as Array<{
+          name: string;
+        }>
       ).map((c) => c.name);
       if (runCols.includes("origin"))
         db.exec("ALTER TABLE tbl_runs DROP COLUMN origin;");
@@ -233,7 +235,9 @@ export class SqliteExtractionRecordRepository implements IExtractionRecordReposi
     // (latencyMs, statusCode, patternKey, fullResponse, extractError — all lived in tbl_run_records)
     try {
       const regCols = (
-        db.prepare("PRAGMA table_info(tbl_file_registry)").all() as any[]
+        db.prepare("PRAGMA table_info(tbl_file_registry)").all() as Array<{
+          name: string;
+        }>
       ).map((c) => c.name);
       const toDrop = [
         "latencyMs",
@@ -264,7 +268,9 @@ export class SqliteExtractionRecordRepository implements IExtractionRecordReposi
     // M5: Simplify tbl_schedule_logs — drop redundant structured columns, keep only id+timestamp+data
     try {
       const schCols = (
-        db.prepare("PRAGMA table_info(tbl_schedule_logs)").all() as any[]
+        db.prepare("PRAGMA table_info(tbl_schedule_logs)").all() as Array<{
+          name: string;
+        }>
       ).map((c) => c.name);
       const legacyCols = ["scheduleId", "outcome", "level", "message"];
       for (const col of legacyCols) {

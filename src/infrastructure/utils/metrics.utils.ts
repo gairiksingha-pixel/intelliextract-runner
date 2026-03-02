@@ -1,4 +1,5 @@
 import { quantile } from "simple-statistics";
+import type { ExtractionRecord, Anomaly } from "../../core/domain/types.js";
 
 const TOP_SLOWEST_N = 5;
 
@@ -8,7 +9,7 @@ const TOP_SLOWEST_N = 5;
  */
 export function computeMetrics(
   runId: string,
-  records: any[],
+  records: ExtractionRecord[],
   startedAt?: Date,
   finishedAt?: Date,
 ) {
@@ -118,7 +119,7 @@ export function computeMetrics(
 }
 
 function inferErrorType(
-  record: any,
+  record: ExtractionRecord,
 ): "timeout" | "clientError" | "serverError" | "readError" | "other" {
   const code = record.statusCode ?? 0;
   const msg = (record.errorMessage ?? "").toLowerCase();
@@ -132,7 +133,7 @@ function inferErrorType(
   return "other";
 }
 
-function computeFailureBreakdown(failed: any[]) {
+function computeFailureBreakdown(failed: ExtractionRecord[]) {
   const breakdown = {
     timeout: 0,
     clientError: 0,
@@ -146,7 +147,7 @@ function computeFailureBreakdown(failed: any[]) {
   return breakdown;
 }
 
-function computeTopSlowestFiles(done: any[]) {
+function computeTopSlowestFiles(done: ExtractionRecord[]) {
   return done
     .filter((r) => typeof r.latencyMs === "number" && r.latencyMs >= 0)
     .sort((a, b) => (b.latencyMs ?? 0) - (a.latencyMs ?? 0))
@@ -161,7 +162,7 @@ function computeTopSlowestFiles(done: any[]) {
     }));
 }
 
-function computeFailureCountByBrand(failed: any[]) {
+function computeFailureCountByBrand(failed: ExtractionRecord[]) {
   const byBrand = new Map<string, number>();
   for (const r of failed) {
     byBrand.set(r.brand, (byBrand.get(r.brand) ?? 0) + 1);
@@ -171,8 +172,8 @@ function computeFailureCountByBrand(failed: any[]) {
     .sort((a, b) => b.count - a.count);
 }
 
-function detectAnomalies(records: any[], p95: number) {
-  const anomalies: any[] = [];
+function detectAnomalies(records: ExtractionRecord[], p95: number): Anomaly[] {
+  const anomalies: Anomaly[] = [];
   const threshold = p95 * 2;
   for (const r of records) {
     if (r.status === "done" && r.latencyMs != null && r.latencyMs > threshold) {

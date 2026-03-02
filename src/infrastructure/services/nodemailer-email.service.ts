@@ -6,6 +6,7 @@ import {
   EmailConfig,
   FailureDetail,
 } from "../../core/domain/services/email.service.js";
+import { RunMetrics } from "../../core/domain/types.js";
 import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 
 export class NodemailerEmailService implements IEmailService {
@@ -22,7 +23,7 @@ export class NodemailerEmailService implements IEmailService {
   async sendConsolidatedFailureEmail(
     runId: string,
     failures: FailureDetail[],
-    metrics?: any,
+    metrics?: RunMetrics,
   ): Promise<void> {
     if (failures.length === 0) return;
 

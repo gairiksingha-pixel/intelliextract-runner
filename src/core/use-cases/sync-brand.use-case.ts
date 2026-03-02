@@ -6,8 +6,18 @@ import {
 import { ISyncRepository } from "../domain/repositories/sync.repository.js";
 import PQueue from "p-queue";
 
+export interface BucketConfig {
+  /** S3 bucket name */
+  bucket: string;
+  /** Key prefix to sync (e.g. "brand-a/") */
+  prefix?: string;
+  /** Human-readable brand/tenant name */
+  name: string;
+  purchaser?: string;
+}
+
 export interface SyncBrandRequest {
-  buckets: any[];
+  buckets: BucketConfig[];
   stagingDir: string;
   /** Max new downloads across ALL buckets (skipped unchanged files do not count). */
   limit?: number;

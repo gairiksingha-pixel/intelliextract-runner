@@ -1,6 +1,9 @@
 import { IExtractionRecordRepository } from "../domain/repositories/extraction-record.repository.js";
 import { ExtractionRecord } from "../domain/entities/extraction-record.entity.js";
-import { ExtractionFileDetails } from "../domain/types.js";
+import {
+  ExtractionFileDetails,
+  RawExtractionResponse,
+} from "../domain/types.js";
 import { FileMetadataService } from "../domain/services/file-metadata.service.js";
 
 export class GetExtractionDataUseCase {
@@ -20,7 +23,7 @@ export class GetExtractionDataUseCase {
         (c: ExtractionRecord) => c.status === "done" || c.status === "error",
       )
       .map((c: ExtractionRecord) => {
-        const fullResponse = c.fullResponse || {};
+        const fullResponse = (c.fullResponse || {}) as RawExtractionResponse;
         const status = (c.status === "done" ? "success" : "failed") as
           | "success"
           | "failed";

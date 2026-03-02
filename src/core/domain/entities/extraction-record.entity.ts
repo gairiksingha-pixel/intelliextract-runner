@@ -18,5 +18,5 @@ export interface ExtractionRecord {
   patternKey?: string;
   runId: string;
   purchaser?: string;
-  fullResponse?: any;
+  fullResponse?: unknown;
 }

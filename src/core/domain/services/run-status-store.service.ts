@@ -1,13 +1,21 @@
+import { RunParams } from "../types.js";
+
+export interface ProgressSnapshot {
+  done: number;
+  total: number;
+  percent?: number;
+}
+
 export interface RunInfo {
   caseId: string;
   runId?: string;
   startTime: string;
   origin?: "manual" | "scheduled";
-  params?: any;
+  params?: RunParams;
   status: string;
-  progress?: any;
-  syncProgress?: any;
-  extractProgress?: any;
+  progress?: ProgressSnapshot;
+  syncProgress?: ProgressSnapshot;
+  extractProgress?: ProgressSnapshot;
 }
 
 export interface IRunStatusStore {

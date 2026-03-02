@@ -1,6 +1,10 @@
 import { ServerResponse } from "node:http";
 import { ProcessOrchestrator } from "../../infrastructure/services/process-orchestrator.service.js";
-import { IRunStatusStore } from "../../core/domain/services/run-status-store.service.js";
+import {
+  IRunStatusStore,
+  RunInfo,
+} from "../../core/domain/services/run-status-store.service.js";
+import { RunParams, RunOptions } from "../../core/domain/types.js";
 import {
   IRunStateService,
   RunState,
@@ -12,14 +16,11 @@ import { hasOverlap } from "../../infrastructure/utils/concurrency.utils.js";
 import { z } from "zod";
 import { RunRequestSchema } from "../validation.js";
 import { parseSyncSummaryFromStdout } from "../../infrastructure/utils/stdout-parser.utils.js";
-import type { RunOptions } from "../../infrastructure/utils/command.utils.js";
 
 export type RunRequest = z.infer<typeof RunRequestSchema>;
 
-/** Typed shape for the in-memory active run info object. */
-interface ActiveRunInfo {
-  caseId: string;
-  params: Record<string, unknown>;
+interface ActiveRunInfo extends RunInfo {
+  params: RunParams;
   startTime: string;
   status: "running" | "syncing" | "extracting";
   origin: "manual";
@@ -76,7 +77,7 @@ export class ExtractionController {
     const requestedScope = { tenant, purchaser, pairs };
     const overlappingRun = this.runStatusStore
       .getActiveRuns()
-      .find((r: any) => hasOverlap(requestedScope, r.params || {}));
+      .find((r) => hasOverlap(requestedScope, r.params || {}));
     if (overlappingRun) {
       res.writeHead(409, { "Content-Type": "application/json" });
       res.end(
@@ -250,8 +251,9 @@ export class ExtractionController {
           exitCode: result.exitCode,
         });
       }
-    } catch (e: any) {
-      writeLine({ type: "error", message: e.message || "Unknown error" });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      writeLine({ type: "error", message: msg || "Unknown error" });
     } finally {
       this.runStatusStore.unregisterRun(caseId);
       if (!res.writableEnded) res.end();

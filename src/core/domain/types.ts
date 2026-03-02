@@ -2,6 +2,42 @@
  * Shared types for IntelliExtract test stub
  */
 
+export interface RunParams {
+  syncLimit?: number;
+  extractLimit?: number;
+  tenant?: string;
+  purchaser?: string;
+  pairs?: { tenant: string; purchaser: string }[];
+  retryFailed?: boolean;
+  skipCompleted?: boolean;
+  concurrency?: number;
+  requestsPerSecond?: number;
+  caseId?: string;
+}
+
+export interface RunOptions {
+  resume?: boolean;
+  runId?: string;
+  runKey?: string;
+  lastSyncDone?: number;
+  status?: string;
+}
+
+export interface RawExtractionResponse {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  pattern?: {
+    pattern_key?: string;
+    purchaser_key?: string;
+  };
+  _runId?: string;
+  _relativePath?: string;
+  _brand?: string;
+  _purchaser?: string;
+  [key: string]: unknown;
+}
+
 export interface ApiConfig {
   baseUrl: string;
   timeoutMs: number;
@@ -85,7 +121,7 @@ export interface ExtractionRecord {
   patternKey?: string;
   runId: string;
   purchaser?: string;
-  fullResponse?: any;
+  fullResponse?: unknown;
 }
 
 export interface RequestResponseLogEntry {
@@ -217,7 +253,7 @@ export interface ExtractionFileDetails {
   patternKey: string | null;
   purchaserKey: string | null;
   success: boolean | null;
-  json: any;
+  json: unknown;
   runId: string | null;
   sourceRelativePath: string | null;
   sourceBrand: string | null;

@@ -1,3 +1,5 @@
+import { RunMetrics } from "../types.js";
+
 export interface EmailConfig {
   recipientEmail?: string;
   senderEmail?: string;
@@ -19,7 +21,7 @@ export interface IEmailService {
   sendConsolidatedFailureEmail(
     runId: string,
     failures: FailureDetail[],
-    metrics?: any,
+    metrics?: RunMetrics,
   ): Promise<void>;
   sendFailureEmail(params: FailureDetail & { runId: string }): Promise<void>;
 }

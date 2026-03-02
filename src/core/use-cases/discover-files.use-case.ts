@@ -1,15 +1,22 @@
 import { join, relative } from "node:path";
 import { readdirSync, statSync, existsSync } from "node:fs";
-import { normalizeRelativePath } from "../../infrastructure/utils/storage.utils.js";
+import { normalizeRelativePath } from "../../core/domain/utils.js";
 
 export interface DiscoverFilesRequest {
   stagingDir: string;
   pairs?: Array<{ brand: string; purchaser: string }>;
 }
 
+interface DiscoveredFile {
+  filePath: string;
+  relativePath: string;
+  brand: string;
+  purchaser: string;
+}
+
 export class DiscoverFilesUseCase {
-  execute(request: DiscoverFilesRequest): any[] {
-    const files: any[] = [];
+  execute(request: DiscoverFilesRequest): DiscoveredFile[] {
+    const files: DiscoveredFile[] = [];
 
     if (request.pairs && request.pairs.length > 0) {
       for (const pair of request.pairs) {

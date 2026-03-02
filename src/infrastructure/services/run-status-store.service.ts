@@ -4,7 +4,7 @@ import {
 } from "../../core/domain/services/run-status-store.service.js";
 
 export class RunStatusStore implements IRunStatusStore {
-  constructor(private activeRunsMap: Map<string, any>) {}
+  constructor(private activeRunsMap: Map<string, RunInfo>) {}
 
   registerRun(run: RunInfo): void {
     this.activeRunsMap.set(run.caseId, run);

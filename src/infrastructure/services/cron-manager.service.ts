@@ -1,16 +1,22 @@
 import cron from "node-cron";
 import { ProcessOrchestrator } from "./process-orchestrator.service.js";
-import { IRunStatusStore } from "../../core/domain/services/run-status-store.service.js";
+import {
+  IRunStatusStore,
+  RunInfo,
+} from "../../core/domain/services/run-status-store.service.js";
 import { IScheduleRepository } from "../../core/domain/repositories/schedule.repository.js";
+import { Schedule } from "../../core/domain/entities/schedule.entity.js";
 import { IExtractionRecordRepository } from "../../core/domain/repositories/extraction-record.repository.js";
 import { IRunStateService } from "../../core/domain/services/run-state.service.js";
 import { getPairsForSchedule } from "../utils/tenant.utils.js";
 import { SCHEDULE_TIMEZONES } from "../views/constants.js";
 import { ChildProcess } from "node:child_process";
 import { hasOverlap } from "../utils/concurrency.utils.js";
+import type { RunParams } from "../utils/command.utils.js";
+import type { ScheduledTask } from "node-cron";
 
 export class CronManager {
-  private activeCronJobs = new Map<string, any>();
+  private activeCronJobs = new Map<string, ScheduledTask>();
   private childProcesses = new Map<string, ChildProcess>();
 
   constructor(
@@ -28,7 +34,7 @@ export class CronManager {
     list.forEach((s) => this.registerJob(s));
   }
 
-  registerJob(schedule: any) {
+  registerJob(schedule: Schedule) {
     if (!schedule.cron || !cron.validate(schedule.cron)) {
       this.recordRepo.appendScheduleLog({
         outcome: "skipped",
@@ -53,7 +59,7 @@ export class CronManager {
 
     if (this.activeCronJobs.has(schedule.id)) {
       try {
-        this.activeCronJobs.get(schedule.id).stop();
+        this.activeCronJobs.get(schedule.id)?.stop();
       } catch (_) {}
       this.activeCronJobs.delete(schedule.id);
     }
@@ -128,20 +134,18 @@ export class CronManager {
           schedule.purchasers || [],
           this.brandPurchaserMap,
         );
-        const params: any = {};
+        const params: RunParams = {};
         if (pairs.length > 0) {
           params.pairs = pairs;
         }
 
         const activeRunKey = `${caseId}:scheduled`;
-        const runInfo: any = {
+        const runInfo: RunInfo = {
           caseId,
-          params,
+          params: params as Record<string, unknown>,
           startTime: now,
           status: "running",
-          scheduled: true,
           origin: "scheduled",
-          scheduleId: schedule.id,
         };
 
         this.runStatusStore.registerRun(runInfo);
@@ -212,7 +216,7 @@ export class CronManager {
   stopJob(id: string) {
     if (this.activeCronJobs.has(id)) {
       try {
-        this.activeCronJobs.get(id).stop();
+        this.activeCronJobs.get(id)?.stop();
       } catch (_) {}
       this.activeCronJobs.delete(id);
     }
