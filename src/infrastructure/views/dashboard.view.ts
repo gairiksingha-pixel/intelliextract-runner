@@ -180,6 +180,29 @@ export class DashboardView {
       .result .exit { font-weight: 700; margin-bottom: 0.2rem; color: var(--text); width: 100%; text-align: center; }
       .result.running .exit { font-size: 0.825rem; display: block; }
       .result .out { color: var(--text-secondary); }
+      .result-actions {
+        position: absolute; top: 0.722rem; right: 0.85rem;
+        display: flex; gap: 0.5rem; opacity: 1; transition: all 0.2s ease;
+        z-index: 25; pointer-events: auto;
+      }
+      .result.result-placeholder ~ .result-actions,
+      .result.running ~ .result-actions {
+        display: none !important;
+      }
+      
+      .btn-clear-output {
+        height: 26px; padding: 0 0.85rem; background: var(--accent-light);
+        color: var(--primary); border: 0.85px solid rgba(45, 157, 95, 0.2);
+        border-top: none; border-right: none;
+        border-radius: 0 var(--radius) 0 var(--radius);
+        font-size: 0.71rem; font-weight: 700;
+        cursor: pointer; display: flex; align-items: center; gap: 6px;
+        box-shadow: none; transition: all 0.2s;
+      }
+      .btn-clear-output:hover {
+        background: #dcf2e6; color: var(--primary-hover); border-color: var(--primary);
+      }
+      .btn-clear-output svg { width: 11px; height: 11px; stroke-width: 3.5; }
 
       .result .sync-progress-wrap { font-size: 1.05rem; font-weight: 700; color: var(--text); width: 100%; text-align: center; line-height: 1.1; margin-top: 0.425rem; }
       .result .extraction-progress-wrap { margin-top: 0.637rem; }

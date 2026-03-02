@@ -290,6 +290,16 @@ function renderRow(c) {
   if (retryBtn) btnRow.appendChild(retryBtn);
   btnRow.appendChild(resetBtn);
   btnRow.appendChild(resetDuringResumeBtn);
+
+  // Add persistent output actions (Clear button)
+  const actionsDiv = document.createElement("div");
+  actionsDiv.className = "result-actions";
+  actionsDiv.innerHTML = `
+    <button type="button" class="btn-clear-output" title="Clear/Reset Result" onclick="event.stopPropagation(); window.resetDashboardResult('${c.id}')">
+      ${AppIcons.RESET}<span>Clear Output</span>
+    </button>
+  `;
+  resultCell.appendChild(actionsDiv);
   tr.appendChild(resultCell);
 
   return tr;
@@ -972,9 +982,9 @@ function buildResultTable(caseId, data, pass, stdoutStr, stderrStr) {
 function showResult(div, data, pass, options) {
   const resultClass = data ? (pass ? "pass" : "fail") : "running";
   div.className = "result " + resultClass;
+  const caseId = (options && options.caseId) || div.id.replace("result-", "");
 
   if (data) {
-    const caseId = (options && options.caseId) || "";
     if (!data.runId && options && options.runId) data.runId = options.runId;
     if (data.type === "report" || data.type === "error") {
       // Use built-in structured table logic for both success and error/interrupt reports
@@ -992,12 +1002,11 @@ function showResult(div, data, pass, options) {
         ["Status", "Failed"],
         ["Output", AppUtils.esc(errMsg)],
       ];
-      div.innerHTML = `<table class="result-table-wrap">${rows
-        .map(
-          (r) =>
-            `<tr class="status-row metric-row"><th>${r[0]}</th><td>${r[1]}</td></tr>`,
-        )
-        .join("")}</table>`;
+      div.innerHTML = `
+        <table class="result-table-wrap">
+          ${rows.map((r) => `<tr class="status-row metric-row"><th>${r[0]}</th><td>${r[1]}</td></tr>`).join("")}
+        </table>
+      `;
     }
     saveDashboardState();
     return;
@@ -1009,7 +1018,6 @@ function showResult(div, data, pass, options) {
     resumeSkipSyncProgress,
     resumeSkipExtractProgress,
     logMessage,
-    caseId,
   } = options || {};
 
   let extra = "";
@@ -1156,14 +1164,19 @@ function getPairsForRun() {
 
 function resetCase(div) {
   if (!div) return;
-  const caseId = div.id.replace("result-", "");
+  const caseId = typeof div === "string" ? div : div.id.replace("result-", "");
+  const targetDiv =
+    typeof div === "string" ? document.getElementById(`result-${caseId}`) : div;
+  if (!targetDiv) return;
+
   clearRowProgress(caseId);
-  div.className = "result result-placeholder";
-  div.innerHTML = `<span class="result-placeholder-text">${getPlaceholderText(
+  targetDiv.className = "result result-placeholder";
+  targetDiv.innerHTML = `<span class="result-placeholder-text">${getPlaceholderText(
     caseId,
   )}</span>`;
   saveDashboardState();
 }
+window.resetDashboardResult = resetCase;
 
 function getPlaceholderText(caseId) {
   if (caseId === "P1")
