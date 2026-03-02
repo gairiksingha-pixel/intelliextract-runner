@@ -30,7 +30,10 @@ function getRecordFilename(r) {
   const safe = String(r.relativePath || r.filename || "")
     .replace(/[\\\/]/g, "_")
     .replace(/[^a-zA-Z0-9._-]/g, "_");
-  const base = (r.brand || "") + "_" + (safe || "file");
+  const brandPrefix = (r.brand || "").toLowerCase() + "_";
+  const base = safe.toLowerCase().startsWith(brandPrefix)
+    ? safe
+    : (r.brand || "") + "_" + (safe || "file");
   return base.endsWith(".json") ? base : base + ".json";
 }
 
@@ -446,7 +449,7 @@ function buildRunSection(s) {
   const topSlowRows = (m.topSlowestFiles || [])
     .map((f) => {
       const jsonName = getRecordFilename(f);
-      const sourcePath = `output/staging/${f.brand}/${f.relativePath}`;
+      const sourcePath = `output/staging/${f.relativePath}`;
       const jsonPath = `output/extractions/succeeded/${jsonName}`;
       return `
     <tr>
@@ -573,7 +576,7 @@ function buildRunSection(s) {
 
       const searchData = `${escapeHtml(rec.filePath)} ${rec.status} ${escapeHtml(patternKey)}`;
 
-      const sourcePath = `output/staging/${rec.brand}/${rec.relativePath}`;
+      const sourcePath = `output/staging/${rec.relativePath}`;
       let jsonDir = "output/extractions/failed";
       if (rec.status === "done" || (rec.status === "skipped" && er)) {
         jsonDir =

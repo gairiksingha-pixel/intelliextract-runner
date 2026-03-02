@@ -60,7 +60,10 @@ function extractionResultFilenameFromRecord(record: {
   const safe = record.relativePath
     .replace(/[\\\/]/g, "_")
     .replace(/[^a-zA-Z0-9._-]/g, "_");
-  const base = record.brand + "_" + (safe || "file");
+  const brandPrefix = record.brand.toLowerCase() + "_";
+  const base = safe.toLowerCase().startsWith(brandPrefix)
+    ? safe
+    : record.brand + "_" + (safe || "file");
   return base.endsWith(".json") ? base : base + ".json";
 }
 
@@ -839,7 +842,7 @@ function sectionForRun(entry: HistoricalRunSummary): string {
       }
 
       const jsonPath = `${jsonDir}/${jsonName}`;
-      const sourcePath = `output/staging/${rec.brand}/${rec.relativePath}`;
+      const sourcePath = `output/staging/${rec.relativePath}`;
       showSource = existsSync(sourcePath);
 
       const jsonBtn = showJson
@@ -2934,10 +2937,10 @@ function htmlReport(
 
 function escapeHtml(s: string): string {
   return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 /**

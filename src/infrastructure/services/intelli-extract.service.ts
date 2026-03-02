@@ -93,7 +93,10 @@ export class IntelliExtractService implements IExtractionService {
         const safe = (relativePath || "")
           .replace(/[\\\/]/g, "_")
           .replace(/[^a-zA-Z0-9._-]/g, "_");
-        const base = brand + "_" + (safe || "file");
+        const brandPrefix = brand.toLowerCase() + "_";
+        const base = safe.toLowerCase().startsWith(brandPrefix)
+          ? safe
+          : brand + "_" + (safe || "file");
         const jsonName = base.endsWith(".json") ? base : base + ".json";
 
         writeFileSync(

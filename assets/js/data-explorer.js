@@ -457,8 +457,13 @@ window.downloadRow = function (idx) {
 window.downloadSource = function (idx) {
   const r = ALL_ROWS[idx];
   if (!r || !r.sourceRelativePath) return;
-  const fullPath =
-    "output/staging/" + r.sourceBrand + "/" + r.sourceRelativePath;
+  const brandPrefix = (r.sourceBrand || "").toLowerCase() + "/";
+  const path = (r.sourceRelativePath || "")
+    .toLowerCase()
+    .startsWith(brandPrefix)
+    ? r.sourceRelativePath
+    : r.sourceBrand + "/" + r.sourceRelativePath;
+  const fullPath = "output/staging/" + path;
   window.location.href =
     "/api/download-file?file=" + encodeURIComponent(fullPath);
 };
@@ -470,9 +475,13 @@ window.exportBatch = async function (type) {
   const files = filtered
     .map((r) => {
       if (type === "source") {
-        return r.sourceRelativePath
-          ? "output/staging/" + r.sourceBrand + "/" + r.sourceRelativePath
-          : null;
+        const brandPrefix = (r.sourceBrand || "").toLowerCase() + "/";
+        const path = (r.sourceRelativePath || "")
+          .toLowerCase()
+          .startsWith(brandPrefix)
+          ? r.sourceRelativePath
+          : r.sourceBrand + "/" + r.sourceRelativePath;
+        return "output/staging/" + path;
       } else {
         const statusDir = r.status === "success" ? "succeeded" : "failed";
         return "output/extractions/" + statusDir + "/" + r.filename;

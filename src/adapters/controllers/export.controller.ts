@@ -65,7 +65,10 @@ export class ExportController {
             const safe = (r.relativePath || "")
               .replace(/[\\\/]/g, "_")
               .replace(/[^a-zA-Z0-9._-]/g, "_");
-            const base = r.brand + "_" + (safe || "file");
+            const brandPrefix = r.brand.toLowerCase() + "_";
+            const base = safe.toLowerCase().startsWith(brandPrefix)
+              ? safe
+              : r.brand + "_" + (safe || "file");
             const jsonName = base.endsWith(".json") ? base : base + ".json";
             return jsonName === filename && r.fullResponse;
           });
